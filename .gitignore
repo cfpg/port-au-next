@@ -1,0 +1,30 @@
+# Docker Compose
+docker-compose.override.yml
+docker-compose.override.yaml
+
+# Nginx logs
+*.log
+logs/
+nginx-logs/
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+dist/
+build/
+coverage/
+
+# Deployment manager specific
+deployment-manager/node_modules/
+deployment-manager/dist/
+deployment-manager/.env
+
+# Ignore apps
+apps/*
