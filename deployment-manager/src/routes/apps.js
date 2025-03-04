@@ -12,13 +12,13 @@ router.get('/', async (req, res) => {
              d.status as latest_status,
              d.deployed_at as latest_deployment_date
       FROM apps a
-      LEFT JOIN deployments d ON d.app_id = a.id
-      WHERE d.id = (
-        SELECT id FROM deployments 
-        WHERE app_id = a.id 
-        ORDER BY deployed_at DESC 
+      LEFT JOIN LATERAL (
+        SELECT id, status, deployed_at
+        FROM deployments
+        WHERE app_id = a.id
+        ORDER BY deployed_at DESC
         LIMIT 1
-      )
+      ) d ON true
       ORDER BY a.created_at DESC
     `);
     res.json(result.rows);
@@ -112,6 +112,25 @@ router.post('/', async (req, res) => {
   } catch (error) {
     console.error(`Error registering app: ${error.message}`);
     res.status(500).json({ error: 'Failed to register app' });
+  }
+});
+
+router.get('/:name/deployments', async (req, res) => {
+  const { name } = req.params;
+  
+  try {
+    const result = await pool.query(`
+      SELECT d.* 
+      FROM deployments d
+      JOIN apps a ON a.id = d.app_id
+      WHERE a.name = $1
+      ORDER BY d.deployed_at DESC
+    `, [name]);
+    
+    res.json(result.rows);
+  } catch (error) {
+    console.error(`Error fetching deployments for ${name}: ${error.message}`);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
