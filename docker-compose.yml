@@ -1,3 +1,4 @@
+name: port-au-next
 services:
   # Shared PostgreSQL database
   postgres:

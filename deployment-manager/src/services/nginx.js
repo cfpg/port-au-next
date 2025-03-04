@@ -17,7 +17,7 @@ async function updateNginxConfig(appName, domain, containerId = null) {
     }
     
     const configPath = path.join(NGINX_CONFIG_DIR, `app-${domain}.conf`);
-    let upstreamServer = 'deployment-manager:3000'; // Default during initial setup
+    let upstreamServer = 'deployment-manager:3000';
 
     if (containerId) {
       const containerIp = await getContainerIp(containerId);
@@ -55,7 +55,7 @@ async function reloadNginx() {
   
   return new Promise((resolve, reject) => {
     exec(
-      'docker-compose exec -T nginx nginx -s reload',
+      'docker compose -p port-au-next exec -T nginx nginx -s reload',
       { cwd: projectRoot },
       (error) => {
         if (error) {
