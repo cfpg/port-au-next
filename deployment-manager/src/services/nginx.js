@@ -3,18 +3,28 @@ const path = require('path');
 const { exec } = require('child_process');
 const { getContainerIp } = require('./docker');
 
-const NGINX_CONFIG_DIR = path.join(__dirname, '../../../nginx/conf.d');
+// Use absolute path from project root
+const NGINX_CONFIG_DIR = path.join(process.cwd(), './nginx/conf.d');
 
 async function updateNginxConfig(appName, domain, containerId = null) {
-  const configPath = path.join(NGINX_CONFIG_DIR, `${domain}.conf`);
-  let upstreamServer = 'deployment-manager:3000'; // Default during initial setup
+  try {
+    console.log(`Using nginx config directory: ${NGINX_CONFIG_DIR}`);
+    
+    // Ensure nginx config directory exists
+    if (!fs.existsSync(NGINX_CONFIG_DIR)) {
+      console.log(`Creating nginx config directory: ${NGINX_CONFIG_DIR}`);
+      fs.mkdirSync(NGINX_CONFIG_DIR, { recursive: true });
+    }
+    
+    const configPath = path.join(NGINX_CONFIG_DIR, `app-${domain}.conf`);
+    let upstreamServer = 'deployment-manager:3000'; // Default during initial setup
 
-  if (containerId) {
-    const containerIp = await getContainerIp(containerId);
-    upstreamServer = `${containerIp}:3000`;
-  }
+    if (containerId) {
+      const containerIp = await getContainerIp(containerId);
+      upstreamServer = `${containerIp}:3000`;
+    }
 
-  const config = `
+    const config = `
 server {
     listen 80;
     listen [::]:80;
@@ -31,31 +41,35 @@ server {
 }
 `;
 
-  fs.writeFileSync(configPath, config);
-  await reloadNginx();
+    console.log(`Writing nginx config to: ${configPath}`);
+    fs.writeFileSync(configPath, config);
+    await reloadNginx();
+  } catch (error) {
+    console.error(`Error updating nginx config: ${error.message}`);
+    throw error;
+  }
 }
 
 async function reloadNginx() {
+  const projectRoot = path.join(process.cwd(), './');
+  
   return new Promise((resolve, reject) => {
-    exec('docker exec nginx nginx -s reload', (error) => {
-      if (error) {
-        // Fallback to docker-compose if direct docker exec fails
-        exec('docker-compose exec -T nginx nginx -s reload', (error2) => {
-          if (error2) {
-            console.error('Failed to reload nginx:', error2);
-            reject(error2);
-          } else {
-            resolve();
-          }
-        });
-      } else {
-        resolve();
+    exec(
+      'docker-compose exec -T nginx nginx -s reload',
+      { cwd: projectRoot },
+      (error) => {
+        if (error) {
+          console.error(`Error reloading nginx: ${error.message}`);
+          reject(error);
+        } else {
+          console.log('Nginx configuration reloaded successfully');
+          resolve();
+        }
       }
-    });
+    );
   });
 }
 
 module.exports = {
-  updateNginxConfig,
-  reloadNginx
+  updateNginxConfig
 }; 

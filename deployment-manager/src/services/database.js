@@ -1,4 +1,5 @@
 const { pool } = require('../config/database');
+const { Pool } = require('pg');
 const crypto = require('crypto');
 
 async function initializeDatabase() {
@@ -38,20 +39,63 @@ async function initializeDatabase() {
   }
 }
 
+async function checkDatabaseExists(dbName, tempPool) {
+  const result = await tempPool.query(`
+    SELECT 1 FROM pg_database WHERE datname = $1
+  `, [dbName]);
+  return result.rows.length > 0;
+}
+
+async function checkUserExists(dbUser, tempPool) {
+  const result = await tempPool.query(`
+    SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = $1
+  `, [dbUser]);
+  return result.rows.length > 0;
+}
+
 async function setupAppDatabase(appName) {
   const dbUser = `${appName}_user`.toLowerCase().replace(/[^a-z0-9_]/g, '_');
   const dbName = `${appName}_db`.toLowerCase().replace(/[^a-z0-9_]/g, '_');
   const dbPassword = crypto.randomBytes(16).toString('hex');
 
   try {
-    const rootPool = new Pool({
-      ...dbConfig,
-      database: 'postgres'
+    const tempPool = new Pool({
+      user: process.env.POSTGRES_USER,
+      password: process.env.POSTGRES_PASSWORD,
+      host: 'postgres',
+      database: 'postgres',
+      port: 5432
     });
 
-    await rootPool.query(`CREATE USER ${dbUser} WITH PASSWORD '${dbPassword}'`);
-    await rootPool.query(`CREATE DATABASE ${dbName} OWNER ${dbUser}`);
-    await rootPool.end();
+    // Check if user exists
+    const userExists = await checkUserExists(dbUser, tempPool);
+    
+    if (!userExists) {
+      console.log(`Creating database user ${dbUser}...`);
+      await tempPool.query(`CREATE USER ${dbUser} WITH PASSWORD '${dbPassword}'`);
+    } else {
+      console.log(`User ${dbUser} already exists, updating password...`);
+      // Use ALTER USER instead of CREATE USER for existing users
+      await tempPool.query(`ALTER USER ${dbUser} WITH PASSWORD '${dbPassword}'`);
+    }
+
+    // Check if database exists
+    const dbExists = await checkDatabaseExists(dbName, tempPool);
+    if (!dbExists) {
+      console.log(`Creating database ${dbName}...`);
+      await tempPool.query(`CREATE DATABASE ${dbName} OWNER ${dbUser}`);
+    } else {
+      console.log(`Database ${dbName} already exists, ensuring correct owner...`);
+      // Need to disconnect all users before changing owner
+      await tempPool.query(`
+        SELECT pg_terminate_backend(pid) 
+        FROM pg_stat_activity 
+        WHERE datname = $1 AND pid <> pg_backend_pid()
+      `, [dbName]);
+      await tempPool.query(`ALTER DATABASE ${dbName} OWNER TO ${dbUser}`);
+    }
+
+    await tempPool.end();
 
     return { dbUser, dbName, dbPassword };
   } catch (error) {

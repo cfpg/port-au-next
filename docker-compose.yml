@@ -3,6 +3,8 @@ services:
   postgres:
     image: postgres:17-alpine
     restart: always
+    ports:
+      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     environment:
@@ -52,17 +54,23 @@ services:
       context: ./deployment-manager
       dockerfile: Dockerfile
     restart: always
-    user: "node"
+    # user: "1000:1000"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./apps:/app/apps
-      - ./deployment-manager/public:/app/public
+      - ./apps:/app/apps:rw
+      - ./deployment-manager/public:/app/public:ro
+      - ~/.ssh/id_rsa:/home/node/.ssh/id_rsa:ro
+      - ~/.ssh/id_rsa.pub:/home/node/.ssh/id_rsa.pub:ro
+      - ./nginx:/app/nginx:rw
+      - ./docker-compose.yml:/app/docker-compose.yml:ro
     environment:
       - NODE_ENV=production
       - PORT=3000
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=${POSTGRES_DB}
+      - THUMBOR_SECURITY_KEY=${THUMBOR_SECURITY_KEY}
+      - HOST_APPS_DIR=/app/apps
     ports:
       - "3000:3000"
     depends_on:
