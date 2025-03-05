@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Port-au-Next Dashboard</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100 font-sans">
+  <div class="container mx-auto px-4 py-8">
+    <header class="mb-10">
+      <h1 class="text-3xl font-bold text-gray-800">Port-au-Next Dashboard</h1>
+      <p class="text-gray-600">Next.js Application Deployment Manager</p>
+    </header>
+    
+    <div class="bg-white shadow-md rounded-lg p-6 mb-8">
+      <h2 class="text-xl font-semibold mb-4">Applications</h2>
+      <div id="apps-container" class="overflow-x-auto">
+        <table class="min-w-full bg-white">
+          <thead>
+            <tr>
+              <th class="py-2 px-4 border-b border-gray-200 text-left text-sm font-semibold text-gray-700">Name</th>
+              <th class="py-2 px-4 border-b border-gray-200 text-left text-sm font-semibold text-gray-700">Domain</th>
+              <th class="py-2 px-4 border-b border-gray-200 text-left text-sm font-semibold text-gray-700">Repository</th>
+              <th class="py-2 px-4 border-b border-gray-200 text-left text-sm font-semibold text-gray-700">Branch</th>
+              <th class="py-2 px-4 border-b border-gray-200 text-left text-sm font-semibold text-gray-700">Status</th>
+              <th class="py-2 px-4 border-b border-gray-200 text-left text-sm font-semibold text-gray-700">Last Deployed</th>
+              <th class="py-2 px-4 border-b border-gray-200 text-left text-sm font-semibold text-gray-700">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="apps-table-body">
+            <tr>
+              <td colspan="7" class="py-4 px-4 text-center text-gray-500">Loading applications...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    
+    <div class="bg-white shadow-md rounded-lg p-6 mb-8">
+      <h2 class="text-xl font-semibold mb-4">Recent Deployments</h2>
+      <div id="deployments-container" class="overflow-x-auto">
+        <table class="min-w-full bg-white">
+          <thead>
+            <tr>
+              <th class="py-2 px-4 border-b border-gray-200 text-left text-sm font-semibold text-gray-700">App</th>
+              <th class="py-2 px-4 border-b border-gray-200 text-left text-sm font-semibold text-gray-700">Version</th>
+              <th class="py-2 px-4 border-b border-gray-200 text-left text-sm font-semibold text-gray-700">Commit</th>
+              <th class="py-2 px-4 border-b border-gray-200 text-left text-sm font-semibold text-gray-700">Status</th>
+              <th class="py-2 px-4 border-b border-gray-200 text-left text-sm font-semibold text-gray-700">Deployed At</th>
+            </tr>
+          </thead>
+          <tbody id="deployments-table-body">
+            <tr>
+              <td colspan="5" class="py-4 px-4 text-center text-gray-500">Loading deployments...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    
+    <div class="mt-8 bg-white shadow-md rounded-lg p-6">
+      <h2 class="text-xl font-semibold mb-4">Register New App</h2>
+      <form id="register-app-form" class="space-y-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">App Name</label>
+            <input type="text" id="app-name" name="name" required 
+                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                   placeholder="my-nextjs-app">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Domain</label>
+            <input type="text" id="app-domain" name="domain" required 
+                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                   placeholder="app.example.com">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Repository URL</label>
+            <input type="text" id="app-repo" name="repo_url" required 
+                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                   placeholder="https://github.com/user/repo.git">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Branch</label>
+            <input type="text" id="app-branch" name="branch" 
+                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                   placeholder="main" value="main">
+          </div>
+        </div>
+        <div class="flex justify-end">
+          <button type="submit" 
+                  class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+            Register App
+          </button>
+        </div>
+      </form>
+    </div>
+    
+    <!-- Modal for deployment details -->
+    <div id="deployment-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden flex items-center justify-center">
+      <div class="bg-white rounded-lg shadow-lg p-6 max-w-3xl w-full max-h-screen overflow-y-auto">
+        <div class="flex justify-between items-center mb-4">
+          <h3 id="modal-title" class="text-xl font-semibold">Deployments for App</h3>
+          <button onclick="closeDeploymentModal()" class="text-gray-600 hover:text-gray-800">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div id="modal-content">
+          <div class="overflow-x-auto">
+            <table class="min-w-full bg-white">
+              <thead>
+                <tr>
+                  <th class="py-2 px-4 border-b border-gray-200 text-left text-sm font-semibold text-gray-700">Version</th>
+                  <th class="py-2 px-4 border-b border-gray-200 text-left text-sm font-semibold text-gray-700">Commit</th>
+                  <th class="py-2 px-4 border-b border-gray-200 text-left text-sm font-semibold text-gray-700">Status</th>
+                  <th class="py-2 px-4 border-b border-gray-200 text-left text-sm font-semibold text-gray-700">Container</th>
+                  <th class="py-2 px-4 border-b border-gray-200 text-left text-sm font-semibold text-gray-700">Deployed At</th>
+                </tr>
+              </thead>
+              <tbody id="modal-deployments-body">
+                <!-- Deployment details will be inserted here -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Toast notifications -->
+    <div id="toast" class="fixed bottom-4 right-4 bg-white shadow-lg rounded-lg px-4 py-3 hidden">
+      <div id="toast-content" class="flex items-center">
+        <span id="toast-icon" class="mr-2">
+          <!-- Icon will be inserted here -->
+        </span>
+        <span id="toast-message">Notification message</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Fetch and display apps
+    async function fetchApps() {
+      try {
+        const response = await fetch('/api/apps');
+        const apps = await response.json();
+        
+        const tableBody = document.getElementById('apps-table-body');
+        tableBody.innerHTML = '';
+        
+        if (apps.length === 0) {
+          tableBody.innerHTML = '<tr><td colspan="7" class="py-4 px-4 text-center text-gray-500">No applications found</td></tr>';
+          return;
+        }
+        
+        apps.forEach(app => {
+          const statusClass = getStatusClass(app.latest_status);
+          
+          tableBody.innerHTML += `
+            <tr>
+              <td class="py-2 px-4 border-b border-gray-200">${app.name}</td>
+              <td class="py-2 px-4 border-b border-gray-200">${app.domain}</td>
+              <td class="py-2 px-4 border-b border-gray-200">${app.repo_url}</td>
+              <td class="py-2 px-4 border-b border-gray-200">${app.branch}</td>
+              <td class="py-2 px-4 border-b border-gray-200">
+                <span class="inline-block px-2 py-1 text-xs font-semibold rounded-full ${statusClass}">
+                  ${app.latest_status || 'Not deployed'}
+                </span>
+              </td>
+              <td class="py-2 px-4 border-b border-gray-200">${formatDate(app.latest_deployment_date)}</td>
+              <td class="py-2 px-4 border-b border-gray-200">
+                <button onclick="triggerDeploy('${app.name}')" class="mr-2 text-blue-600 hover:text-blue-800">
+                  Deploy
+                </button>
+                <button onclick="viewDeployments('${app.name}')" class="text-blue-600 hover:text-blue-800">
+                  View Deployments
+                </button>
+              </td>
+            </tr>
+          `;
+        });
+      } catch (error) {
+        console.error('Error fetching apps:', error);
+        showToast('Failed to load applications', 'error');
+      }
+    }
+    
+    // Fetch and display recent deployments
+    async function fetchRecentDeployments() {
+      try {
+        const response = await fetch('/api/deployments/recent');
+        const deployments = await response.json();
+        
+        const tableBody = document.getElementById('deployments-table-body');
+        tableBody.innerHTML = '';
+        
+        if (deployments.length === 0) {
+          tableBody.innerHTML = '<tr><td colspan="5" class="py-4 px-4 text-center text-gray-500">No deployments found</td></tr>';
+          return;
+        }
+        
+        deployments.forEach(deployment => {
+          const statusClass = getStatusClass(deployment.status);
+          
+          tableBody.innerHTML += `
+            <tr>
+              <td class="py-2 px-4 border-b border-gray-200">${deployment.app_name}</td>
+              <td class="py-2 px-4 border-b border-gray-200">${deployment.version}</td>
+              <td class="py-2 px-4 border-b border-gray-200">
+                ${deployment.commit_id ? deployment.commit_id.substring(0, 7) : 'N/A'}
+              </td>
+              <td class="py-2 px-4 border-b border-gray-200">
+                <span class="inline-block px-2 py-1 text-xs font-semibold rounded-full ${statusClass}">
+                  ${deployment.status}
+                </span>
+              </td>
+              <td class="py-2 px-4 border-b border-gray-200">${formatDate(deployment.deployed_at)}</td>
+            </tr>
+          `;
+        });
+      } catch (error) {
+        console.error('Error fetching deployments:', error);
+        showToast('Failed to load deployments', 'error');
+      }
+    }
+    
+    // View deployments for a specific app
+    async function viewDeployments(appName) {
+      try {
+        const response = await fetch(`/api/apps/${appName}/deployments`);
+        const deployments = await response.json();
+        
+        const modalTitle = document.getElementById('modal-title');
+        const modalDeploymentsBody = document.getElementById('modal-deployments-body');
+        
+        modalTitle.textContent = `Deployments for ${appName}`;
+        modalDeploymentsBody.innerHTML = '';
+        
+        if (deployments.length === 0) {
+          modalDeploymentsBody.innerHTML = '<tr><td colspan="5" class="py-4 px-4 text-center text-gray-500">No deployments found</td></tr>';
+        } else {
+          deployments.forEach(deployment => {
+            const statusClass = getStatusClass(deployment.status);
+            
+            modalDeploymentsBody.innerHTML += `
+              <tr>
+                <td class="py-2 px-4 border-b border-gray-200">${deployment.version}</td>
+                <td class="py-2 px-4 border-b border-gray-200">${deployment.commit_id ? deployment.commit_id.substring(0, 7) : 'N/A'}</td>
+                <td class="py-2 px-4 border-b border-gray-200">
+                  <span class="inline-block px-2 py-1 text-xs font-semibold rounded-full ${statusClass}">
+                    ${deployment.status}
+                  </span>
+                </td>
+                <td class="py-2 px-4 border-b border-gray-200">${deployment.active_container || 'N/A'}</td>
+                <td class="py-2 px-4 border-b border-gray-200">${formatDate(deployment.deployed_at)}</td>
+              </tr>
+            `;
+          });
+        }
+        
+        document.getElementById('deployment-modal').classList.remove('hidden');
+      } catch (error) {
+        console.error('Error fetching deployments:', error);
+        showToast('Failed to load deployment history', 'error');
+      }
+    }
+    
+    // Close deployment modal
+    function closeDeploymentModal() {
+      document.getElementById('deployment-modal').classList.add('hidden');
+    }
+    
+    // Trigger deployment for an app
+    async function triggerDeploy(appName) {
+      try {
+        showToast(`Triggering deployment for ${appName}...`, 'info');
+        
+        const response = await fetch(`/api/apps/${appName}/deploy`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error('Deployment failed');
+        }
+        
+        const result = await response.json();
+        showToast(`Deployment started for ${appName}`, 'success');
+        
+        // Refresh data
+        fetchApps();
+        fetchRecentDeployments();
+      } catch (error) {
+        console.error('Error deploying app:', error);
+        showToast(`Failed to deploy ${appName}`, 'error');
+      }
+    }
+    
+    // Register new app
+    document.getElementById('register-app-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const formData = new FormData(e.target);
+      const data = Object.fromEntries(formData.entries());
+      
+      try {
+        const response = await fetch('/api/apps', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(data)
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to register app');
+        }
+        
+        showToast('Application registered successfully', 'success');
+        e.target.reset();
+        fetchApps();
+      } catch (error) {
+        console.error('Error registering app:', error);
+        showToast('Failed to register application', 'error');
+      }
+    });
+    
+    // Helper functions
+    function getStatusClass(status) {
+      switch (status?.toLowerCase()) {
+        case 'active':
+          return 'bg-green-100 text-green-800';
+        case 'pending':
+          return 'bg-yellow-100 text-yellow-800';
+        case 'failed':
+          return 'bg-red-100 text-red-800';
+        case 'building':
+          return 'bg-blue-100 text-blue-800';
+        case 'inactive':
+          return 'bg-gray-100 text-gray-800';
+        default:
+          return 'bg-gray-100 text-gray-600';
+      }
+    }
+    
+    function formatDate(dateString) {
+      if (!dateString) return 'N/A';
+      const date = new Date(dateString);
+      return date.toLocaleString();
+    }
+    
+    // Show toast notification
+    function showToast(message, type = 'info') {
+      const toast = document.getElementById('toast');
+      const toastMessage = document.getElementById('toast-message');
+      const toastIcon = document.getElementById('toast-icon');
+      
+      toastMessage.textContent = message;
+      
+      let iconSvg = '';
+      let bgColor = '';
+      
+      switch (type) {
+        case 'success':
+          iconSvg = '<svg class="h-5 w-5 text-green-500" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>';
+          bgColor = 'bg-green-50 border-l-4 border-green-500';
+          break;
+        case 'error':
+          iconSvg = '<svg class="h-5 w-5 text-red-500" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/></svg>';
+          bgColor = 'bg-red-50 border-l-4 border-red-500';
+          break;
+        default:
+          iconSvg = '<svg class="h-5 w-5 text-blue-500" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2h-1V9a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>';
+          bgColor = 'bg-blue-50 border-l-4 border-blue-500';
+      }
+      
+      toastIcon.innerHTML = iconSvg;
+      toast.className = `fixed bottom-4 right-4 flex items-center space-x-2 ${bgColor} px-4 py-3 rounded-lg shadow-lg`;
+      
+      toast.classList.remove('hidden');
+      
+      setTimeout(() => {
+        toast.classList.add('hidden');
+      }, 5000);
+    }
+    
+    // Start polling for updates
+    function startPolling() {
+      fetchApps();
+      fetchRecentDeployments();
+      
+      // Refresh data every 10 seconds
+      setInterval(() => {
+        fetchApps();
+        fetchRecentDeployments();
+      }, 10000);
+    }
+    
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => {
+      startPolling();
+    });
+    
+    // Handle escape key for modal
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeDeploymentModal();
+      }
+    });
+  </script>
+</body>
+</html>

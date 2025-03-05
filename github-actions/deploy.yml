@@ -1,0 +1,20 @@
+name: Deploy Next.js App
+
+on:
+  push:
+    branches: [ main ]  # Or your default branch
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger deployment
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            # Trigger a deployment through the port-au-next API
+            curl -X POST http://localhost:3000/api/apps/${{ secrets.APP_NAME }}/deploy \
+              -H "Content-Type: application/json"

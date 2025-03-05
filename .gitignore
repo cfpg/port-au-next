@@ -28,3 +28,6 @@ deployment-manager/.env
 
 # Ignore apps
 apps/*
+
+# Ignore nginx configs
+nginx/conf.d/app-*.conf
