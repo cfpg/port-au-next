@@ -58,16 +58,28 @@ async function cloneRepository(appName, repoUrl, branch = 'main') {
 async function pullLatestChanges(appName, branch = 'main') {
   const appDir = path.join(APPS_DIR, appName);
 
-  return new Promise((resolve, reject) => {
-    exec(`cd ${appDir} && git pull origin ${branch}`, (error, stdout) => {
-      if (error) {
-        console.error(`Error pulling latest changes: ${error.message}`);
-        reject(error);
-      } else {
-        resolve(stdout);
-      }
+  try {
+    // Check if directory exists
+    if (!fs.existsSync(appDir)) {
+      throw new Error(`App directory ${appDir} does not exist`);
+    }
+
+    // Pull latest changes
+    return new Promise((resolve, reject) => {
+      exec(`cd ${appDir} && git fetch && git checkout ${branch} && git pull origin ${branch}`, (error, stdout) => {
+        if (error) {
+          console.error(`Error pulling latest changes: ${error.message}`);
+          reject(error);
+        } else {
+          console.log(`Successfully pulled latest changes for ${appName}`);
+          resolve(stdout);
+        }
+      });
     });
-  });
+  } catch (error) {
+    console.error(`Error in pullLatestChanges: ${error.message}`);
+    throw error;
+  }
 }
 
 async function getLatestCommit(appName) {

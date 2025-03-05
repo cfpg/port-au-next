@@ -2,7 +2,8 @@ const express = require('express');
 const router = express.Router();
 const { setupAppDatabase } = require('../services/database');
 const { updateNginxConfig } = require('../services/nginx');
-const { cloneRepository } = require('../services/git');
+const { cloneRepository, pullLatestChanges, getLatestCommit } = require('../services/git');
+const { startContainer, stopContainer } = require('../services/docker');
 const { pool } = require('../config/database');
 
 router.get('/', async (req, res) => {
@@ -131,6 +132,105 @@ router.get('/:name/deployments', async (req, res) => {
   } catch (error) {
     console.error(`Error fetching deployments for ${name}: ${error.message}`);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/:name/deploy', async (req, res) => {
+  const { name } = req.params;
+  
+  try {
+    // Get app details
+    const appResult = await pool.query(
+      'SELECT * FROM apps WHERE name = $1',
+      [name]
+    );
+    
+    if (appResult.rows.length === 0) {
+      return res.status(404).json({ error: 'App not found' });
+    }
+
+    const app = appResult.rows[0];
+    const version = new Date().toISOString().replace(/[^0-9]/g, '');
+
+    // Start deployment record
+    const deploymentResult = await pool.query(
+      `INSERT INTO deployments (app_id, version, status)
+       VALUES ($1, $2, $3)
+       RETURNING id`,
+      [app.id, version, 'pending']
+    );
+    
+    const deploymentId = deploymentResult.rows[0].id;
+
+    // Async deployment process
+    (async () => {
+      try {
+        // Update status to building
+        await pool.query(
+          'UPDATE deployments SET status = $1 WHERE id = $2',
+          ['building', deploymentId]
+        );
+
+        // Pull latest changes and get commit ID
+        await pullLatestChanges(name, app.branch);
+        const commitId = await getLatestCommit(name);
+
+        // Start new container with blue/green deployment
+        const { containerId } = await startContainer(name, version, {
+          POSTGRES_USER: app.db_user,
+          POSTGRES_PASSWORD: app.db_password,
+          POSTGRES_DB: app.db_name,
+          POSTGRES_HOST: 'postgres'
+        });
+
+        // Get old container ID if exists
+        const oldDeployment = await pool.query(
+          `SELECT container_id FROM deployments 
+           WHERE app_id = $1 AND status = 'active'`,
+          [app.id]
+        );
+
+        // Update nginx config to point to new container
+        await updateNginxConfig(name, app.domain, containerId);
+
+        // Mark new deployment as active
+        await pool.query(
+          `UPDATE deployments 
+           SET status = $1, commit_id = $2, container_id = $3 
+           WHERE id = $4`,
+          ['active', commitId, containerId, deploymentId]
+        );
+
+        // If there was a previous deployment, stop its container and mark as inactive
+        if (oldDeployment.rows.length > 0) {
+          const oldContainerId = oldDeployment.rows[0].container_id;
+          await stopContainer(oldContainerId);
+          
+          await pool.query(
+            `UPDATE deployments 
+             SET status = 'inactive' 
+             WHERE container_id = $1`,
+            [oldContainerId]
+          );
+        }
+
+      } catch (error) {
+        console.error(`Deployment error for ${name}:`, error);
+        await pool.query(
+          'UPDATE deployments SET status = $1 WHERE id = $2',
+          ['failed', deploymentId]
+        );
+      }
+    })();
+
+    res.json({ 
+      message: 'Deployment started', 
+      deploymentId, 
+      version 
+    });
+  } catch (error) {
+    console.error(`Error initiating deployment: ${error.message}`);
+    res.status(500).json({ error: 'Deployment failed' });
   }
 });
 
