@@ -32,6 +32,18 @@ async function initializeDatabase() {
       )
     `);
 
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS app_env_vars (
+        id SERIAL PRIMARY KEY,
+        app_id INTEGER REFERENCES apps(id),
+        branch TEXT,
+        key TEXT,
+        value TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(app_id, branch, key)
+      )
+    `);
+
     console.log('Database initialized successfully');
   } catch (error) {
     console.error('Database initialization error:', error);

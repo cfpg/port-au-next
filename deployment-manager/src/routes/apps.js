@@ -234,4 +234,74 @@ router.post('/:name/deploy', async (req, res) => {
   }
 });
 
+// Add environment variables for an app
+router.post('/:name/env', async (req, res) => {
+  try {
+    const { name } = req.params;
+    const { branch = 'main', vars } = req.body;
+
+    if (!vars || typeof vars !== 'object') {
+      return res.status(400).json({ error: 'Invalid environment variables format' });
+    }
+
+    // Get app ID
+    const appResult = await pool.query(
+      'SELECT id FROM apps WHERE name = $1',
+      [name]
+    );
+
+    if (appResult.rows.length === 0) {
+      return res.status(404).json({ error: 'App not found' });
+    }
+
+    const appId = appResult.rows[0].id;
+
+    // Insert or update environment variables
+    for (const [key, value] of Object.entries(vars)) {
+      await pool.query(`
+        INSERT INTO app_env_vars (app_id, branch, key, value)
+        VALUES ($1, $2, $3, $4)
+        ON CONFLICT (app_id, branch, key)
+        DO UPDATE SET value = EXCLUDED.value
+      `, [appId, branch, key, value]);
+    }
+
+    res.json({ message: 'Environment variables updated successfully' });
+  } catch (error) {
+    console.error(`Error updating env vars: ${error.message}`);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get environment variables for an app
+router.get('/:name/env', async (req, res) => {
+  try {
+    const { name } = req.params;
+    const { branch = 'main' } = req.query;
+
+    // Get app ID
+    const appResult = await pool.query(
+      'SELECT id FROM apps WHERE name = $1',
+      [name]
+    );
+
+    if (appResult.rows.length === 0) {
+      return res.status(404).json({ error: 'App not found' });
+    }
+
+    const appId = appResult.rows[0].id;
+
+    // Get environment variables
+    const envVarsResult = await pool.query(
+      'SELECT key, value FROM app_env_vars WHERE app_id = $1 AND branch = $2',
+      [appId, branch]
+    );
+
+    res.json(envVarsResult.rows);
+  } catch (error) {
+    console.error(`Error fetching env vars: ${error.message}`);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 module.exports = router; 

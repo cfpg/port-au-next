@@ -1,6 +1,7 @@
 const { exec } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const { pool } = require('./database');
 
 const APPS_DIR = process.env.HOST_APPS_DIR || '/app/apps';
 
@@ -57,6 +58,20 @@ async function buildImage(appName, version) {
 
 async function startContainer(appName, version, env = {}) {
   try {
+    // Get app's environment variables from database
+    const envResult = await pool.query(`
+      SELECT key, value 
+      FROM app_env_vars av
+      JOIN apps a ON a.id = av.app_id
+      WHERE a.name = $1 AND av.branch = $2
+    `, [appName, env.BRANCH || 'main']);
+
+    // Combine default env vars with app-specific ones
+    const appEnv = {
+      ...env,
+      ...Object.fromEntries(envResult.rows.map(row => [row.key, row.value]))
+    };
+
     // Ensure Dockerfile exists
     const appDir = path.join(APPS_DIR, appName);
     await ensureDockerfile(appDir);
@@ -71,7 +86,7 @@ async function startContainer(appName, version, env = {}) {
 
     // Start new container with environment variables
     console.log(`Starting container ${containerName}...`);
-    const envString = Object.entries(env)
+    const envString = Object.entries(appEnv)
       .map(([key, value]) => `-e ${key}=${value}`)
       .join(' ');
 
