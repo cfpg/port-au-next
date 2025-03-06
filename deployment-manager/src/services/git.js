@@ -5,6 +5,15 @@ const logger = require('./logger');
 
 const APPS_DIR = path.join(__dirname, '../../apps');
 
+// Files that we modify and should be ignored during git operations
+const MANAGED_FILES = [
+  'next.config.js',
+  'next.config.ts',
+  '.env',
+  'src/lib/image-loader.js',
+  'src/lib/image-loader.ts'
+];
+
 async function isGitRepo(dir) {
   return new Promise((resolve) => {
     fs.access(path.join(dir, '.git'), fs.constants.F_OK, (err) => {
@@ -58,33 +67,33 @@ async function cloneRepository(appName, repoUrl, branch = 'main') {
   }
 }
 
+async function execGitCommand(appDir, command) {
+  return new Promise((resolve, reject) => {
+    exec(`cd ${appDir} && ${command}`, (error, stdout, stderr) => {
+      if (error) {
+        reject(error);
+      } else {
+        resolve(stdout.trim());
+      }
+    });
+  });
+}
+
 async function pullLatestChanges(appName, branch = 'main') {
   const appDir = path.join(APPS_DIR, appName);
-
+  
   try {
-    // Check if directory exists
-    if (!fs.existsSync(appDir)) {
-      const error = new Error(`App directory ${appDir} does not exist`);
-      await logger.error('Directory check failed', error);
-      throw error;
-    }
-
-    await logger.info(`Pulling latest changes for branch ${branch}`);
+    await logger.info('Stashing any local changes', { appName });
+    await execGitCommand(appDir, 'git stash');
     
-    // Pull latest changes
-    return new Promise((resolve, reject) => {
-      exec(`cd ${appDir} && git fetch && git checkout ${branch} && git pull origin ${branch}`, (error, stdout) => {
-        if (error) {
-          logger.error(`Error pulling latest changes`, error);
-          reject(error);
-        } else {
-          logger.info(`Successfully pulled latest changes`, { stdout: stdout.trim() });
-          resolve(stdout);
-        }
-      });
-    });
+    await logger.info('Pulling latest changes', { appName, branch });
+    await execGitCommand(appDir, `git fetch origin ${branch}`);
+    await execGitCommand(appDir, `git reset --hard origin/${branch}`);
+    await execGitCommand(appDir, 'git clean -fd');
+    
+    await logger.info('Successfully pulled latest changes');
   } catch (error) {
-    await logger.error(`Error in pullLatestChanges`, error);
+    await logger.error('Error pulling latest changes', error);
     throw error;
   }
 }
@@ -109,5 +118,6 @@ async function getLatestCommit(appName) {
 module.exports = {
   cloneRepository,
   pullLatestChanges,
-  getLatestCommit
+  getLatestCommit,
+  isGitRepo
 }; 

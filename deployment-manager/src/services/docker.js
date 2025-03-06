@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const { pool } = require('../config/database');
 const logger = require('./logger');
+const { ensureNextConfig } = require('./nextConfig');
 
 const APPS_DIR = process.env.HOST_APPS_DIR || '/app/apps';
 
@@ -114,6 +115,10 @@ async function buildImage(appName, version) {
 async function startContainer(appName, version, env = {}) {
   try {
     const appDir = path.join(APPS_DIR, appName);
+    
+    // Ensure Next.js configuration and image loader are in place
+    await ensureNextConfig(appDir);
+    
     await ensureDockerfile(appDir, appName);
 
     await logger.debug('Fetching environment variables');
@@ -121,7 +126,9 @@ async function startContainer(appName, version, env = {}) {
 
     const appEnv = {
       ...env,
-      ...Object.fromEntries(envVars.map(row => [row.key, row.value]))
+      ...Object.fromEntries(envVars.map(row => [row.key, row.value])),
+      NEXT_PUBLIC_IMAGE_DOMAIN: `https://${env.domain}`,
+      NEXT_PUBLIC_DEPLOY_VERSION: version
     };
 
     const envFilePath = path.join(appDir, '.env');

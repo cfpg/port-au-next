@@ -188,7 +188,8 @@ router.post('/:name/deploy', async (req, res) => {
           POSTGRES_USER: app.db_user,
           POSTGRES_PASSWORD: app.db_password,
           POSTGRES_DB: app.db_name,
-          POSTGRES_HOST: 'postgres'
+          POSTGRES_HOST: 'postgres',
+          DOMAIN: app.domain
         });
         await logger.info('Container started successfully', { containerId });
 
