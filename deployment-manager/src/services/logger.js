@@ -72,7 +72,7 @@ class Logger {
     return this.log('debug', message, metadata);
   }
 
-  static async getDeploymentLogs(deploymentId) {
+  async getDeploymentLogs(deploymentId) {
     try {
       const result = await pool.query(
         `SELECT * FROM deployment_logs 
