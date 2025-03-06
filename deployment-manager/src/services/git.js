@@ -1,6 +1,7 @@
 const { exec } = require('child_process');
 const path = require('path');
 const fs = require('fs');
+const logger = require('./logger');
 
 const APPS_DIR = path.join(__dirname, '../../apps');
 
@@ -18,6 +19,7 @@ async function cloneRepository(appName, repoUrl, branch = 'main') {
   try {
     // Create directory if it doesn't exist
     if (!fs.existsSync(appDir)) {
+      await logger.info(`Creating directory ${appDir}`);
       fs.mkdirSync(appDir, { recursive: true });
     }
 
@@ -25,11 +27,11 @@ async function cloneRepository(appName, repoUrl, branch = 'main') {
     const isRepo = await isGitRepo(appDir);
     
     if (isRepo) {
-      console.log(`Repository already exists at ${appDir}, updating instead...`);
+      await logger.info(`Repository already exists at ${appDir}, updating instead...`);
       return new Promise((resolve, reject) => {
         exec(`cd ${appDir} && git fetch && git checkout ${branch} && git pull origin ${branch}`, (error) => {
           if (error) {
-            console.error(`Error updating repository: ${error.message}`);
+            logger.error(`Error updating repository`, error);
             reject(error);
           } else {
             resolve();
@@ -39,10 +41,11 @@ async function cloneRepository(appName, repoUrl, branch = 'main') {
     }
 
     // If not a repo, clone it
+    await logger.info(`Cloning repository from ${repoUrl}`);
     return new Promise((resolve, reject) => {
       exec(`git clone -b ${branch} ${repoUrl} ${appDir}`, (error) => {
         if (error) {
-          console.error(`Error cloning repository: ${error.message}`);
+          logger.error(`Error cloning repository`, error);
           reject(error);
         } else {
           resolve();
@@ -50,7 +53,7 @@ async function cloneRepository(appName, repoUrl, branch = 'main') {
       });
     });
   } catch (error) {
-    console.error(`Error in repository setup: ${error.message}`);
+    await logger.error(`Error in repository setup`, error);
     throw error;
   }
 }
@@ -61,23 +64,27 @@ async function pullLatestChanges(appName, branch = 'main') {
   try {
     // Check if directory exists
     if (!fs.existsSync(appDir)) {
-      throw new Error(`App directory ${appDir} does not exist`);
+      const error = new Error(`App directory ${appDir} does not exist`);
+      await logger.error('Directory check failed', error);
+      throw error;
     }
 
+    await logger.info(`Pulling latest changes for branch ${branch}`);
+    
     // Pull latest changes
     return new Promise((resolve, reject) => {
       exec(`cd ${appDir} && git fetch && git checkout ${branch} && git pull origin ${branch}`, (error, stdout) => {
         if (error) {
-          console.error(`Error pulling latest changes: ${error.message}`);
+          logger.error(`Error pulling latest changes`, error);
           reject(error);
         } else {
-          console.log(`Successfully pulled latest changes for ${appName}`);
+          logger.info(`Successfully pulled latest changes`, { stdout: stdout.trim() });
           resolve(stdout);
         }
       });
     });
   } catch (error) {
-    console.error(`Error in pullLatestChanges: ${error.message}`);
+    await logger.error(`Error in pullLatestChanges`, error);
     throw error;
   }
 }
@@ -88,10 +95,12 @@ async function getLatestCommit(appName) {
   return new Promise((resolve, reject) => {
     exec(`cd ${appDir} && git rev-parse HEAD`, (error, stdout) => {
       if (error) {
-        console.error(`Error getting latest commit: ${error.message}`);
+        logger.error(`Error getting latest commit`, error);
         reject(error);
       } else {
-        resolve(stdout.trim());
+        const commitId = stdout.trim();
+        logger.debug(`Got latest commit`, { commitId });
+        resolve(commitId);
       }
     });
   });

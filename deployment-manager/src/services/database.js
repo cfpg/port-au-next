@@ -44,6 +44,17 @@ async function initializeDatabase() {
       )
     `);
 
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS deployment_logs (
+        id SERIAL PRIMARY KEY,
+        deployment_id INTEGER REFERENCES deployments(id),
+        type TEXT CHECK (type IN ('info', 'error', 'warning', 'debug')),
+        message TEXT,
+        metadata JSONB,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     console.log('Database initialized successfully');
   } catch (error) {
     console.error('Database initialization error:', error);

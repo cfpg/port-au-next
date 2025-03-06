@@ -2,17 +2,18 @@ const fs = require('fs');
 const path = require('path');
 const { exec } = require('child_process');
 const { getContainerIp } = require('./docker');
+const logger = require('./logger');
 
 // Use absolute path from project root
 const NGINX_CONFIG_DIR = path.join(process.cwd(), './nginx/conf.d');
 
 async function updateNginxConfig(appName, domain, containerId = null) {
   try {
-    console.log(`Using nginx config directory: ${NGINX_CONFIG_DIR}`);
+    await logger.info(`Using nginx config directory: ${NGINX_CONFIG_DIR}`);
     
     // Ensure nginx config directory exists
     if (!fs.existsSync(NGINX_CONFIG_DIR)) {
-      console.log(`Creating nginx config directory: ${NGINX_CONFIG_DIR}`);
+      await logger.info(`Creating nginx config directory: ${NGINX_CONFIG_DIR}`);
       fs.mkdirSync(NGINX_CONFIG_DIR, { recursive: true });
     }
     
@@ -20,8 +21,10 @@ async function updateNginxConfig(appName, domain, containerId = null) {
     let upstreamServer = 'deployment-manager:3000';
 
     if (containerId) {
+      await logger.debug('Getting container IP', { containerId });
       const containerIp = await getContainerIp(containerId);
       upstreamServer = `${containerIp}:3000`;
+      await logger.debug('Using container IP for upstream', { containerIp });
     }
 
     const config = `
@@ -41,11 +44,12 @@ server {
 }
 `;
 
-    console.log(`Writing nginx config to: ${configPath}`);
+    await logger.info(`Writing nginx config to: ${configPath}`);
     fs.writeFileSync(configPath, config);
     await reloadNginx();
+    await logger.info('Nginx configuration updated successfully');
   } catch (error) {
-    console.error(`Error updating nginx config: ${error.message}`);
+    await logger.error(`Error updating nginx config`, error);
     throw error;
   }
 }
@@ -59,10 +63,10 @@ async function reloadNginx() {
       { cwd: projectRoot },
       (error) => {
         if (error) {
-          console.error(`Error reloading nginx: ${error.message}`);
+          logger.error(`Error reloading nginx`, error);
           reject(error);
         } else {
-          console.log('Nginx configuration reloaded successfully');
+          logger.info('Nginx configuration reloaded successfully');
           resolve();
         }
       }
