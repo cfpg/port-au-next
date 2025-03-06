@@ -52,8 +52,10 @@ RUN apk add --no-cache libc6-compat
 
 WORKDIR /app
 
+# Copy package files and config first
+COPY . .
+
 # Install dependencies based on the preferred package manager
-COPY package.json package-lock.json* ./
 RUN npm ci
 
 # 2. Rebuild the source code only when needed
@@ -82,6 +84,8 @@ RUN adduser -S nextjs -u 1001
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+USER nextjs
 
 ENV HOSTNAME="0.0.0.0"
 ENV NEXT_TELEMETRY_DISABLED=1
