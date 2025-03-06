@@ -40,16 +40,6 @@ async function ensureDockerfile(appDir, appName) {
   if (!fs.existsSync(dockerfilePath)) {
     console.log('No Dockerfile found, creating one...');
 
-    // Get all NEXT_PUBLIC_ env vars for this app
-    const envVars = await getAppEnvVars(appName, 'main', 'NEXT_PUBLIC_');
-
-    // Generate ARG and ENV statements for each NEXT_PUBLIC_ variable
-    const envStatements = envVars
-      .map(row => `
-ARG ${row.key}
-ENV ${row.key}=\${${row.key}}`)
-      .join('\n');
-
     const dockerfile = `
 FROM node:20-alpine3.20 AS base
 
@@ -75,11 +65,10 @@ ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
 # Copy env file for build time
-RUN npx prisma generate
 RUN npm run build
 
 # 3. Production image, copy all the files and run next
-FROM node:20-alpine3.20 AS runner
+FROM base AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
