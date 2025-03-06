@@ -5,6 +5,7 @@ const { updateNginxConfig } = require('../services/nginx');
 const { cloneRepository, pullLatestChanges, getLatestCommit } = require('../services/git');
 const { startContainer, stopContainer } = require('../services/docker');
 const { pool } = require('../config/database');
+const logger = require('../services/logger');
 
 router.get('/', async (req, res) => {
   try {
@@ -137,6 +138,7 @@ router.get('/:name/deployments', async (req, res) => {
 
 router.post('/:name/deploy', async (req, res) => {
   const { name } = req.params;
+  let deploymentId;
   
   try {
     // Get app details
@@ -160,28 +162,35 @@ router.post('/:name/deploy', async (req, res) => {
       [app.id, version, 'pending']
     );
     
-    const deploymentId = deploymentResult.rows[0].id;
+    deploymentId = deploymentResult.rows[0].id;
+    logger.setDeploymentContext(deploymentId);
+    await logger.info('Deployment record created', { version });
 
     // Async deployment process
     (async () => {
       try {
-        // Update status to building
+        await logger.info('Starting deployment process');
+        await logger.info('Updating deployment status to building');
+        
         await pool.query(
           'UPDATE deployments SET status = $1 WHERE id = $2',
           ['building', deploymentId]
         );
 
-        // Pull latest changes and get commit ID
+        await logger.info(`Pulling latest changes from branch ${app.branch}`);
         await pullLatestChanges(name, app.branch);
+        
         const commitId = await getLatestCommit(name);
+        await logger.info('Got latest commit', { commitId });
 
-        // Start new container with blue/green deployment
+        await logger.info('Starting new container');
         const { containerId } = await startContainer(name, version, {
           POSTGRES_USER: app.db_user,
           POSTGRES_PASSWORD: app.db_password,
           POSTGRES_DB: app.db_name,
           POSTGRES_HOST: 'postgres'
         });
+        await logger.info('Container started successfully', { containerId });
 
         // Get old container ID if exists
         const oldDeployment = await pool.query(
@@ -190,10 +199,12 @@ router.post('/:name/deploy', async (req, res) => {
           [app.id]
         );
 
-        // Update nginx config to point to new container
+        await logger.info('Updating nginx configuration');
         await updateNginxConfig(name, app.domain, containerId);
+        await logger.info('Nginx configuration updated');
 
         // Mark new deployment as active
+        await logger.info('Marking deployment as active');
         await pool.query(
           `UPDATE deployments 
            SET status = $1, commit_id = $2, container_id = $3 
@@ -201,9 +212,10 @@ router.post('/:name/deploy', async (req, res) => {
           ['active', commitId, containerId, deploymentId]
         );
 
-        // If there was a previous deployment, stop its container and mark as inactive
+        // If there was a previous deployment, stop its container
         if (oldDeployment.rows.length > 0) {
           const oldContainerId = oldDeployment.rows[0].container_id;
+          await logger.info('Stopping old container', { oldContainerId });
           await stopContainer(oldContainerId);
           
           await pool.query(
@@ -212,14 +224,20 @@ router.post('/:name/deploy', async (req, res) => {
              WHERE container_id = $1`,
             [oldContainerId]
           );
+          await logger.info('Old container stopped and marked as inactive');
         }
 
+        await logger.info('Deployment completed successfully');
+
       } catch (error) {
-        console.error(`Deployment error for ${name}:`, error);
+        await logger.error('Deployment failed', error);
         await pool.query(
           'UPDATE deployments SET status = $1 WHERE id = $2',
           ['failed', deploymentId]
         );
+      } finally {
+        // Clear the deployment context when done
+        logger.clearDeploymentContext();
       }
     })();
 
@@ -229,7 +247,7 @@ router.post('/:name/deploy', async (req, res) => {
       version 
     });
   } catch (error) {
-    console.error(`Error initiating deployment: ${error.message}`);
+    logger.error('Error initiating deployment', error);
     res.status(500).json({ error: 'Deployment failed' });
   }
 });
@@ -300,6 +318,31 @@ router.get('/:name/env', async (req, res) => {
     res.json(envVarsResult.rows);
   } catch (error) {
     console.error(`Error fetching env vars: ${error.message}`);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Add this new route to get deployment logs
+router.get('/:name/deployments/:deploymentId/logs', async (req, res) => {
+  try {
+    const { name, deploymentId } = req.params;
+
+    // Verify the deployment belongs to the app
+    const deploymentResult = await pool.query(`
+      SELECT d.id 
+      FROM deployments d
+      JOIN apps a ON a.id = d.app_id
+      WHERE a.name = $1 AND d.id = $2
+    `, [name, deploymentId]);
+
+    if (deploymentResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Deployment not found' });
+    }
+
+    const logs = await logger.getDeploymentLogs(deploymentId);
+    res.json(logs);
+  } catch (error) {
+    console.error(`Error fetching deployment logs: ${error.message}`);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
