@@ -1,7 +1,7 @@
 const { exec } = require('child_process');
 const fs = require('fs');
 const path = require('path');
-const { pool } = require('./database');
+const { pool } = require('../config/database');
 
 const APPS_DIR = process.env.HOST_APPS_DIR || '/app/apps';
 
@@ -21,60 +21,128 @@ async function execCommand(command) {
   });
 }
 
-async function ensureDockerfile(appDir) {
+async function getAppEnvVars(appName, branch = 'main', filterPrefix = null) {
+  const query = `
+    SELECT key, value 
+    FROM app_env_vars av
+    JOIN apps a ON a.id = av.app_id
+    WHERE a.name = $1 AND av.branch = $2
+    ${filterPrefix ? `AND key LIKE '${filterPrefix}%'` : ''}
+  `;
+
+  const envResult = await pool.query(query, [appName, branch]);
+  return envResult.rows;
+}
+
+async function ensureDockerfile(appDir, appName) {
   const dockerfilePath = path.join(appDir, 'Dockerfile');
   
   if (!fs.existsSync(dockerfilePath)) {
     console.log('No Dockerfile found, creating one...');
+
+    // Get all NEXT_PUBLIC_ env vars for this app
+    const envVars = await getAppEnvVars(appName, 'main', 'NEXT_PUBLIC_');
+
+    // Generate ARG and ENV statements for each NEXT_PUBLIC_ variable
+    const envStatements = envVars
+      .map(row => `
+ARG ${row.key}
+ENV ${row.key}=\${${row.key}}`)
+      .join('\n');
+
     const dockerfile = `
-FROM node:18-alpine AS builder
+FROM node:20-alpine3.20 AS base
+
+# 1. Install dependencies only when needed
+FROM base as deps
+# Check https://github.com/nodejs/docker-node/tree/b4117f9333da4138b03a546ec926ef50a31506c3#nodealpine to understand why libc6-compat might be needed.
+RUN apk add --no-cache libc6-compat
+
 WORKDIR /app
-COPY package*.json ./
-RUN npm install
+
+# Install dependencies based on the preferred package manager
+COPY package.json package-lock.json* ./
+RUN npm ci
+
+# 2. Rebuild the source code only when needed
+FROM base AS builder
+WORKDIR /app
+
+COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+
+# Copy env file for build time
+RUN npx prisma generate
 RUN npm run build
 
-FROM node:18-alpine AS runner
+# 3. Production image, copy all the files and run next
+FROM node:20-alpine3.20 AS runner
 WORKDIR /app
-COPY --from=builder /app/package*.json ./
-COPY --from=builder /app/.next ./.next
+
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+
+RUN addgroup -g 1001 -S nodejs
+RUN adduser -S nextjs -u 1001
+
 COPY --from=builder /app/public ./public
-COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+ENV HOSTNAME="0.0.0.0"
+ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 EXPOSE 3000
-CMD ["npm", "start"]
+CMD ["node", "server.js"]
 `;
     fs.writeFileSync(dockerfilePath, dockerfile);
+  } else {
+    console.log('Dockerfile already exists, using it...');
   }
 }
 
 async function buildImage(appName, version) {
-  const appDir = path.join(APPS_DIR, appName);
-  const imageTag = `${appName}:${version}`;
-  
-  await execCommand(`docker build -t ${imageTag} ${appDir}`);
-  return imageTag;
+  try {
+    const imageTag = `${appName}:${version}`;
+    const appDir = path.join(APPS_DIR, appName);
+    
+    await execCommand(
+      `docker build -t ${imageTag} ${appDir}`
+    );
+    
+    return imageTag;
+  } catch (error) {
+    console.error(`Error building image: ${error.message}`);
+    throw error;
+  }
 }
 
 async function startContainer(appName, version, env = {}) {
   try {
+    // Ensure Dockerfile exists
+    const appDir = path.join(APPS_DIR, appName);
+    await ensureDockerfile(appDir, appName);
+
     // Get app's environment variables from database
-    const envResult = await pool.query(`
-      SELECT key, value 
-      FROM app_env_vars av
-      JOIN apps a ON a.id = av.app_id
-      WHERE a.name = $1 AND av.branch = $2
-    `, [appName, env.BRANCH || 'main']);
+    const envVars = await getAppEnvVars(appName, env.BRANCH || 'main');
 
     // Combine default env vars with app-specific ones
     const appEnv = {
       ...env,
-      ...Object.fromEntries(envResult.rows.map(row => [row.key, row.value]))
+      ...Object.fromEntries(envVars.map(row => [row.key, row.value]))
     };
 
-    // Ensure Dockerfile exists
-    const appDir = path.join(APPS_DIR, appName);
-    await ensureDockerfile(appDir);
+    // Write .env file
+    const envFilePath = path.join(appDir, '.env');
+    const envFileContent = Object.entries(appEnv)
+      .map(([key, value]) => `${key}=${value}`)
+      .join('\n');
+    
+    fs.writeFileSync(envFilePath, envFileContent, { encoding: 'utf-8' });
+    console.log(`Created .env file at ${envFilePath}`);
 
     // Build new image
     console.log(`Building image for ${appName}...`);
@@ -87,7 +155,7 @@ async function startContainer(appName, version, env = {}) {
     // Start new container with environment variables
     console.log(`Starting container ${containerName}...`);
     const envString = Object.entries(appEnv)
-      .map(([key, value]) => `-e ${key}=${value}`)
+      .map(([key, value]) => `"-e ${key}=${value}"`)
       .join(' ');
 
     // Run container and connect to network at startup

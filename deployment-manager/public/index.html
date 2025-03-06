@@ -203,7 +203,7 @@
           tableBody.innerHTML += `
             <tr>
               <td class="py-2 px-4 border-b border-gray-200">${app.name}</td>
-              <td class="py-2 px-4 border-b border-gray-200">${app.domain}</td>
+              <td class="py-2 px-4 border-b border-gray-200"><a href="https://${app.domain}" target="_blank">${app.domain}</a></td>
               <td class="py-2 px-4 border-b border-gray-200">${app.repo_url}</td>
               <td class="py-2 px-4 border-b border-gray-200">${app.branch}</td>
               <td class="py-2 px-4 border-b border-gray-200">
@@ -215,7 +215,7 @@
               <td class="py-2 px-4 border-b border-gray-200">
                 <button onclick="viewDeployments('${app.name}')" class="mr-2 text-blue-600 hover:text-blue-800">View Deployments</button>
                 <button onclick="manageEnvVars('${app.name}')" class="mr-2 text-blue-600 hover:text-blue-800">Manage Env Vars</button>
-                <button onclick="deployApp('${app.name}')" class="text-blue-600 hover:text-blue-800">Deploy</button>
+                <button onclick="triggerDeploy('${app.name}')" class="text-blue-600 hover:text-blue-800">Deploy</button>
               </td>
             </tr>
           `;
