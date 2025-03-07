@@ -44,7 +44,7 @@ Port-Au-Next uses a Docker-based microservices architecture with the following c
 1. Clone the repository:
 
 ```bash
-git clone https://github.com/yourusername/port-au-next.git
+git clone https://github.com/cfpg/port-au-next.git
 cd port-au-next
 ```
 
@@ -63,7 +63,7 @@ THUMBOR_SECURITY_KEY=your_secure_key
 docker compose up --build -d
 ```
 
-4. Access the deployment manager UI at `http://localhost:3000`
+4. Access the deployment manager UI at `http://localhost:80`
 
 ## Deployment Workflow
 
@@ -131,9 +131,6 @@ The deployment manager provides:
 - Database credentials are managed securely
 - Docker socket access is restricted to the deployment manager
 
-## Contributing
-
-Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## License
 
