@@ -617,7 +617,7 @@
         logsList.innerHTML = logs.map(log => {
           const timestamp = new Date(log.created_at).toLocaleString();
           const typeClass = getLogTypeClass(log.type);
-          const metadata = log.metadata ? `<pre class="text-xs mt-1 text-gray-600 whitespace-pre-wrap break-words">${JSON.stringify(log.metadata, null, 2)}</pre>` : '';
+          const metadata = log.metadata ? `<pre class="text-xs mt-1 text-gray-600 whitespace-pre-wrap break-words">${JSON.stringify(log.metadata, null, 2).replace(/\\n/g, '<br />')}</pre>` : '';
           
           return `
             <div class="log-entry p-2 rounded ${typeClass}">
