@@ -143,7 +143,7 @@ async function startContainer(appName, version, env = {}) {
       .join(' ');
 
     await execCommand(
-      `docker run -d --name ${containerName} --network ${networkName} ${envString} ${imageTag}`
+      `docker run -d --restart unless-stopped --name ${containerName} --network ${networkName} ${envString} ${imageTag}`
     );
     
     const containerId = await execCommand(
