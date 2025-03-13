@@ -3,7 +3,7 @@ const router = express.Router();
 const { setupAppDatabase } = require('../services/database');
 const { updateNginxConfig } = require('../services/nginx');
 const { cloneRepository, pullLatestChanges, getLatestCommit } = require('../services/git');
-const { startContainer, stopContainer } = require('../services/docker');
+const { stopContainer, buildAndStartContainer } = require('../services/docker');
 const { pool } = require('../config/database');
 const logger = require('../services/logger');
 
@@ -184,7 +184,7 @@ router.post('/:name/deploy', async (req, res) => {
         await logger.info('Got latest commit', { commitId });
 
         await logger.info('Starting new container');
-        const { containerId } = await startContainer(name, version, {
+        const { containerId } = await buildAndStartContainer(name, version, {
           POSTGRES_USER: app.db_user,
           POSTGRES_PASSWORD: app.db_password,
           POSTGRES_DB: app.db_name,
