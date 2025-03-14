@@ -6,6 +6,7 @@ const { cloneRepository, pullLatestChanges, getLatestCommit } = require('../serv
 const { stopContainer, buildAndStartContainer } = require('../services/docker');
 const { pool } = require('../config/database');
 const logger = require('../services/logger');
+const cloudflare = require('../services/cloudflare');
 
 router.get('/', async (req, res) => {
   try {
@@ -225,6 +226,35 @@ router.post('/:name/deploy', async (req, res) => {
             [oldContainerId]
           );
           await logger.info('Old container stopped and marked as inactive');
+        }
+
+        // Inside the deployment process, after getting the new commit ID:
+        const oldDeploymentCommit = await pool.query(
+          `SELECT d.commit_id 
+           FROM deployments d
+           WHERE app_id = $1 AND status = 'active'
+           ORDER BY deployed_at DESC
+           LIMIT 1`,
+          [app.id]
+        );
+
+        const oldCommitId = oldDeploymentCommit.rows[0]?.commit_id;
+
+        if (oldCommitId) {
+          try {
+            const changedAssets = await cloudflare.getChangedAssets(
+              name,
+              oldCommitId,
+              commitId
+            );
+            
+            if (changedAssets.length > 0) {
+              await cloudflare.purgeCache(app.domain, changedAssets);
+            }
+          } catch (error) {
+            await logger.warning('Failed to purge Cloudflare cache', error);
+            // Don't fail the deployment if cache purge fails
+          }
         }
 
         await logger.info('Deployment completed successfully');
