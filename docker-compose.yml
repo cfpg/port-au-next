@@ -72,6 +72,8 @@ services:
       - POSTGRES_DB=${POSTGRES_DB}
       - THUMBOR_SECURITY_KEY=${THUMBOR_SECURITY_KEY}
       - HOST_APPS_DIR=/app/apps
+      - CLOUDFLARE_API_EMAIL=${CLOUDFLARE_API_EMAIL}
+      - CLOUDFLARE_API_KEY=${CLOUDFLARE_API_KEY}
     ports:
       - "3000:3000"
     depends_on:

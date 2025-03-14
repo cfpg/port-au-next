@@ -5,9 +5,9 @@ const logger = require('./logger');
 
 class CloudflareService {
   constructor() {
-    if (process.env.CLOUDFLARE_EMAIL && process.env.CLOUDFLARE_API_KEY) {
+    if (process.env.CLOUDFLARE_API_EMAIL && process.env.CLOUDFLARE_API_KEY) {
       this.cf = new Cloudflare({
-        apiEmail: process.env.CLOUDFLARE_EMAIL,
+        apiEmail: process.env.CLOUDFLARE_API_EMAIL,
         apiKey: process.env.CLOUDFLARE_API_KEY,
       });
       this.enabled = true;
@@ -41,11 +41,15 @@ class CloudflareService {
   }
 
   async purgeCache(domain, zoneId, files) {
-    if (!this.enabled) return;
+    if (!this.enabled) {
+      await logger.info('Cloudflare integration is not enabled, skipping cache purge.');
+      return null;
+    };
 
     try {
       if (!files.length || !zoneId) {
-        return;
+        await logger.info('No files to purge or zone ID not found, skipping cache purge.');
+        return null;
       }
 
       // Convert file paths to URLs
@@ -77,7 +81,10 @@ class CloudflareService {
 
   // Helper method to fetch zone ID for a domain
   async getZoneId(domain) {
-    if (!this.enabled) return null;
+    if (!this.enabled) {
+      await logger.info('Cloudflare integration is not enabled, skipping zone ID fetch.');
+      return null;
+    };
 
     try {
       const zones = await this.cf.zones.list({

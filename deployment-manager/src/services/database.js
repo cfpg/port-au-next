@@ -16,9 +16,14 @@ async function initializeDatabase() {
         db_name TEXT,
         db_user TEXT,
         db_password TEXT,
-        cloudflare_zone_id TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
+    `);
+
+    // Add Cloudflare Zone ID column
+    await pool.query(`
+      ALTER TABLE apps
+      ADD COLUMN IF NOT EXISTS cloudflare_zone_id TEXT
     `);
 
     await pool.query(`

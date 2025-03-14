@@ -353,4 +353,66 @@ router.get('/:name/deployments/:deploymentId/logs', async (req, res) => {
   }
 });
 
+// Get single app details
+router.get('/:name', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM apps WHERE name = $1',
+      [req.params.name]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'App not found' });
+    }
+    
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error fetching app:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Fetch Zone ID from Cloudflare
+router.get('/:name/fetch-zone-id', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT domain FROM apps WHERE name = $1',
+      [req.params.name]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'App not found' });
+    }
+    
+    const { domain } = result.rows[0];
+    const zoneId = await cloudflare.getZoneId(domain);
+    
+    if (!zoneId) {
+      return res.status(404).json({ error: 'Zone ID not found for domain' });
+    }
+    
+    res.json({ zoneId });
+  } catch (error) {
+    console.error('Error fetching Zone ID:', error);
+    res.status(500).json({ error: 'Failed to fetch Zone ID' });
+  }
+});
+
+// Update app settings
+router.post('/:name/settings', async (req, res) => {
+  try {
+    const { cloudflare_zone_id } = req.body;
+    
+    await pool.query(
+      'UPDATE apps SET cloudflare_zone_id = $1 WHERE name = $2',
+      [cloudflare_zone_id, req.params.name]
+    );
+    
+    res.json({ message: 'Settings updated successfully' });
+  } catch (error) {
+    console.error('Error updating settings:', error);
+    res.status(500).json({ error: 'Failed to update settings' });
+  }
+});
+
 module.exports = router; 
