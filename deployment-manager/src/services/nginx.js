@@ -33,6 +33,25 @@ server {
     listen [::]:80;
     server_name ${domain};
     
+    # Cache settings for static files, images and Next.js image optimization
+    location ~* (\.(jpg|jpeg|png|gif|ico|webp|svg|woff2|woff|ttf|mp4)$|/_next/image\?) {
+        proxy_pass http://${upstreamServer};
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # Enable caching
+        proxy_cache_use_stale error timeout http_500 http_502 http_503 http_504;
+        proxy_cache_valid 200 31d;
+        expires 31d;
+        add_header Cache-Control "public, no-transform, max-age=2678400";
+        
+        # Optional: Add a cache identifier in response headers
+        add_header X-Cache-Status $upstream_cache_status;
+    }
+    
     location / {
         proxy_pass http://${upstreamServer};
         proxy_http_version 1.1;
