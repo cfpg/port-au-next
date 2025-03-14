@@ -73,7 +73,7 @@ async function pullLatestChanges(appName, branch = 'main') {
     
     // Pull latest changes
     return new Promise((resolve, reject) => {
-      exec(`cd ${appDir} && git fetch && git checkout ${branch} && git pull origin ${branch}`, (error, stdout) => {
+      exec(`cd ${appDir} && git fetch && git stash && git checkout ${branch} && git pull origin ${branch}`, (error, stdout) => {
         if (error) {
           logger.error(`Error pulling latest changes`, error);
           reject(error);

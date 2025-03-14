@@ -5,7 +5,7 @@ const { updateNginxConfig } = require('./nginx');
 const logger = require('./logger');
 const { execCommand } = require('../utils/docker');
 const { pool } = require('../config/database');
-
+const nextConfig = require('./nextConfig');
 const APPS_DIR = process.env.HOST_APPS_DIR || '/app/apps';
 
 const networkName = 'port-au-next_port_au_next_network';
@@ -131,6 +131,8 @@ async function buildAndStartContainer(appName, version, env = {}) {
   try {
     const appDir = path.join(APPS_DIR, appName);
     await ensureDockerfile(appDir, appName);
+
+    await nextConfig.modifyNextConfig(appDir, appName);
 
     await logger.debug('Fetching environment variables');
     const envVars = await getAppEnvVars(appName, env.BRANCH || 'main');
