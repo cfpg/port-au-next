@@ -72,23 +72,14 @@ services:
       - POSTGRES_DB=${POSTGRES_DB}
       - THUMBOR_SECURITY_KEY=${THUMBOR_SECURITY_KEY}
       - HOST_APPS_DIR=/app/apps
+      - CLOUDFLARE_API_EMAIL=${CLOUDFLARE_API_EMAIL}
+      - CLOUDFLARE_API_KEY=${CLOUDFLARE_API_KEY}
     ports:
       - "3000:3000"
     depends_on:
       - postgres
     networks:
       - port_au_next_network
-  
-  # Examplle app config
-  # example_app_1:
-  #   build:
-  #     context: ./apps/example_app_1
-  #     dockerfile: Dockerfile
-  #   restart: always
-  #   ports:
-  #     - "3000:3001"
-  #   networks:
-  #     - port_au_next_network
 
 networks:
   port_au_next_network:

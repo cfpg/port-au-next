@@ -200,11 +200,44 @@
         <span id="toast-message">Notification message</span>
       </div>
     </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden overflow-y-auto h-full w-full">
+      <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div class="mt-3">
+          <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">App Settings</h3>
+          
+          <!-- Cloudflare Section -->
+          <div class="mb-4">
+            <h4 class="text-md font-medium text-gray-700 mb-2">Cloudflare Settings</h4>
+            <div class="mb-4">
+              <label class="block text-sm font-medium text-gray-700">Zone ID</label>
+              <div class="mt-1 flex rounded-md shadow-sm">
+                <input type="text" id="cloudflare-zone-id" class="flex-1 min-w-0 block w-full px-3 py-2 rounded-md border border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+                <button onclick="fetchZoneId()" class="ml-2 inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                  Fetch ID
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex justify-end space-x-3">
+            <button onclick="closeSettingsModal()" class="px-4 py-2 bg-gray-300 text-gray-800 text-base font-medium rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300">
+              Close
+            </button>
+            <button onclick="saveSettings()" class="px-4 py-2 bg-blue-500 text-white text-base font-medium rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500">
+              Save Changes
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script>
     let currentAppName = '';
     let envVars = [];
+    let currentZoneId = '';
 
     // Fetch and display apps
     async function fetchApps() {
@@ -238,6 +271,7 @@
               <td class="py-2 px-4 border-b border-gray-200">
                 <button onclick="viewDeployments('${app.name}')" class="mr-2 text-blue-600 hover:text-blue-800">View Deployments</button>
                 <button onclick="manageEnvVars('${app.name}')" class="mr-2 text-blue-600 hover:text-blue-800">Manage Env Vars</button>
+                <button onclick="appSettings('${app.name}')" class="mr-2 text-blue-600 hover:text-blue-800">Settings</button>
                 <button onclick="triggerDeploy('${app.name}')" class="text-blue-600 hover:text-blue-800">Deploy</button>
               </td>
             </tr>
@@ -647,6 +681,66 @@
         default:
           return 'bg-blue-50 border-l-4 border-blue-500';
       }
+    }
+
+    async function appSettings(appName) {
+      currentAppName = appName;
+      
+      try {
+        const response = await fetch(`/api/apps/${appName}`);
+        const app = await response.json();
+        
+        document.getElementById('cloudflare-zone-id').value = app.cloudflare_zone_id || '';
+        currentZoneId = app.cloudflare_zone_id || '';
+        
+        document.getElementById('settings-modal').classList.remove('hidden');
+      } catch (error) {
+        console.error('Error fetching app settings:', error);
+        showToast('Failed to load app settings', 'error');
+      }
+    }
+
+    async function fetchZoneId() {
+      try {
+        const response = await fetch(`/api/apps/${currentAppName}/fetch-zone-id`);
+        if (!response.ok) throw new Error('Failed to fetch Zone ID');
+        
+        const { zoneId } = await response.json();
+        document.getElementById('cloudflare-zone-id').value = zoneId;
+      } catch (error) {
+        console.error('Error fetching Zone ID:', error);
+        showToast('Failed to fetch Cloudflare Zone ID', 'error');
+      }
+    }
+
+    async function saveSettings() {
+      const zoneId = document.getElementById('cloudflare-zone-id').value;
+      
+      try {
+        const response = await fetch(`/api/apps/${currentAppName}/settings`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            cloudflare_zone_id: zoneId
+          })
+        });
+
+        if (!response.ok) throw new Error('Failed to save settings');
+        
+        showToast('Settings saved successfully');
+        closeSettingsModal();
+      } catch (error) {
+        console.error('Error saving settings:', error);
+        showToast('Failed to save settings', 'error');
+      }
+    }
+
+    function closeSettingsModal() {
+      document.getElementById('settings-modal').classList.add('hidden');
+      currentAppName = '';
+      currentZoneId = '';
     }
   </script>
 

@@ -20,6 +20,12 @@ async function initializeDatabase() {
       )
     `);
 
+    // Add Cloudflare Zone ID column
+    await pool.query(`
+      ALTER TABLE apps
+      ADD COLUMN IF NOT EXISTS cloudflare_zone_id TEXT
+    `);
+
     await pool.query(`
       CREATE TABLE IF NOT EXISTS deployments (
         id SERIAL PRIMARY KEY,
