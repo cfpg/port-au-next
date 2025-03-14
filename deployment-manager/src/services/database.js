@@ -16,6 +16,7 @@ async function initializeDatabase() {
         db_name TEXT,
         db_user TEXT,
         db_password TEXT,
+        cloudflare_zone_id TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);

@@ -32,66 +32,36 @@ router.get('/', async (req, res) => {
 });
 
 router.post('/', async (req, res) => {
+  const { name, repo_url, branch = 'main', domain } = req.body;
+  
   try {
-    const { name, repo_url, branch = 'main', domain } = req.body;
+    let cloudflare_zone_id = null;
     
-    if (!name || !repo_url || !domain) {
-      return res.status(400).json({ error: 'Missing required fields' });
+    // Try to get Zone ID if domain is provided
+    if (domain) {
+      try {
+        cloudflare_zone_id = await cloudflare.getZoneId(domain);
+      } catch (error) {
+        await logger.warning('Failed to fetch Cloudflare Zone ID', { domain }, error);
+        // Continue without Zone ID - cache purging will be skipped
+      }
     }
 
-    // Check if app already exists
-    const existingApp = await pool.query(
-      'SELECT * FROM apps WHERE name = $1 OR domain = $2',
-      [name, domain]
+    const result = await pool.query(
+      `INSERT INTO apps (name, repo_url, branch, domain, cloudflare_zone_id)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (name) 
+       DO UPDATE SET 
+         repo_url = EXCLUDED.repo_url,
+         branch = EXCLUDED.branch,
+         domain = EXCLUDED.domain,
+         cloudflare_zone_id = EXCLUDED.cloudflare_zone_id
+       RETURNING *`,
+      [name, repo_url, branch, domain, cloudflare_zone_id]
     );
-
-    let isUpdate = false;
-    if (existingApp.rows.length > 0) {
-      const existing = existingApp.rows[0];
-      if (existing.domain !== domain && existing.name === name) {
-        return res.status(409).json({ error: `App with name "${name}" already exists` });
-      }
-      if (existing.domain === domain && existing.name !== name) {
-        return res.status(409).json({ error: `Domain "${domain}" is already in use by app "${existing.name}"` });
-      }
-      
-      // App exists with same name and domain - update it
-      console.log(`Updating existing app ${name}`);
-      isUpdate = true;
-    }
 
     // Setup database (creates or updates)
     const dbCredentials = await setupAppDatabase(name);
-
-    // Database operation (create or update)
-    if (isUpdate) {
-      await pool.query(
-        `UPDATE apps 
-         SET repo_url = $1, branch = $2, 
-             db_name = $3, db_user = $4, db_password = $5
-         WHERE name = $6`,
-        [
-          repo_url, branch,
-          dbCredentials.dbName,
-          dbCredentials.dbUser,
-          dbCredentials.dbPassword,
-          name
-        ]
-      );
-    } else {
-      await pool.query(
-        `INSERT INTO apps (
-          name, repo_url, branch, domain, 
-          db_name, db_user, db_password
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-        [
-          name, repo_url, branch, domain,
-          dbCredentials.dbName,
-          dbCredentials.dbUser,
-          dbCredentials.dbPassword
-        ]
-      );
-    }
 
     // If we got here, database operations succeeded
     // Now setup git and nginx
@@ -104,8 +74,8 @@ router.post('/', async (req, res) => {
       // as partially configured
     }
 
-    res.status(isUpdate ? 200 : 201).json({
-      message: isUpdate ? `App "${name}" updated successfully` : `App "${name}" created successfully`,
+    res.status(200).json({
+      message: `App "${name}" updated successfully`,
       name,
       repo_url,
       branch,
@@ -240,7 +210,7 @@ router.post('/:name/deploy', async (req, res) => {
 
         const oldCommitId = oldDeploymentCommit.rows[0]?.commit_id;
 
-        if (oldCommitId) {
+        if (oldCommitId && app.cloudflare_zone_id) {
           try {
             const changedAssets = await cloudflare.getChangedAssets(
               name,
@@ -249,12 +219,18 @@ router.post('/:name/deploy', async (req, res) => {
             );
             
             if (changedAssets.length > 0) {
-              await cloudflare.purgeCache(app.domain, changedAssets);
+              await cloudflare.purgeCache(
+                app.domain,
+                app.cloudflare_zone_id,
+                changedAssets
+              );
             }
           } catch (error) {
             await logger.warning('Failed to purge Cloudflare cache', error);
             // Don't fail the deployment if cache purge fails
           }
+        } else {
+          await logger.info('No Cloudflare zone ID found, skipping cache purge');
         }
 
         await logger.info('Deployment completed successfully');

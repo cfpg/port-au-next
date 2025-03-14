@@ -55,6 +55,7 @@ POSTGRES_USER=portaunext
 POSTGRES_PASSWORD=your_secure_password
 POSTGRES_DB=portaunext
 THUMBOR_SECURITY_KEY=your_secure_key
+CLOUDFLARE_API_TOKEN=changeme123
 ```
 
 3. Launch the system:
