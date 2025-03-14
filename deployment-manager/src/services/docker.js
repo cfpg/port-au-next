@@ -1,26 +1,14 @@
-const { exec } = require('child_process');
 const fs = require('fs');
 const path = require('path');
-const { pool } = require('../config/database');
+const { getActiveDeployments, updateDeploymentContainer } = require('./database');
+const { updateNginxConfig } = require('./nginx');
 const logger = require('./logger');
+const { execCommand } = require('../utils/docker');
+const { pool } = require('../config/database');
 
 const APPS_DIR = process.env.HOST_APPS_DIR || '/app/apps';
 
 const networkName = 'port-au-next_port_au_next_network';
-
-async function execCommand(command) {
-  return new Promise((resolve, reject) => {
-    logger.debug(`Executing command`, { command });
-    exec(command, (error, stdout, stderr) => {
-      if (error) {
-        logger.error('Command execution failed', { error, stderr });
-        reject(error);
-      } else {
-        resolve(stdout);
-      }
-    });
-  });
-}
 
 async function getAppEnvVars(appName, branch = 'main', filterPrefix = null) {
   const query = `
@@ -117,7 +105,29 @@ async function buildImage(appName, version) {
   }
 }
 
-async function startContainer(appName, version, env = {}) {
+async function startContainer(containerName, imageTag, networkName, envString) {
+  await logger.info('Starting container', { containerName });
+  
+  await execCommand(
+    `docker run -d --restart unless-stopped --name ${containerName} --network ${networkName} ${envString} ${imageTag}`
+  );
+  
+  const containerId = await execCommand(
+    `docker inspect --format='{{.Id}}' ${containerName}`
+  );
+
+  await logger.info('Container started successfully', { 
+    containerId: containerId.trim(),
+    containerName 
+  });
+
+  return {
+    containerId: containerId.trim(),
+    containerName
+  };
+}
+
+async function buildAndStartContainer(appName, version, env = {}) {
   try {
     const appDir = path.join(APPS_DIR, appName);
     await ensureDockerfile(appDir, appName);
@@ -139,34 +149,16 @@ async function startContainer(appName, version, env = {}) {
     await logger.info('Created .env file', { path: envFilePath });
 
     const imageTag = await buildImage(appName, version);
-
     const timestamp = new Date().getTime();
     const containerName = `${appName}_${version}_${timestamp}`;
 
-    await logger.info('Starting container', { containerName });
     const envString = Object.entries(appEnv)
       .map(([key, value]) => `"-e ${key}=${value}"`)
       .join(' ');
 
-    await execCommand(
-      `docker run -d --name ${containerName} --network ${networkName} ${envString} ${imageTag}`
-    );
-    
-    const containerId = await execCommand(
-      `docker inspect -f '{{.Id}}' ${containerName}`
-    );
-
-    await logger.info('Container started successfully', { 
-      containerId: containerId.trim(),
-      containerName 
-    });
-
-    return {
-      containerId: containerId.trim(),
-      containerName
-    };
+    return await startContainer(containerName, imageTag, networkName, envString);
   } catch (error) {
-    await logger.error(`Error starting container`, error);
+    await logger.error(`Error building and starting container`, error);
     throw error;
   }
 }
@@ -189,20 +181,6 @@ async function stopContainer(containerId) {
     await logger.info('Container stopped and removed successfully', { containerId });
   } catch (error) {
     await logger.error(`Error stopping container`, error);
-    throw error;
-  }
-}
-
-async function getContainerIp(containerId) {
-  try {
-    await logger.debug('Getting container IP', { containerId });
-    const ip = await execCommand(
-      `docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' ${containerId}`
-    );
-    await logger.debug('Got container IP', { containerId, ip: ip.trim() });
-    return ip.trim();
-  } catch (error) {
-    await logger.error(`Error getting container IP`, error);
     throw error;
   }
 }
@@ -234,9 +212,169 @@ async function waitForHealthyContainer(containerId, timeout = 30000) {
   throw error;
 }
 
+async function containerExists(containerId) {
+  try {
+    // Use --no-trunc to get full container IDs in the listing
+    const result = await execCommand(`docker ps -a --no-trunc -q -f "id=${containerId}"`);
+    return result.trim() !== '';
+  } catch (error) {
+    logger.debug('Container existence check failed', { 
+      error: error.message,
+      containerId 
+    });
+    return false;
+  }
+}
+
+async function startExistingContainer(containerId) {
+  await logger.info('Starting existing container', { containerId });
+  
+  await execCommand(`docker start ${containerId}`);
+  
+  await logger.info('Container started successfully', { containerId });
+  return { containerId };
+}
+
+async function imageExists(imageTag) {
+  try {
+    const result = await execCommand(`docker image inspect ${imageTag}`);
+    return true;
+  } catch (error) {
+    logger.debug('Image not found', { imageTag });
+    return false;
+  }
+}
+
+async function recoverContainers() {
+  try {
+    const deployments = await getActiveDeployments();
+    await logger.info('Recovering active containers...', { count: deployments.length });
+
+    for (const deployment of deployments) {
+      try {
+        const exists = await containerExists(deployment.container_id);
+        
+        if (!exists) {
+          const imageTag = `${deployment.name}:${deployment.version}`;
+          const hasImage = await imageExists(imageTag);
+
+          if (hasImage) {
+            await logger.info(`Container gone but image exists, starting new container`, {
+              name: deployment.name,
+              imageTag
+            });
+
+            // Get environment variables from database
+            const envVars = await getAppEnvVars(deployment.name, 'main');
+            const envString = envVars
+              .map(({ key, value }) => `"-e ${key}=${value}"`)
+              .join(' ');
+
+            const timestamp = new Date().getTime();
+            const containerName = `${deployment.name}_${deployment.version}_${timestamp}`;
+
+            const { containerId } = await startContainer(
+              containerName,
+              imageTag,
+              networkName,
+              envString
+            );
+
+            await updateNginxConfig(
+              deployment.name,
+              deployment.domain,
+              containerId
+            );
+
+            await updateDeploymentContainer(deployment.container_id, containerId);
+            
+            await logger.info(`Successfully started new container from existing image`, {
+              name: deployment.name,
+              containerId
+            });
+          } else {
+            await logger.info(`Container and image gone, performing full rebuild`, {
+              name: deployment.name,
+              containerId: deployment.container_id
+            });
+            
+            const { containerId } = await buildAndStartContainer(
+              deployment.name,
+              deployment.version
+            );
+
+            await updateNginxConfig(
+              deployment.name,
+              deployment.domain,
+              containerId
+            );
+
+            await updateDeploymentContainer(deployment.container_id, containerId);
+          }
+          continue;
+        }
+
+        // If container exists, check its status
+        const containerStatus = await execCommand(
+          `docker inspect -f '{{.State.Status}}' ${deployment.container_id}`
+        ).catch(error => {
+          logger.debug('Container status check failed', { 
+            error: error.message,
+            containerId: deployment.container_id 
+          });
+          return null;
+        });
+
+        if (containerStatus && containerStatus.trim() !== 'running') {
+          await logger.info(`Container exists but not running, attempting to recover`, { 
+            name: deployment.name, 
+            status: containerStatus.trim() 
+          });
+          
+          // Double check after a delay to avoid race conditions with docker restart
+          await new Promise(resolve => setTimeout(resolve, 5000));
+          
+          const retryStatus = await execCommand(
+            `docker inspect -f '{{.State.Status}}' ${deployment.container_id}`
+          ).catch(() => null);
+
+          if (!retryStatus || retryStatus.trim() !== 'running') {
+            // Simply start the existing container instead of creating a new one
+            await startExistingContainer(deployment.container_id);
+            await logger.info(`Successfully recovered existing container`, { 
+              name: deployment.name,
+              containerId: deployment.container_id 
+            });
+          } else {
+            await logger.info(`Container recovered on its own`, { 
+              name: deployment.name,
+              status: retryStatus.trim() 
+            });
+          }
+        } else {
+          await logger.info(`Container is healthy`, { 
+            name: deployment.name,
+            status: containerStatus ? containerStatus.trim() : 'unknown'
+          });
+        }
+      } catch (error) {
+        await logger.error(`Failed to recover container`, { 
+          name: deployment.name,
+          error: error.message || 'Unknown error'
+        });
+      }
+    }
+  } catch (error) {
+    await logger.error('Container recovery failed', error);
+    throw error;
+  }
+}
+
 module.exports = {
+  buildAndStartContainer,
   startContainer,
   stopContainer,
-  getContainerIp,
-  waitForHealthyContainer
+  waitForHealthyContainer,
+  recoverContainers,
+  containerExists
 }; 

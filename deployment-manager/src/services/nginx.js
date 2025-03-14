@@ -1,8 +1,8 @@
 const fs = require('fs');
 const path = require('path');
 const { exec } = require('child_process');
-const { getContainerIp } = require('./docker');
 const logger = require('./logger');
+const { getContainerIp } = require('../utils/docker');
 
 // Use absolute path from project root
 const NGINX_CONFIG_DIR = path.join(process.cwd(), './nginx/conf.d');

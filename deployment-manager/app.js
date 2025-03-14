@@ -2,6 +2,7 @@ const express = require('express');
 const path = require('path');
 const { initializeDatabase } = require('./src/services/database');
 const { appsRouter, deploymentsRouter } = require('./src/routes');
+const docker = require('./src/services/docker');
 
 // Configure paths and app
 const PORT = process.env.PORT || 3000;
@@ -29,6 +30,9 @@ async function startup() {
   try {
     console.log('Starting application...');
     await initializeDatabase();
+    
+    // Try and recover stopped containers that should be running
+    docker.recoverContainers();
     
     app.listen(PORT, () => {
       console.log(`Deployment manager running on port ${PORT}`);

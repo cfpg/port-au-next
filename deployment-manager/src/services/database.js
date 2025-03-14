@@ -127,7 +127,28 @@ async function setupAppDatabase(appName) {
   }
 }
 
+async function getActiveDeployments() {
+  const result = await pool.query(`
+    SELECT a.name, a.domain, d.container_id, d.version
+    FROM deployments d
+    JOIN apps a ON a.id = d.app_id
+    WHERE d.status = 'active'
+  `);
+  return result.rows;
+}
+
+async function updateDeploymentContainer(oldContainerId, newContainerId) {
+  await pool.query(
+    `UPDATE deployments 
+     SET container_id = $1 
+     WHERE container_id = $2`,
+    [newContainerId, oldContainerId]
+  );
+}
+
 module.exports = {
   initializeDatabase,
-  setupAppDatabase
+  setupAppDatabase,
+  getActiveDeployments,
+  updateDeploymentContainer
 }; 
