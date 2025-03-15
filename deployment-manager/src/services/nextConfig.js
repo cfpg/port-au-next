@@ -11,10 +11,32 @@ const NEXT_CONFIG = {
   },
 };
 
-function getImageConfig() {
+function getImageConfig(existingConfig = '') {
+  const minimumCacheTTLRegex = /['"]?minimumCacheTTL['"]?:/;
+  const minimumCacheTTLConfig = `minimumCacheTTL: ${NEXT_CONFIG.images.minimumCacheTTL}`;
+  
+  // If there's existing config
+  if (existingConfig) {
+    if (minimumCacheTTLRegex.test(existingConfig)) {
+      // Replace existing minimumCacheTTL with our value
+      return existingConfig.replace(
+        /['"]?minimumCacheTTL['"]?:\s*\d+/,
+        minimumCacheTTLConfig
+      );
+    }
+
+    // Insert minimumCacheTTL right after images: {
+    return existingConfig.replace(
+      /images:\s*{/,
+      `images: {
+    ${minimumCacheTTLConfig},`
+    );
+  }
+  
+  // If no existing config, just return minimumCacheTTL
   return `images: {
-    minimumCacheTTL: ${NEXT_CONFIG.images.minimumCacheTTL},
-  },`;
+    ${minimumCacheTTLConfig}
+  }`;
 }
 
 function getOutputStandaloneConfig() {
@@ -85,11 +107,15 @@ async function modifyNextConfig(appDir) {
     // Add image config only if Cloudflare is enabled
     if (cloudflare.enabled) {
       if (configContent.includes('images:')) {
-        // Update existing images config
-        modifiedContent = modifiedContent.replace(
-          /images:\s*{[^}]*}/,
-          getImageConfig()
-        );
+        // Extract existing images config
+        const imagesMatch = configContent.match(/images:\s*{[^}]*}/);
+        if (imagesMatch) {
+          // Update existing images config while preserving other settings
+          modifiedContent = modifiedContent.replace(
+            /images:\s*{[^}]*}/,
+            getImageConfig(imagesMatch[0])
+          );
+        }
       } else {
         configInsertions.push(getImageConfig());
       }
