@@ -42,6 +42,9 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
 
+        # Remove existing Cache-Control header from upstream
+        proxy_hide_header Cache-Control;
+
         # Enable caching
         proxy_cache_use_stale error timeout http_500 http_502 http_503 http_504;
         proxy_cache_valid 200 31d;
