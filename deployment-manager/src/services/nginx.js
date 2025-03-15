@@ -46,7 +46,7 @@ server {
         proxy_cache_use_stale error timeout http_500 http_502 http_503 http_504;
         proxy_cache_valid 200 31d;
         expires 31d;
-        add_header Cache-Control "public, no-transform, max-age=2678400";
+        add_header Cache-Control "public, no-transform, max-age=2678400" if_not_sent;
         
         # Optional: Add a cache identifier in response headers
         add_header X-Cache-Status $upstream_cache_status;
