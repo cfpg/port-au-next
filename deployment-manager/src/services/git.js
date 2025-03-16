@@ -29,7 +29,7 @@ async function cloneRepository(appName, repoUrl, branch = 'main') {
     if (isRepo) {
       await logger.info(`Repository already exists at ${appDir}, updating instead...`);
       return new Promise((resolve, reject) => {
-        exec(`cd ${appDir} && git fetch && git checkout ${branch} && git pull origin ${branch}`, (error) => {
+        exec(`cd ${appDir} && git fetch && git stash && git checkout ${branch} && git pull origin ${branch}`, (error) => {
           if (error) {
             logger.error(`Error updating repository`, error);
             reject(error);
@@ -106,8 +106,37 @@ async function getLatestCommit(appName) {
   });
 }
 
+async function deleteRepository(appName) {
+  try {
+    // Validate appName doesn't contain path traversal attempts
+    if (appName.includes('/') || appName.includes('..')) {
+      throw new Error('Invalid app name');
+    }
+
+    const appDir = path.join(APPS_DIR, appName);
+    
+    // Ensure the path is still within APPS_DIR after joining
+    if (!appDir.startsWith(APPS_DIR)) {
+      throw new Error('Invalid app directory path');
+    }
+    
+    // Check if directory exists before trying to delete
+    if (fs.existsSync(appDir)) {
+      // Use fs.rm instead of exec for better security
+      await fs.promises.rm(appDir, { 
+        recursive: true, 
+        force: true 
+      });
+    }
+  } catch (error) {
+    await logger.error(`Error deleting repository`, error);
+    throw error;
+  }
+}
+
 module.exports = {
   cloneRepository,
   pullLatestChanges,
-  getLatestCommit
+  getLatestCommit,
+  deleteRepository
 }; 

@@ -102,6 +102,48 @@ async function reloadNginx() {
   });
 }
 
+async function deleteAppConfig(domain) {
+  try {
+    // Validate domain doesn't contain path traversal attempts
+    if (!domain || domain.includes('/') || domain.includes('..')) {
+      throw new Error('Invalid domain name');
+    }
+
+    const configPath = path.join(NGINX_CONFIG_DIR, `app-${domain}.conf`);
+    
+    // Ensure the path is still within NGINX_CONFIG_DIR after joining
+    if (!configPath.startsWith(NGINX_CONFIG_DIR)) {
+      throw new Error('Invalid nginx config path');
+    }
+    
+    // Check if config exists before trying to delete
+    if (fs.existsSync(configPath)) {
+      await logger.info(`Found nginx config at ${configPath}, deleting...`);
+      // Use promises version for better async handling
+      await fs.promises.unlink(configPath);
+      
+      // Verify nginx config before reloading
+      try {
+        // Test nginx configuration first
+        await execCommand('nginx -t');
+        // Only reload if test passes
+        await reloadNginx();
+        await logger.info('Nginx configuration reloaded successfully');
+      } catch (nginxError) {
+        await logger.error('Failed to reload nginx after config deletion', nginxError);
+        // Still consider deletion successful since file is gone
+      }
+    } else {
+      await logger.info(`No nginx config found at ${configPath}, skipping deletion`);
+    }
+    return true; // Success either way for idempotency
+  } catch (error) {
+    await logger.error(`Error deleting nginx config`, error);
+    throw error;
+  }
+}
+
 module.exports = {
-  updateNginxConfig
+  updateNginxConfig,
+  deleteAppConfig
 }; 

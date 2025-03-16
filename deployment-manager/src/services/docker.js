@@ -372,11 +372,29 @@ async function recoverContainers() {
   }
 }
 
+async function deleteAppContainers(appName) {
+  try {
+    // Find all containers for this app (active and inactive)
+    const containers = await execCommand(`docker ps -a --filter "name=${appName}" --format "{{.ID}}"`);
+    const containerIds = containers.trim().split('\n').filter(id => id);
+
+    // Stop and remove each container
+    for (const containerId of containerIds) {
+      await execCommand(`docker stop ${containerId}`);
+      await execCommand(`docker rm ${containerId}`);
+    }
+  } catch (error) {
+    await logger.error(`Error deleting containers for ${appName}`, error);
+    throw error;
+  }
+}
+
 module.exports = {
   buildAndStartContainer,
   startContainer,
   stopContainer,
   waitForHealthyContainer,
   recoverContainers,
-  containerExists
+  containerExists,
+  deleteAppContainers
 }; 

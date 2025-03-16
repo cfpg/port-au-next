@@ -221,6 +221,18 @@
             </div>
           </div>
 
+          <!-- Add this inside the settings modal, after the Cloudflare section -->
+          <div class="mt-8 pt-6 border-t border-gray-200 mb-8">
+            <h4 class="text-md font-medium text-red-700 mb-2">Danger Zone</h4>
+            <p class="text-sm text-gray-500 mb-4">
+              Once you delete an app, there is no going back. You'll be asked to confirm the app name to ensure you're deleting the correct app.
+            </p>
+            <button onclick="showDeleteConfirmation()" 
+                    class="w-full px-4 py-2 bg-red-600 text-white text-base font-medium rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500">
+              Delete App
+            </button>
+          </div>
+
           <div class="flex justify-end space-x-3">
             <button onclick="closeSettingsModal()" class="px-4 py-2 bg-gray-300 text-gray-800 text-base font-medium rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300">
               Close
@@ -232,12 +244,51 @@
         </div>
       </div>
     </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="delete-confirm-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden overflow-y-auto h-full w-full z-50">
+      <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div class="mt-3">
+          <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">
+            Delete "<span id="delete-modal-title" class="text-red-600"></span>"
+          </h3>
+          <div class="mb-4">
+            <p class="text-sm text-gray-500">
+              This action cannot be undone. This will permanently delete the app
+              "<span id="delete-app-name" class="font-semibold"></span>" and all associated data.
+            </p>
+            <div class="mt-4">
+              <label class="block text-sm font-medium text-gray-700">
+                Please type "<span id="confirm-app-name" class="font-semibold text-red-600"></span>" to confirm
+              </label>
+              <input type="text" 
+                     id="delete-confirmation-input"
+                     class="mt-1 block w-full px-3 py-2 rounded-md border border-gray-300 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm"
+                     onkeyup="validateDeleteConfirmation()" />
+            </div>
+          </div>
+          <div class="flex justify-end space-x-3">
+            <button onclick="closeDeleteConfirmation()" 
+                    class="px-4 py-2 bg-gray-300 text-gray-800 text-base font-medium rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300">
+              Cancel
+            </button>
+            <button id="confirm-delete-button"
+                    onclick="deleteApp()"
+                    disabled
+                    class="px-4 py-2 bg-red-600 text-white text-base font-medium rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed">
+              Delete App
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script>
     let currentAppName = '';
     let envVars = [];
     let currentZoneId = '';
+    let currentAppForSettings = null;
 
     // Fetch and display apps
     async function fetchApps() {
@@ -684,7 +735,7 @@
     }
 
     async function appSettings(appName) {
-      currentAppName = appName;
+      currentAppForSettings = appName;
       
       try {
         const response = await fetch(`/api/apps/${appName}`);
@@ -702,7 +753,7 @@
 
     async function fetchZoneId() {
       try {
-        const response = await fetch(`/api/apps/${currentAppName}/fetch-zone-id`);
+        const response = await fetch(`/api/apps/${currentAppForSettings}/fetch-zone-id`);
         if (!response.ok) throw new Error('Failed to fetch Zone ID');
         
         const { zoneId } = await response.json();
@@ -717,7 +768,7 @@
       const zoneId = document.getElementById('cloudflare-zone-id').value;
       
       try {
-        const response = await fetch(`/api/apps/${currentAppName}/settings`, {
+        const response = await fetch(`/api/apps/${currentAppForSettings}/settings`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
@@ -739,8 +790,68 @@
 
     function closeSettingsModal() {
       document.getElementById('settings-modal').classList.add('hidden');
-      currentAppName = '';
+      currentAppForSettings = null;
       currentZoneId = '';
+    }
+
+    function showDeleteConfirmation() {
+      if (!currentAppForSettings) {
+        console.error('No app selected for deletion');
+        return;
+      }
+      
+      const appName = currentAppForSettings;
+      document.getElementById('delete-modal-title').textContent = appName;
+      document.getElementById('delete-app-name').textContent = appName;
+      document.getElementById('confirm-app-name').textContent = appName;
+      document.getElementById('delete-confirmation-input').value = '';
+      document.getElementById('confirm-delete-button').disabled = true;
+      document.getElementById('delete-confirm-modal').classList.remove('hidden');
+    }
+
+    function closeDeleteConfirmation() {
+      document.getElementById('delete-confirm-modal').classList.add('hidden');
+    }
+
+    function validateDeleteConfirmation() {
+      const input = document.getElementById('delete-confirmation-input').value;
+      const deleteButton = document.getElementById('confirm-delete-button');
+      deleteButton.disabled = input !== currentAppForSettings;
+    }
+
+    async function deleteApp() {
+      if (!currentAppForSettings) {
+        console.error('No app selected for deletion');
+        return;
+      }
+
+      const confirmationInput = document.getElementById('delete-confirmation-input').value;
+
+      try {
+        const response = await fetch(`/api/apps/${currentAppForSettings}`, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            confirmationName: confirmationInput
+          })
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+          closeDeleteConfirmation();
+          closeSettingsModal();
+          showToast(result.message, 'success');
+          fetchApps();
+        } else {
+          showToast(result.error || 'Failed to delete app', 'error');
+        }
+      } catch (error) {
+        console.error('Error deleting app:', error);
+        showToast('Failed to delete app', 'error');
+      }
     }
   </script>
 

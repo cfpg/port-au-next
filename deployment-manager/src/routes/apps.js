@@ -7,6 +7,18 @@ const { stopContainer, buildAndStartContainer } = require('../services/docker');
 const { pool } = require('../config/database');
 const logger = require('../services/logger');
 const cloudflare = require('../services/cloudflare');
+const docker = require('../services/docker');
+const nginx = require('../services/nginx');
+const git = require('../services/git');
+const database = require('../services/database');
+
+console.log('Registering apps routes...');
+
+// Add this before all routes
+router.use((req, res, next) => {
+  console.log('Apps route hit:', req.method, req.path);
+  next();
+});
 
 router.get('/', async (req, res) => {
   try {
@@ -458,6 +470,117 @@ router.post('/:name/settings', async (req, res) => {
   } catch (error) {
     console.error('Error updating settings:', error);
     res.status(500).json({ error: 'Failed to update settings' });
+  }
+});
+
+// Add this alternative route
+router.delete('/:name', async (req, res) => {
+  const { name } = req.params;
+  const { confirmationName } = req.body;
+
+  if (!confirmationName || confirmationName !== name) {
+    return res.status(400).json({ 
+      error: 'Confirmation name does not match app name' 
+    });
+  }
+
+  const deletionStatus = {
+    success: false,
+    containers: { success: false, error: null },
+    nginx: { success: false, error: null },
+    repository: { success: false, error: null },
+    database: { success: false, error: null },
+    appRecord: { success: false, error: null }
+  };
+  
+  try {
+    // First verify the app exists
+    const appResult = await pool.query(
+      'SELECT * FROM apps WHERE name = $1',
+      [name]
+    );
+
+    if (appResult.rows.length === 0) {
+      return res.status(404).json({ error: 'App not found' });
+    }
+
+    const app = appResult.rows[0];
+    await logger.info(`Starting deletion process for app ${name}`);
+
+    // Delete app data from each service, continuing even if individual steps fail
+    try {
+      // 1. Stop and remove all containers
+      try {
+        await docker.deleteAppContainers(name);
+        deletionStatus.containers.success = true;
+        await logger.info('Removed all Docker containers');
+      } catch (error) {
+        deletionStatus.containers.error = error.message;
+        await logger.error('Failed to remove Docker containers', error);
+      }
+
+      // 2. Remove nginx configuration
+      try {
+        await nginx.deleteAppConfig(app.domain);
+        deletionStatus.nginx.success = true;
+        await logger.info('Removed Nginx configuration');
+      } catch (error) {
+        deletionStatus.nginx.error = error.message;
+        await logger.error('Failed to remove Nginx configuration', error);
+      }
+
+      // 3. Remove git repository
+      try {
+        await git.deleteRepository(name);
+        deletionStatus.repository.success = true;
+        await logger.info('Removed Git repository');
+      } catch (error) {
+        deletionStatus.repository.error = error.message;
+        await logger.error('Failed to remove Git repository', error);
+      }
+
+      // 4. Remove database resources
+      try {
+        await database.deleteAppDatabase(app.db_name, app.db_user);
+        deletionStatus.database.success = true;
+        await logger.info('Removed database resources');
+      } catch (error) {
+        deletionStatus.database.error = error.message;
+        await logger.error('Failed to remove database resources', error);
+      }
+
+      // 5. Finally, remove the app record only if it still exists
+      try {
+        await database.deleteAppRecord(app.id);
+        deletionStatus.appRecord.success = true;
+        await logger.info('Removed app records from management database');
+      } catch (error) {
+        deletionStatus.appRecord.error = error.message;
+        await logger.error('Failed to remove app records', error);
+      }
+
+      // Check if everything was successful
+      deletionStatus.success = Object.values(deletionStatus)
+        .every(status => status === true || (typeof status === 'object' && status.success === true));
+
+      const statusCode = deletionStatus.success ? 200 : 207; // Use 207 Multi-Status if partial success
+      res.status(statusCode).json({
+        message: deletionStatus.success 
+          ? `App "${name}" and all associated resources have been deleted`
+          : `App "${name}" was partially deleted. Some resources may need manual cleanup.`,
+        details: deletionStatus
+      });
+
+    } catch (error) {
+      await logger.error('Unexpected error during app deletion', error);
+      res.status(500).json({ 
+        error: 'Failed to complete deletion process',
+        details: deletionStatus
+      });
+    }
+  } catch (error) {
+    console.error(`Error initiating app deletion: ${error.message}`);
+    res.status(500).json({ error: 'Failed to initiate app deletion' });
   }
 });
 

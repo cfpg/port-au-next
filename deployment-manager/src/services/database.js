@@ -152,9 +152,48 @@ async function updateDeploymentContainer(oldContainerId, newContainerId) {
   );
 }
 
+async function deleteAppDatabase(dbName, dbUser) {
+  try {
+    const tempPool = new Pool({
+      user: process.env.POSTGRES_USER,
+      password: process.env.POSTGRES_PASSWORD,
+      host: 'postgres',
+      database: 'postgres',
+      port: 5432
+    });
+
+    // Terminate all connections to the database
+    await tempPool.query(`
+      SELECT pg_terminate_backend(pid)
+      FROM pg_stat_activity 
+      WHERE datname = $1
+    `, [dbName]);
+
+    // Drop database and user
+    await tempPool.query(`DROP DATABASE IF EXISTS ${dbName}`);
+    await tempPool.query(`DROP USER IF EXISTS ${dbUser}`);
+
+    await tempPool.end();
+  } catch (error) {
+    console.error(`Error deleting app database: ${error.message}`);
+    throw error;
+  }
+}
+
+async function deleteAppRecord(appId) {
+  // Delete all related records first
+  await pool.query('DELETE FROM deployment_logs WHERE deployment_id IN (SELECT id FROM deployments WHERE app_id = $1)', [appId]);
+  await pool.query('DELETE FROM app_env_vars WHERE app_id = $1', [appId]);
+  await pool.query('DELETE FROM deployments WHERE app_id = $1', [appId]);
+  // Finally delete the app record
+  await pool.query('DELETE FROM apps WHERE id = $1', [appId]);
+}
+
 module.exports = {
   initializeDatabase,
   setupAppDatabase,
   getActiveDeployments,
-  updateDeploymentContainer
+  updateDeploymentContainer,
+  deleteAppDatabase,
+  deleteAppRecord
 }; 
