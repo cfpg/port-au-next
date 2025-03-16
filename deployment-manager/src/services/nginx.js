@@ -33,6 +33,12 @@ server {
     listen [::]:80;
     server_name ${domain};
     
+    # Increase buffer size settings
+    proxy_buffer_size 128k;
+    proxy_buffers 4 256k;
+    proxy_busy_buffers_size 256k;
+    proxy_max_temp_file_size 0;
+    
     # Cache settings for static files, images and Next.js image optimization
     location ~* (\.(jpg|jpeg|png|gif|ico|webp|svg|woff2|woff|ttf|mp4)$|/_next/image\?) {
         proxy_pass http://${upstreamServer};
