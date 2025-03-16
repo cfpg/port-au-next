@@ -7,6 +7,18 @@ const { stopContainer, buildAndStartContainer } = require('../services/docker');
 const { pool } = require('../config/database');
 const logger = require('../services/logger');
 const cloudflare = require('../services/cloudflare');
+const docker = require('../services/docker');
+const nginx = require('../services/nginx');
+const git = require('../services/git');
+const database = require('../services/database');
+
+console.log('Registering apps routes...');
+
+// Add this before all routes
+router.use((req, res, next) => {
+  console.log('Apps route hit:', req.method, req.path);
+  next();
+});
 
 router.get('/', async (req, res) => {
   try {
@@ -33,10 +45,37 @@ router.get('/', async (req, res) => {
 
 router.post('/', async (req, res) => {
   const { name, repo_url, branch = 'main', domain } = req.body;
-  
+
   try {
+    if (!name || !repo_url || !domain) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    // Check if app already exists
+    const existingApp = await pool.query(
+      'SELECT * FROM apps WHERE name = $1 OR domain = $2',
+      [name, domain]
+    );
+
+    let isUpdate = false;
+    if (existingApp.rows.length > 0) {
+      const existing = existingApp.rows[0];
+
+      if (existing.domain !== domain && existing.name === name) {
+        return res.status(409).json({ error: `App with name "${name}" already exists` });
+      }
+
+      if (existing.domain === domain && existing.name !== name) {
+        return res.status(409).json({ error: `Domain "${domain}" is already in use by app "${existing.name}"` });
+      }
+
+      // App exists with same name and domain - update it
+      console.log(`Updating existing app ${name}`);
+      isUpdate = true;
+    }
+
     let cloudflare_zone_id = null;
-    
+
     // Try to get Zone ID if domain is provided
     if (domain) {
       try {
@@ -47,21 +86,40 @@ router.post('/', async (req, res) => {
       }
     }
 
-    const result = await pool.query(
-      `INSERT INTO apps (name, repo_url, branch, domain, cloudflare_zone_id)
-       VALUES ($1, $2, $3, $4, $5)
-       ON CONFLICT (name) 
-       DO UPDATE SET 
-         repo_url = EXCLUDED.repo_url,
-         branch = EXCLUDED.branch,
-         domain = EXCLUDED.domain,
-         cloudflare_zone_id = EXCLUDED.cloudflare_zone_id
-       RETURNING *`,
-      [name, repo_url, branch, domain, cloudflare_zone_id]
-    );
-
     // Setup database (creates or updates)
     const dbCredentials = await setupAppDatabase(name);
+
+    // Database operation (create or update)
+    if (isUpdate) {
+      await pool.query(
+        `UPDATE apps 
+         SET repo_url = $1, branch = $2, 
+             db_name = $3, db_user = $4, db_password = $5, cloudflare_zone_id = $6
+         WHERE name = $7`,
+        [
+          repo_url, branch,
+          dbCredentials.dbName,
+          dbCredentials.dbUser,
+          dbCredentials.dbPassword,
+          cloudflare_zone_id,
+          name
+        ]
+      );
+    } else {
+      await pool.query(
+        `INSERT INTO apps (
+          name, repo_url, branch, domain, 
+          db_name, db_user, db_password, cloudflare_zone_id
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [
+          name, repo_url, branch, domain,
+          dbCredentials.dbName,
+          dbCredentials.dbUser,
+          dbCredentials.dbPassword,
+          cloudflare_zone_id
+        ]
+      );
+    }
 
     // If we got here, database operations succeeded
     // Now setup git and nginx
@@ -74,8 +132,8 @@ router.post('/', async (req, res) => {
       // as partially configured
     }
 
-    res.status(200).json({
-      message: `App "${name}" updated successfully`,
+    res.status(isUpdate ? 200 : 201).json({
+      message: isUpdate ? `App "${name}" updated successfully` : `App "${name}" created successfully`,
       name,
       repo_url,
       branch,
@@ -90,7 +148,7 @@ router.post('/', async (req, res) => {
 
 router.get('/:name/deployments', async (req, res) => {
   const { name } = req.params;
-  
+
   try {
     const result = await pool.query(`
       SELECT d.* 
@@ -99,7 +157,7 @@ router.get('/:name/deployments', async (req, res) => {
       WHERE a.name = $1
       ORDER BY d.deployed_at DESC
     `, [name]);
-    
+
     res.json(result.rows);
   } catch (error) {
     console.error(`Error fetching deployments for ${name}: ${error.message}`);
@@ -110,14 +168,14 @@ router.get('/:name/deployments', async (req, res) => {
 router.post('/:name/deploy', async (req, res) => {
   const { name } = req.params;
   let deploymentId;
-  
+
   try {
     // Get app details
     const appResult = await pool.query(
       'SELECT * FROM apps WHERE name = $1',
       [name]
     );
-    
+
     if (appResult.rows.length === 0) {
       return res.status(404).json({ error: 'App not found' });
     }
@@ -132,7 +190,7 @@ router.post('/:name/deploy', async (req, res) => {
        RETURNING id`,
       [app.id, version, 'pending']
     );
-    
+
     deploymentId = deploymentResult.rows[0].id;
     logger.setDeploymentContext(deploymentId);
     await logger.info('Deployment record created', { version });
@@ -142,7 +200,7 @@ router.post('/:name/deploy', async (req, res) => {
       try {
         await logger.info('Starting deployment process');
         await logger.info('Updating deployment status to building');
-        
+
         await pool.query(
           'UPDATE deployments SET status = $1 WHERE id = $2',
           ['building', deploymentId]
@@ -150,7 +208,7 @@ router.post('/:name/deploy', async (req, res) => {
 
         await logger.info(`Pulling latest changes from branch ${app.branch}`);
         await pullLatestChanges(name, app.branch);
-        
+
         const commitId = await getLatestCommit(name);
         await logger.info('Got latest commit', { commitId });
 
@@ -188,7 +246,7 @@ router.post('/:name/deploy', async (req, res) => {
           const oldContainerId = oldDeployment.rows[0].container_id;
           await logger.info('Stopping old container', { oldContainerId });
           await stopContainer(oldContainerId);
-          
+
           await pool.query(
             `UPDATE deployments 
              SET status = 'inactive' 
@@ -217,7 +275,7 @@ router.post('/:name/deploy', async (req, res) => {
               oldCommitId,
               commitId
             );
-            
+
             if (changedAssets.length > 0) {
               await cloudflare.purgeCache(
                 app.domain,
@@ -247,10 +305,10 @@ router.post('/:name/deploy', async (req, res) => {
       }
     })();
 
-    res.json({ 
-      message: 'Deployment started', 
-      deploymentId, 
-      version 
+    res.json({
+      message: 'Deployment started',
+      deploymentId,
+      version
     });
   } catch (error) {
     logger.error('Error initiating deployment', error);
@@ -360,11 +418,11 @@ router.get('/:name', async (req, res) => {
       'SELECT * FROM apps WHERE name = $1',
       [req.params.name]
     );
-    
+
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'App not found' });
     }
-    
+
     res.json(result.rows[0]);
   } catch (error) {
     console.error('Error fetching app:', error);
@@ -379,18 +437,18 @@ router.get('/:name/fetch-zone-id', async (req, res) => {
       'SELECT domain FROM apps WHERE name = $1',
       [req.params.name]
     );
-    
+
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'App not found' });
     }
-    
+
     const { domain } = result.rows[0];
     const zoneId = await cloudflare.getZoneId(domain);
-    
+
     if (!zoneId) {
       return res.status(404).json({ error: 'Zone ID not found for domain' });
     }
-    
+
     res.json({ zoneId });
   } catch (error) {
     console.error('Error fetching Zone ID:', error);
@@ -400,18 +458,166 @@ router.get('/:name/fetch-zone-id', async (req, res) => {
 
 // Update app settings
 router.post('/:name/settings', async (req, res) => {
+  const { name } = req.params;
+  const { name: newName, domain, repo_url, branch, cloudflare_zone_id } = req.body;
+
   try {
-    const { cloudflare_zone_id } = req.body;
-    
-    await pool.query(
-      'UPDATE apps SET cloudflare_zone_id = $1 WHERE name = $2',
-      [cloudflare_zone_id, req.params.name]
+    // First check if the app exists
+    const appResult = await pool.query(
+      'SELECT * FROM apps WHERE name = $1',
+      [name]
     );
-    
+
+    if (appResult.rows.length === 0) {
+      return res.status(404).json({ error: 'App not found' });
+    }
+
+    // If name is being changed, check if new name is available
+    if (newName !== name) {
+      const nameCheck = await pool.query(
+        'SELECT * FROM apps WHERE name = $1 AND name != $2',
+        [newName, name]
+      );
+      if (nameCheck.rows.length > 0) {
+        return res.status(409).json({ error: 'App name already taken' });
+      }
+    }
+
+    // If domain is being changed, check if new domain is available
+    if (domain !== appResult.rows[0].domain) {
+      const domainCheck = await pool.query(
+        'SELECT * FROM apps WHERE domain = $1 AND name != $2',
+        [domain, name]
+      );
+      if (domainCheck.rows.length > 0) {
+        return res.status(409).json({ error: 'Domain already in use' });
+      }
+    }
+
+    // Update the app settings
+    await pool.query(
+      `UPDATE apps 
+       SET name = $1, domain = $2, repo_url = $3, branch = $4, cloudflare_zone_id = $5
+       WHERE name = $6`,
+      [newName, domain, repo_url, branch, cloudflare_zone_id, name]
+    );
+
+    await logger.info(`Updated settings for app ${name}${newName !== name ? ` (renamed to ${newName})` : ''}`);
     res.json({ message: 'Settings updated successfully' });
   } catch (error) {
-    console.error('Error updating settings:', error);
+    await logger.error('Error updating app settings:', error);
     res.status(500).json({ error: 'Failed to update settings' });
+  }
+});
+
+// Add this alternative route
+router.delete('/:name', async (req, res) => {
+  const { name } = req.params;
+  const { confirmationName } = req.body;
+
+  if (!confirmationName || confirmationName !== name) {
+    return res.status(400).json({ 
+      error: 'Confirmation name does not match app name' 
+    });
+  }
+
+  const deletionStatus = {
+    success: false,
+    containers: { success: false, error: null },
+    nginx: { success: false, error: null },
+    repository: { success: false, error: null },
+    database: { success: false, error: null },
+    appRecord: { success: false, error: null }
+  };
+  
+  try {
+    // First verify the app exists
+    const appResult = await pool.query(
+      'SELECT * FROM apps WHERE name = $1',
+      [name]
+    );
+
+    if (appResult.rows.length === 0) {
+      return res.status(404).json({ error: 'App not found' });
+    }
+
+    const app = appResult.rows[0];
+    await logger.info(`Starting deletion process for app ${name}`);
+
+    // Delete app data from each service, continuing even if individual steps fail
+    try {
+      // 1. Stop and remove all containers
+      try {
+        await docker.deleteAppContainers(name);
+        deletionStatus.containers.success = true;
+        await logger.info('Removed all Docker containers');
+      } catch (error) {
+        deletionStatus.containers.error = error.message;
+        await logger.error('Failed to remove Docker containers', error);
+      }
+
+      // 2. Remove nginx configuration
+      try {
+        await nginx.deleteAppConfig(app.domain);
+        deletionStatus.nginx.success = true;
+        await logger.info('Removed Nginx configuration');
+      } catch (error) {
+        deletionStatus.nginx.error = error.message;
+        await logger.error('Failed to remove Nginx configuration', error);
+      }
+
+      // 3. Remove git repository
+      try {
+        await git.deleteRepository(name);
+        deletionStatus.repository.success = true;
+        await logger.info('Removed Git repository');
+      } catch (error) {
+        deletionStatus.repository.error = error.message;
+        await logger.error('Failed to remove Git repository', error);
+      }
+
+      // 4. Remove database resources
+      try {
+        await database.deleteAppDatabase(app.db_name, app.db_user);
+        deletionStatus.database.success = true;
+        await logger.info('Removed database resources');
+      } catch (error) {
+        deletionStatus.database.error = error.message;
+        await logger.error('Failed to remove database resources', error);
+      }
+
+      // 5. Finally, remove the app record only if it still exists
+      try {
+        await database.deleteAppRecord(app.id);
+        deletionStatus.appRecord.success = true;
+        await logger.info('Removed app records from management database');
+      } catch (error) {
+        deletionStatus.appRecord.error = error.message;
+        await logger.error('Failed to remove app records', error);
+      }
+
+      // Check if everything was successful
+      deletionStatus.success = Object.values(deletionStatus)
+        .every(status => status === true || (typeof status === 'object' && status.success === true));
+
+      const statusCode = deletionStatus.success ? 200 : 207; // Use 207 Multi-Status if partial success
+      res.status(statusCode).json({
+        message: deletionStatus.success 
+          ? `App "${name}" and all associated resources have been deleted`
+          : `App "${name}" was partially deleted. Some resources may need manual cleanup.`,
+        details: deletionStatus
+      });
+
+    } catch (error) {
+      await logger.error('Unexpected error during app deletion', error);
+      res.status(500).json({ 
+        error: 'Failed to complete deletion process',
+        details: deletionStatus
+      });
+    }
+  } catch (error) {
+    console.error(`Error initiating app deletion: ${error.message}`);
+    res.status(500).json({ error: 'Failed to initiate app deletion' });
   }
 });
 
