@@ -458,17 +458,54 @@ router.get('/:name/fetch-zone-id', async (req, res) => {
 
 // Update app settings
 router.post('/:name/settings', async (req, res) => {
-  try {
-    const { cloudflare_zone_id } = req.body;
+  const { name } = req.params;
+  const { name: newName, domain, repo_url, branch, cloudflare_zone_id } = req.body;
 
-    await pool.query(
-      'UPDATE apps SET cloudflare_zone_id = $1 WHERE name = $2',
-      [cloudflare_zone_id, req.params.name]
+  try {
+    // First check if the app exists
+    const appResult = await pool.query(
+      'SELECT * FROM apps WHERE name = $1',
+      [name]
     );
 
+    if (appResult.rows.length === 0) {
+      return res.status(404).json({ error: 'App not found' });
+    }
+
+    // If name is being changed, check if new name is available
+    if (newName !== name) {
+      const nameCheck = await pool.query(
+        'SELECT * FROM apps WHERE name = $1 AND name != $2',
+        [newName, name]
+      );
+      if (nameCheck.rows.length > 0) {
+        return res.status(409).json({ error: 'App name already taken' });
+      }
+    }
+
+    // If domain is being changed, check if new domain is available
+    if (domain !== appResult.rows[0].domain) {
+      const domainCheck = await pool.query(
+        'SELECT * FROM apps WHERE domain = $1 AND name != $2',
+        [domain, name]
+      );
+      if (domainCheck.rows.length > 0) {
+        return res.status(409).json({ error: 'Domain already in use' });
+      }
+    }
+
+    // Update the app settings
+    await pool.query(
+      `UPDATE apps 
+       SET name = $1, domain = $2, repo_url = $3, branch = $4, cloudflare_zone_id = $5
+       WHERE name = $6`,
+      [newName, domain, repo_url, branch, cloudflare_zone_id, name]
+    );
+
+    await logger.info(`Updated settings for app ${name}${newName !== name ? ` (renamed to ${newName})` : ''}`);
     res.json({ message: 'Settings updated successfully' });
   } catch (error) {
-    console.error('Error updating settings:', error);
+    await logger.error('Error updating app settings:', error);
     res.status(500).json({ error: 'Failed to update settings' });
   }
 });
