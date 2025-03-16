@@ -33,10 +33,37 @@ router.get('/', async (req, res) => {
 
 router.post('/', async (req, res) => {
   const { name, repo_url, branch = 'main', domain } = req.body;
-  
+
   try {
+    if (!name || !repo_url || !domain) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    // Check if app already exists
+    const existingApp = await pool.query(
+      'SELECT * FROM apps WHERE name = $1 OR domain = $2',
+      [name, domain]
+    );
+
+    let isUpdate = false;
+    if (existingApp.rows.length > 0) {
+      const existing = existingApp.rows[0];
+
+      if (existing.domain !== domain && existing.name === name) {
+        return res.status(409).json({ error: `App with name "${name}" already exists` });
+      }
+
+      if (existing.domain === domain && existing.name !== name) {
+        return res.status(409).json({ error: `Domain "${domain}" is already in use by app "${existing.name}"` });
+      }
+
+      // App exists with same name and domain - update it
+      console.log(`Updating existing app ${name}`);
+      isUpdate = true;
+    }
+
     let cloudflare_zone_id = null;
-    
+
     // Try to get Zone ID if domain is provided
     if (domain) {
       try {
@@ -47,21 +74,40 @@ router.post('/', async (req, res) => {
       }
     }
 
-    const result = await pool.query(
-      `INSERT INTO apps (name, repo_url, branch, domain, cloudflare_zone_id)
-       VALUES ($1, $2, $3, $4, $5)
-       ON CONFLICT (name) 
-       DO UPDATE SET 
-         repo_url = EXCLUDED.repo_url,
-         branch = EXCLUDED.branch,
-         domain = EXCLUDED.domain,
-         cloudflare_zone_id = EXCLUDED.cloudflare_zone_id
-       RETURNING *`,
-      [name, repo_url, branch, domain, cloudflare_zone_id]
-    );
-
     // Setup database (creates or updates)
     const dbCredentials = await setupAppDatabase(name);
+
+    // Database operation (create or update)
+    if (isUpdate) {
+      await pool.query(
+        `UPDATE apps 
+         SET repo_url = $1, branch = $2, 
+             db_name = $3, db_user = $4, db_password = $5, cloudflare_zone_id = $6
+         WHERE name = $7`,
+        [
+          repo_url, branch,
+          dbCredentials.dbName,
+          dbCredentials.dbUser,
+          dbCredentials.dbPassword,
+          cloudflare_zone_id,
+          name
+        ]
+      );
+    } else {
+      await pool.query(
+        `INSERT INTO apps (
+          name, repo_url, branch, domain, 
+          db_name, db_user, db_password, cloudflare_zone_id
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [
+          name, repo_url, branch, domain,
+          dbCredentials.dbName,
+          dbCredentials.dbUser,
+          dbCredentials.dbPassword,
+          cloudflare_zone_id
+        ]
+      );
+    }
 
     // If we got here, database operations succeeded
     // Now setup git and nginx
@@ -74,8 +120,8 @@ router.post('/', async (req, res) => {
       // as partially configured
     }
 
-    res.status(200).json({
-      message: `App "${name}" updated successfully`,
+    res.status(isUpdate ? 200 : 201).json({
+      message: isUpdate ? `App "${name}" updated successfully` : `App "${name}" created successfully`,
       name,
       repo_url,
       branch,
@@ -90,7 +136,7 @@ router.post('/', async (req, res) => {
 
 router.get('/:name/deployments', async (req, res) => {
   const { name } = req.params;
-  
+
   try {
     const result = await pool.query(`
       SELECT d.* 
@@ -99,7 +145,7 @@ router.get('/:name/deployments', async (req, res) => {
       WHERE a.name = $1
       ORDER BY d.deployed_at DESC
     `, [name]);
-    
+
     res.json(result.rows);
   } catch (error) {
     console.error(`Error fetching deployments for ${name}: ${error.message}`);
@@ -110,14 +156,14 @@ router.get('/:name/deployments', async (req, res) => {
 router.post('/:name/deploy', async (req, res) => {
   const { name } = req.params;
   let deploymentId;
-  
+
   try {
     // Get app details
     const appResult = await pool.query(
       'SELECT * FROM apps WHERE name = $1',
       [name]
     );
-    
+
     if (appResult.rows.length === 0) {
       return res.status(404).json({ error: 'App not found' });
     }
@@ -132,7 +178,7 @@ router.post('/:name/deploy', async (req, res) => {
        RETURNING id`,
       [app.id, version, 'pending']
     );
-    
+
     deploymentId = deploymentResult.rows[0].id;
     logger.setDeploymentContext(deploymentId);
     await logger.info('Deployment record created', { version });
@@ -142,7 +188,7 @@ router.post('/:name/deploy', async (req, res) => {
       try {
         await logger.info('Starting deployment process');
         await logger.info('Updating deployment status to building');
-        
+
         await pool.query(
           'UPDATE deployments SET status = $1 WHERE id = $2',
           ['building', deploymentId]
@@ -150,7 +196,7 @@ router.post('/:name/deploy', async (req, res) => {
 
         await logger.info(`Pulling latest changes from branch ${app.branch}`);
         await pullLatestChanges(name, app.branch);
-        
+
         const commitId = await getLatestCommit(name);
         await logger.info('Got latest commit', { commitId });
 
@@ -188,7 +234,7 @@ router.post('/:name/deploy', async (req, res) => {
           const oldContainerId = oldDeployment.rows[0].container_id;
           await logger.info('Stopping old container', { oldContainerId });
           await stopContainer(oldContainerId);
-          
+
           await pool.query(
             `UPDATE deployments 
              SET status = 'inactive' 
@@ -217,7 +263,7 @@ router.post('/:name/deploy', async (req, res) => {
               oldCommitId,
               commitId
             );
-            
+
             if (changedAssets.length > 0) {
               await cloudflare.purgeCache(
                 app.domain,
@@ -247,10 +293,10 @@ router.post('/:name/deploy', async (req, res) => {
       }
     })();
 
-    res.json({ 
-      message: 'Deployment started', 
-      deploymentId, 
-      version 
+    res.json({
+      message: 'Deployment started',
+      deploymentId,
+      version
     });
   } catch (error) {
     logger.error('Error initiating deployment', error);
@@ -360,11 +406,11 @@ router.get('/:name', async (req, res) => {
       'SELECT * FROM apps WHERE name = $1',
       [req.params.name]
     );
-    
+
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'App not found' });
     }
-    
+
     res.json(result.rows[0]);
   } catch (error) {
     console.error('Error fetching app:', error);
@@ -379,18 +425,18 @@ router.get('/:name/fetch-zone-id', async (req, res) => {
       'SELECT domain FROM apps WHERE name = $1',
       [req.params.name]
     );
-    
+
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'App not found' });
     }
-    
+
     const { domain } = result.rows[0];
     const zoneId = await cloudflare.getZoneId(domain);
-    
+
     if (!zoneId) {
       return res.status(404).json({ error: 'Zone ID not found for domain' });
     }
-    
+
     res.json({ zoneId });
   } catch (error) {
     console.error('Error fetching Zone ID:', error);
@@ -402,12 +448,12 @@ router.get('/:name/fetch-zone-id', async (req, res) => {
 router.post('/:name/settings', async (req, res) => {
   try {
     const { cloudflare_zone_id } = req.body;
-    
+
     await pool.query(
       'UPDATE apps SET cloudflare_zone_id = $1 WHERE name = $2',
       [cloudflare_zone_id, req.params.name]
     );
-    
+
     res.json({ message: 'Settings updated successfully' });
   } catch (error) {
     console.error('Error updating settings:', error);
