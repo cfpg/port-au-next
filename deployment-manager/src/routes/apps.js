@@ -14,12 +14,6 @@ const database = require('../services/database');
 
 console.log('Registering apps routes...');
 
-// Add this before all routes
-router.use((req, res, next) => {
-  console.log('Apps route hit:', req.method, req.path);
-  next();
-});
-
 router.get('/', async (req, res) => {
   try {
     const result = await pool.query(`
