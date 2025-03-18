@@ -6,6 +6,7 @@ interface AppRegistrationFormProps {
     repository: string;
     branch: string;
     port: number;
+    env: Record<string, string>;
   }) => void;
 }
 
@@ -15,6 +16,7 @@ export default function AppRegistrationForm({ onSubmit }: AppRegistrationFormPro
     repository: '',
     branch: 'main',
     port: 3000,
+    env: {},
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -25,6 +27,7 @@ export default function AppRegistrationForm({ onSubmit }: AppRegistrationFormPro
       repository: '',
       branch: 'main',
       port: 3000,
+      env: {},
     });
   };
 
