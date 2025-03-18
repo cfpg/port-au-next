@@ -343,6 +343,14 @@ async function recoverContainers() {
           if (!retryStatus || retryStatus.trim() !== 'running') {
             // Simply start the existing container instead of creating a new one
             await startExistingContainer(deployment.container_id);
+
+            // Container could start with a different IP address, so we need to update the nginx config
+            await updateNginxConfig(
+              deployment.name,
+              deployment.domain,
+              deployment.container_id
+            );
+
             await logger.info(`Successfully recovered existing container`, { 
               name: deployment.name,
               containerId: deployment.container_id 
