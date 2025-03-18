@@ -36,7 +36,7 @@ function getImageConfig(existingConfig = '') {
   // If no existing config, just return minimumCacheTTL
   return `images: {
     ${minimumCacheTTLConfig}
-  }`;
+  },`;
 }
 
 function getOutputStandaloneConfig() {
