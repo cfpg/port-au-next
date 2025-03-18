@@ -1,10 +1,21 @@
 interface App {
+  id: number;
   name: string;
   repository: string;
   branch: string;
-  port: number;
-  status: 'running' | 'stopped' | 'error';
-  last_deployment?: string;
+  domain?: string;
+  db_name?: string;
+  db_user?: string;
+  db_password?: string;
+  cloudflare_zone_id?: string;
+  env: Record<string, string>;
+  status: string;
+  last_deployment?: {
+    version: string;
+    commit_id: string;
+    status: string;
+    deployed_at: Date;
+  };
 }
 
 interface AppTableProps {
@@ -24,13 +35,15 @@ export default function AppTable({
   onEditSettings,
   onDelete,
 }: AppTableProps) {
-  const getStatusColor = (status: App['status']) => {
-    switch (status) {
+  const getStatusColor = (status: string) => {
+    switch (status.toLowerCase()) {
       case 'running':
+      case 'success':
         return 'bg-green-100 text-green-800';
       case 'stopped':
         return 'bg-gray-100 text-gray-800';
       case 'error':
+      case 'failed':
         return 'bg-red-100 text-red-800';
       default:
         return 'bg-gray-100 text-gray-800';
@@ -52,7 +65,7 @@ export default function AppTable({
               Branch
             </th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Port
+              Domain
             </th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               Status
@@ -67,7 +80,7 @@ export default function AppTable({
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
           {apps.map((app) => (
-            <tr key={app.name}>
+            <tr key={app.id}>
               <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                 {app.name}
               </td>
@@ -78,7 +91,7 @@ export default function AppTable({
                 {app.branch}
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                {app.port}
+                {app.domain || '-'}
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
                 <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(app.status)}`}>
@@ -86,7 +99,7 @@ export default function AppTable({
                 </span>
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                {app.last_deployment || 'Never'}
+                {app.last_deployment ? new Date(app.last_deployment.deployed_at).toLocaleString() : 'Never'}
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
                 <button

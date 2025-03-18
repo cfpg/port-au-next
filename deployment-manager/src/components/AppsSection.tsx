@@ -10,21 +10,43 @@ import SettingsModal from './SettingsModal';
 import DeleteConfirmationModal from './DeleteConfirmationModal';
 
 interface App {
+  id: number;
   name: string;
   repository: string;
   branch: string;
-  port: number;
-  status: 'running' | 'stopped' | 'error';
-  last_deployment?: string;
+  domain?: string;
+  db_name?: string;
+  db_user?: string;
+  db_password?: string;
+  cloudflare_zone_id?: string;
   env: Record<string, string>;
+  status: string;
+  last_deployment?: {
+    version: string;
+    commit_id: string;
+    status: string;
+    deployed_at: Date;
+  };
 }
 
 interface Deployment {
   version: string;
   commit_id: string;
-  status: 'success' | 'failed' | 'in_progress';
-  active_container: string;
-  deployed_at: string;
+  status: string;
+  container_id: string;
+  deployed_at: Date;
+}
+
+interface AppSettings {
+  name: string;
+  repository: string;
+  branch: string;
+  domain?: string;
+  db_name?: string;
+  db_user?: string;
+  db_password?: string;
+  cloudflare_zone_id?: string;
+  env: Record<string, string>;
 }
 
 interface AppsSectionProps {
@@ -117,7 +139,7 @@ export default function AppsSection({ initialApps, initialDeployments }: AppsSec
     }
   };
 
-  const handleSaveSettings = async (settings: Omit<App, 'status' | 'last_deployment'>) => {
+  const handleSaveSettings = async (settings: AppSettings) => {
     try {
       const response = await fetch(`/api/apps/${selectedApp?.name}/settings`, {
         method: 'PUT',
@@ -127,6 +149,13 @@ export default function AppsSection({ initialApps, initialDeployments }: AppsSec
       if (!response.ok) throw new Error('Failed to save settings');
       showToast('Settings saved successfully', 'success');
       setIsSettingsModalOpen(false);
+      
+      // Update the local state
+      setApps(apps.map(app => 
+        app.id === selectedApp?.id 
+          ? { ...app, ...settings }
+          : app
+      ));
     } catch (error) {
       showToast('Failed to save settings', 'error');
     }
@@ -197,7 +226,11 @@ export default function AppsSection({ initialApps, initialDeployments }: AppsSec
             name: '',
             repository: '',
             branch: 'main',
-            port: 3000,
+            domain: '',
+            db_name: '',
+            db_user: '',
+            db_password: '',
+            cloudflare_zone_id: '',
             env: {},
           }}
           onSave={handleSaveSettings}

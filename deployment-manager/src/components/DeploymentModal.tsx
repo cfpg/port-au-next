@@ -2,8 +2,8 @@ interface Deployment {
   version: string;
   commit_id: string;
   status: string;
-  active_container: string;
-  deployed_at: string;
+  container_id: string;
+  deployed_at: Date;
 }
 
 interface DeploymentModalProps {
@@ -62,7 +62,7 @@ export default function DeploymentModal({ appName, deployments, onViewLogs }: De
                     {deployment.status}
                   </span>
                 </td>
-                <td className="py-2 px-4 border-b border-gray-200">{deployment.active_container || 'N/A'}</td>
+                <td className="py-2 px-4 border-b border-gray-200">{deployment.container_id || 'N/A'}</td>
                 <td className="py-2 px-4 border-b border-gray-200">
                   {new Date(deployment.deployed_at).toLocaleString()}
                 </td>

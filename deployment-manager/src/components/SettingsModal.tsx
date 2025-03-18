@@ -4,7 +4,11 @@ interface AppSettings {
   name: string;
   repository: string;
   branch: string;
-  port: number;
+  domain?: string;
+  db_name?: string;
+  db_user?: string;
+  db_password?: string;
+  cloudflare_zone_id?: string;
   env: Record<string, string>;
 }
 
@@ -70,14 +74,66 @@ export default function SettingsModal({
       </div>
 
       <div>
-        <label htmlFor="port" className="block text-sm font-medium text-gray-700 mb-2">
-          Port:
+        <label htmlFor="domain" className="block text-sm font-medium text-gray-700 mb-2">
+          Domain:
         </label>
         <input
-          type="number"
-          id="port"
-          value={formData.port}
-          onChange={(e) => setFormData({ ...formData, port: parseInt(e.target.value) })}
+          type="text"
+          id="domain"
+          value={formData.domain || ''}
+          onChange={(e) => setFormData({ ...formData, domain: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+        />
+      </div>
+
+      <div>
+        <label htmlFor="db-name" className="block text-sm font-medium text-gray-700 mb-2">
+          Database Name:
+        </label>
+        <input
+          type="text"
+          id="db-name"
+          value={formData.db_name || ''}
+          onChange={(e) => setFormData({ ...formData, db_name: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+        />
+      </div>
+
+      <div>
+        <label htmlFor="db-user" className="block text-sm font-medium text-gray-700 mb-2">
+          Database User:
+        </label>
+        <input
+          type="text"
+          id="db-user"
+          value={formData.db_user || ''}
+          onChange={(e) => setFormData({ ...formData, db_user: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+        />
+      </div>
+
+      <div>
+        <label htmlFor="db-password" className="block text-sm font-medium text-gray-700 mb-2">
+          Database Password:
+        </label>
+        <input
+          type="password"
+          id="db-password"
+          value={formData.db_password || ''}
+          onChange={(e) => setFormData({ ...formData, db_password: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+        />
+      </div>
+
+      <div>
+        <label htmlFor="cloudflare-zone" className="block text-sm font-medium text-gray-700 mb-2">
+          Cloudflare Zone ID:
+        </label>
+        <input
+          type="text"
+          id="cloudflare-zone"
+          value={formData.cloudflare_zone_id || ''}
+          onChange={(e) => setFormData({ ...formData, cloudflare_zone_id: e.target.value })}
           className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
         />
       </div>

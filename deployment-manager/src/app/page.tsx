@@ -1,22 +1,19 @@
-import DashboardLayout from '~/components/layouts/DashboardLayout';
 import AppsSection from '~/components/AppsSection';
 import AppRegistrationSection from '~/components/AppRegistrationSection';
 import fetchApps from '~/queries/fetchApps';
-
-interface Deployment {
-  version: string;
-  commit_id: string;
-  status: 'success' | 'failed' | 'in_progress';
-  active_container: string;
-  deployed_at: string;
-}
+import fetchDeployments from '~/queries/fetchDeployments';
 
 export default async function Home() {
-  const apps = await fetchApps();
-  const deployments: Deployment[] = []; // TODO: Implement fetchDeployments query
+  // Fetch both apps and deployments in parallel
+  const [apps, deployments] = await Promise.all([
+    fetchApps(),
+    fetchDeployments()
+  ]);
 
   return (
-    <DashboardLayout>
+    <main className="container mx-auto px-4 py-8">
+      <h1 className="text-3xl font-bold mb-8">Port-au-Next Dashboard</h1>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2">
           <AppsSection
@@ -29,6 +26,6 @@ export default async function Home() {
           <AppRegistrationSection />
         </div>
       </div>
-    </DashboardLayout>
+    </main>
   );
 }
