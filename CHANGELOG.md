@@ -1,0 +1,30 @@
+# Changelog
+All notable changes to Port-Au-Next will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [0.1.0] - 2025-03-17
+
+### Added
+- Initial release of Port-Au-Next
+- Blue/green deployment strategy for Next.js applications
+- Multi-tenant application support
+- Environment variables management per app/branch
+- Deployment logs system
+- Cloudflare integration for cache management
+- Docker container recovery system
+- Web-based management UI
+- Nginx reverse proxy with caching optimizations
+- Default Dockerfile generation for Next.js apps
+- GitHub integration for automated deployments
+
+### Fixed
+- Trailing comma issue in next.config file
+- Nginx IP configuration after container recovery
+- Proxy buffer size for deployed apps
+- Next.js image optimization and caching
+- Docker build logging improvements
+
+### Security
+- Updated axios to 1.8.2 for security patches 
