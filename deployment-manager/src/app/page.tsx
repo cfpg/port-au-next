@@ -1,6 +1,7 @@
 import AppsSection from '~/components/AppsSection';
 import AppRegistrationSection from '~/components/AppRegistrationSection';
 import { fetchApps, fetchRecentDeployments } from '~/app/actions';
+import { Deployment } from '~/types';
 
 export default async function Home() {
   // Fetch both apps and deployments in parallel
@@ -17,7 +18,7 @@ export default async function Home() {
         <div className="col-span-12">
           <AppsSection
             initialApps={apps}
-            initialDeployments={deployments}
+            initialDeployments={deployments as Deployment[]}
           />
         </div>
 

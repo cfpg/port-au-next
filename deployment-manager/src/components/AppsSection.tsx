@@ -77,7 +77,7 @@ export default function AppsSection({ initialApps, initialDeployments }: AppsSec
     // Continously pool for deployments data
     const poolDeployments = async () => {
       const response = await fetchRecentDeployments();
-      setDeployments(response);
+      setDeployments(response as Deployment[]);
     };
 
     const scheduleNextPoolDeployments = () => {

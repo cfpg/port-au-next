@@ -1,3 +1,3 @@
 export default function getSingleAppPath(appName: string) {
-  return `/apps/${appName}`;
+  return `/app/${appName}`;
 }

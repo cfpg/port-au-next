@@ -1,6 +1,6 @@
 import { getStatusColor } from '~/utils/status';
-import Button from './general/Button';
-import Link from './general/Link';
+import Button from '~/components/general/Button';
+import Link from '~/components/general/Link';
 import getSingleAppPath from '~/utils/getSingleAppPath';
 
 interface App {
@@ -81,7 +81,7 @@ export default function AppTable({
                 {app.branch}
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                {app.domain || '-'}
+                <a href={`https://${app.domain}`} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700 underline">{app.domain}</a>
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
                 <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(app.status)}`}>
