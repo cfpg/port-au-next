@@ -1,7 +1,6 @@
 import AppsSection from '~/components/AppsSection';
 import AppRegistrationSection from '~/components/AppRegistrationSection';
-import fetchApps from '~/queries/fetchApps';
-import fetchRecentDeployments from '~/queries/fetchRecentDeployments';
+import { fetchApps, fetchRecentDeployments } from '~/app/actions';
 
 export default async function Home() {
   // Fetch both apps and deployments in parallel
@@ -11,7 +10,7 @@ export default async function Home() {
   ]);
 
   return (
-    <main className="container mx-auto px-4 py-8">
+    <main className="">
       <h1 className="text-3xl font-bold mb-8">Port-au-Next Dashboard</h1>
 
       <div className="grid grid-cols-12 gap-8">
@@ -22,7 +21,7 @@ export default async function Home() {
           />
         </div>
 
-        <div className="col-span-12">
+        <div className="col-span-12" id="new">
           <AppRegistrationSection />
         </div>
       </div>

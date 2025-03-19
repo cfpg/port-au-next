@@ -2,6 +2,9 @@ import Cloudflare from 'cloudflare';
 import { exec } from 'child_process';
 import path from 'path';
 import logger from '~/services/logger';
+import getAppsDir from '~/utils/getAppsDir';
+
+const APPS_DIR = getAppsDir();
 
 class CloudflareService {
   private cf!: Cloudflare;
@@ -23,7 +26,7 @@ class CloudflareService {
   async getChangedAssets(appName: string, oldCommit: string, newCommit: string) {
     if (!this.enabled) return [];
     
-    const appDir = path.join(process.env.HOST_APPS_DIR || '/app/apps', appName);
+    const appDir = path.join(APPS_DIR, appName);
     
     return new Promise<string[]>((resolve, reject) => {
       // Use git diff with pathspec to only show specific file types

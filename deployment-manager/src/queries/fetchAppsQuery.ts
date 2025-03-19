@@ -20,7 +20,7 @@ export interface App {
   };
 }
 
-export default async function fetchApps(): Promise<App[]> {
+export default async function fetchAppsQuery(): Promise<App[]> {
   try {
     // Get apps with their latest deployment status and environment variables
     const result = await pool.query<App>(`
@@ -77,7 +77,7 @@ export default async function fetchApps(): Promise<App[]> {
         d.commit_id,
         d.status,
         d.deployed_at
-      ORDER BY a.name;
+      ORDER BY d.deployed_at DESC NULLS LAST, a.name;
     `);
 
     return result.rows;

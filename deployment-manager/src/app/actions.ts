@@ -7,6 +7,18 @@ import { updateNginxConfig } from '~/services/nginx';
 import cloudflare from '~/services/cloudflare';
 import { getLatestCommit } from '~/services/git';
 import { pullLatestChanges } from '~/services/git';
+import fetchAppsQuery from '~/queries/fetchAppsQuery';
+import fetchRecentDeploymentsQuery from '~/queries/fetchRecentDeploymentsQuery';
+
+export async function fetchApps() {
+  const apps = await fetchAppsQuery();
+  return apps;
+}
+
+export async function fetchRecentDeployments() {
+  const deployments = await fetchRecentDeploymentsQuery();
+  return deployments;
+}
 
 export async function triggerDeployment(appName: string) {
   let deploymentId: number;

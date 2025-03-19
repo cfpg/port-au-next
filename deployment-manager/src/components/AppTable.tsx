@@ -1,5 +1,7 @@
 import { getStatusColor } from '~/utils/status';
 import Button from './general/Button';
+import Link from './general/Link';
+import getSingleAppPath from '~/utils/getSingleAppPath';
 
 interface App {
   id: number;
@@ -70,7 +72,7 @@ export default function AppTable({
           {apps.map((app) => (
             <tr key={app.id}>
               <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                {app.name}
+                <Link href={getSingleAppPath(app.name)} variant="nav">{app.name}</Link>
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                 {app.repository}
@@ -95,6 +97,7 @@ export default function AppTable({
                   color="primary"
                   size="sm"
                 >
+                  <i className="fas fa-rocket mr-2"></i>
                   Deploy
                 </Button>
                 <Button
@@ -102,6 +105,7 @@ export default function AppTable({
                   color="blue"
                   size="sm"
                 >
+                  <i className="fas fa-history mr-2"></i>
                   History
                 </Button>
                 <Button
@@ -109,6 +113,7 @@ export default function AppTable({
                   color="green"
                   size="sm"
                 >
+                  <i className="fas fa-laptop-code mr-2"></i>
                   Env Vars
                 </Button>
                 <Button
@@ -116,6 +121,7 @@ export default function AppTable({
                   color="yellow"
                   size="sm"
                 >
+                  <i className="fas fa-gear mr-2"></i>
                   Settings
                 </Button>
                 <Button
@@ -123,6 +129,7 @@ export default function AppTable({
                   color="red"
                   size="sm"
                 >
+                  <i className="fas fa-trash mr-2"></i>
                   Delete
                 </Button>
               </td>

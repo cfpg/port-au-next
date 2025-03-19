@@ -2,8 +2,11 @@ import { exec } from 'child_process';
 import path from 'path';
 import fs from 'fs';
 import logger from '~/services/logger';
+import getAppsDir from '~/utils/getAppsDir';
 
-const APPS_DIR = path.join(__dirname, '../../apps');
+// Instead of using __dirname, we'll go up from the deployment-manager directory
+const APPS_DIR = getAppsDir();
+console.log("APPS_DIR", APPS_DIR);
 
 export async function isGitRepo(dir: string) {
   return new Promise((resolve) => {

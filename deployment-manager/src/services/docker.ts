@@ -8,6 +8,7 @@ import pool from '~/services/database';
 import { modifyNextConfig } from '~/services/nextConfig';
 
 import { execCommand } from '~/utils/docker';
+import getAppsDir from '~/utils/getAppsDir';
 
 // Types
 interface EnvVar {
@@ -21,7 +22,7 @@ interface ContainerInfo {
 }
 
 // Constants
-const APPS_DIR: string = process.env.HOST_APPS_DIR || '/app/apps';
+const APPS_DIR: string = getAppsDir();
 const networkName: string = 'port-au-next_port_au_next_network';
 
 

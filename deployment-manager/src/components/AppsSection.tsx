@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import AppTable from './AppTable';
 import { useToast } from './general/ToastContainer';
 import Modal from './general/Modal';
@@ -10,6 +10,7 @@ import SettingsModal from './SettingsModal';
 import DeleteConfirmationModal from './DeleteConfirmationModal';
 import DeploymentHistoryTable from './DeploymentHistoryTable';
 import { Deployment } from '~/types';
+import { triggerDeployment, fetchApps, fetchRecentDeployments } from '~/app/actions';
 
 interface App {
   id: number;
@@ -58,12 +59,41 @@ export default function AppsSection({ initialApps, initialDeployments }: AppsSec
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const { showToast } = useToast();
 
+  useEffect(() => {
+    // Conntinously pool for apps data
+    const poolApps = async () => { 
+      const response = await fetchApps();
+      setApps(response);
+    };
+
+    const scheduleNextPool = () => {
+      setTimeout(async () => {
+        await poolApps();
+        scheduleNextPool();
+      }, 10000);
+    };
+    scheduleNextPool();
+
+    // Continously pool for deployments data
+    const poolDeployments = async () => {
+      const response = await fetchRecentDeployments();
+      setDeployments(response);
+    };
+
+    const scheduleNextPoolDeployments = () => {
+      setTimeout(async () => {
+        await poolDeployments();
+        scheduleNextPoolDeployments();
+      }, 10000);
+    };
+    scheduleNextPoolDeployments();
+    return () => undefined;
+  }, []);
+
   const handleDeploy = async (appName: string) => {
     try {
-      const response = await fetch(`/api/apps/${appName}/deploy`, {
-        method: 'POST',
-      });
-      if (!response.ok) throw new Error('Deployment failed');
+      const result = await triggerDeployment(appName);
+      if (!result.success) throw new Error(result.error);
       showToast('Deployment started successfully', 'success');
     } catch (error) {
       showToast('Failed to start deployment', 'error');

@@ -31,7 +31,7 @@ export default function AppRegistrationSection() {
 
   return (
     <section className="bg-white rounded-lg shadow p-6">
-      <h2 className="text-xl font-semibold mb-4">Register New App</h2>
+      <h2 className="text-xl font-semibold mb-4 text-black">Register New App</h2>
       <AppRegistrationForm onSubmit={handleRegisterApp} />
     </section>
   );
