@@ -8,6 +8,8 @@ import DeploymentModal from './DeploymentModal';
 import EnvironmentVariablesModal from './EnvironmentVariablesModal';
 import SettingsModal from './SettingsModal';
 import DeleteConfirmationModal from './DeleteConfirmationModal';
+import DeploymentHistoryTable from './DeploymentHistoryTable';
+import { Deployment } from '~/types';
 
 interface App {
   id: number;
@@ -27,14 +29,6 @@ interface App {
     status: string;
     deployed_at: Date;
   };
-}
-
-interface Deployment {
-  version: string;
-  commit_id: string;
-  status: string;
-  container_id: string;
-  deployed_at: Date;
 }
 
 interface AppSettings {
@@ -149,10 +143,10 @@ export default function AppsSection({ initialApps, initialDeployments }: AppsSec
       if (!response.ok) throw new Error('Failed to save settings');
       showToast('Settings saved successfully', 'success');
       setIsSettingsModalOpen(false);
-      
+
       // Update the local state
-      setApps(apps.map(app => 
-        app.id === selectedApp?.id 
+      setApps(apps.map(app =>
+        app.id === selectedApp?.id
           ? { ...app, ...settings }
           : app
       ));
@@ -175,19 +169,29 @@ export default function AppsSection({ initialApps, initialDeployments }: AppsSec
   };
 
   return (
-    <section className="bg-white rounded-lg shadow p-6 mb-8">
-      <h2 className="text-xl font-semibold mb-4">Applications</h2>
-      <AppTable
-        apps={apps}
-        onDeploy={handleDeploy}
-        onViewDeployments={handleViewDeployments}
-        onEditEnvVars={handleEditEnvVars}
-        onEditSettings={handleEditSettings}
-        onDelete={(appName) => {
-          setSelectedApp(apps.find(app => app.name === appName) || null);
-          setIsDeleteModalOpen(true);
-        }}
-      />
+    <>
+      <section className="bg-white rounded-lg shadow p-6 mb-8">
+        <h2 className="text-xl font-semibold mb-4 text-black">Applications</h2>
+        <AppTable
+          apps={apps}
+          onDeploy={handleDeploy}
+          onViewDeployments={handleViewDeployments}
+          onEditEnvVars={handleEditEnvVars}
+          onEditSettings={handleEditSettings}
+          onDelete={(appName) => {
+            setSelectedApp(apps.find(app => app.name === appName) || null);
+            setIsDeleteModalOpen(true);
+          }}
+        />
+      </section>
+
+      <section className="bg-white rounded-lg shadow p-6 mb-8">
+        <h2 className="text-xl font-semibold mb-4 text-black">Deployment History</h2>
+        <DeploymentHistoryTable
+          deployments={deployments}
+          onViewLogs={handleViewLogs}
+        />
+      </section>
 
       <Modal
         isOpen={isDeploymentModalOpen}
@@ -249,6 +253,6 @@ export default function AppsSection({ initialApps, initialDeployments }: AppsSec
           onCancel={() => setIsDeleteModalOpen(false)}
         />
       </Modal>
-    </section>
+    </>
   );
 } 

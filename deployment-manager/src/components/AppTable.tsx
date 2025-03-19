@@ -1,3 +1,6 @@
+import { getStatusColor } from '~/utils/status';
+import Button from './general/Button';
+
 interface App {
   id: number;
   name: string;
@@ -35,21 +38,6 @@ export default function AppTable({
   onEditSettings,
   onDelete,
 }: AppTableProps) {
-  const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'running':
-      case 'success':
-        return 'bg-green-100 text-green-800';
-      case 'stopped':
-        return 'bg-gray-100 text-gray-800';
-      case 'error':
-      case 'failed':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-200">
@@ -102,36 +90,41 @@ export default function AppTable({
                 {app.last_deployment ? new Date(app.last_deployment.deployed_at).toLocaleString() : 'Never'}
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
-                <button
+                <Button
                   onClick={() => onDeploy(app.name)}
-                  className="text-indigo-600 hover:text-indigo-900"
+                  color="primary"
+                  size="sm"
                 >
                   Deploy
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={() => onViewDeployments(app.name)}
-                  className="text-blue-600 hover:text-blue-900"
+                  color="blue"
+                  size="sm"
                 >
                   History
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={() => onEditEnvVars(app.name)}
-                  className="text-green-600 hover:text-green-900"
+                  color="green"
+                  size="sm"
                 >
                   Env Vars
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={() => onEditSettings(app.name)}
-                  className="text-yellow-600 hover:text-yellow-900"
+                  color="yellow"
+                  size="sm"
                 >
                   Settings
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={() => onDelete(app.name)}
-                  className="text-red-600 hover:text-red-900"
+                  color="red"
+                  size="sm"
                 >
                   Delete
-                </button>
+                </Button>
               </td>
             </tr>
           ))}
