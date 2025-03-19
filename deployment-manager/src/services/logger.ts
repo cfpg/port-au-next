@@ -72,21 +72,6 @@ class Logger {
   async debug(message: string, metadata: Record<string, any> = {}) {
     return this.log('debug', message, metadata);
   }
-
-  async getDeploymentLogs(deploymentId: number) {
-    try {
-      const result = await pool.query(
-        `SELECT * FROM deployment_logs 
-         WHERE deployment_id = $1 
-         ORDER BY created_at ASC`,
-        [deploymentId]
-      );
-      return result.rows;
-    } catch (error) {
-      console.error('Error fetching deployment logs:', error);
-      throw error;
-    }
-  }
 }
 
 // Create and export singleton instance

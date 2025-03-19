@@ -1,14 +1,14 @@
 import { tv } from 'tailwind-variants';
 
 const button = tv({
-  base: 'inline-flex items-center justify-center rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none',
+  base: 'inline-flex items-center cursor-pointer justify-center rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none',
   variants: {
     color: {
-      primary: 'text-indigo-600 hover:text-indigo-900 focus:ring-indigo-500',
-      blue: 'text-blue-600 hover:text-blue-900 focus:ring-blue-500',
-      green: 'text-green-600 hover:text-green-900 focus:ring-green-500',
-      yellow: 'text-yellow-600 hover:text-yellow-900 focus:ring-yellow-500',
-      red: 'text-red-600 hover:text-red-900 focus:ring-red-500',
+      primary: 'bg-indigo-600 text-white hover:bg-indigo-900 focus:ring-indigo-500',
+      blue: 'bg-blue-600 text-white hover:bg-blue-900 focus:ring-blue-500',
+      green: 'bg-green-600 text-white hover:bg-green-900 focus:ring-green-500',
+      yellow: 'bg-yellow-600 text-white hover:bg-yellow-900 focus:ring-yellow-500',
+      red: 'bg-red-600 text-white hover:bg-red-900 focus:ring-red-500',
     },
     size: {
       sm: 'text-sm px-2 py-1',
