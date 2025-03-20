@@ -18,6 +18,9 @@ const button = tv({
       md: 'text-sm px-3 py-2',
       lg: 'text-base px-4 py-2',
     },
+    disabled: {
+      true: "cursor-not-allowed",
+    }
   },
   defaultVariants: {
     color: 'primary',
@@ -35,11 +38,12 @@ export default function Button({
   color, 
   size, 
   className, 
-  children, 
+  children,
+  disabled,
   ...props 
 }: ButtonProps) {
   return (
-    <button className={button({ color, size, className })} {...props}>
+    <button className={button({ color, size, className, disabled })} disabled={disabled} {...props}>
       {children}
     </button>
   );

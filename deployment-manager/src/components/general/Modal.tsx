@@ -32,7 +32,7 @@ const modal = tv({
 interface ModalProps extends VariantProps<typeof modal> {
   title: string;
   children: React.ReactNode;
-  closeHref: string;
+  closeHref?: string;
   className?: string;
 }
 
@@ -44,12 +44,14 @@ export default function Modal({ title, children, closeHref, size, className }: M
       <div className={container()}>
         <div className={header()}>
           <h2 className={titleStyles()}>{title}</h2>
-          <Link
-            href={closeHref}
-            className={closeButton()}
-          >
-            &times;
-          </Link>
+          {closeHref && (
+            <Link
+              href={closeHref}
+              className={closeButton()}
+            >
+              &times;
+            </Link>
+          )}
         </div>
         <div className={content()}>
           {children}

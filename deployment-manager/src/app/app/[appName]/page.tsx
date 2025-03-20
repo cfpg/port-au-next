@@ -8,6 +8,7 @@ import { fetchApp, fetchAppDeployments } from './actions';
 import { getStatusColor } from '~/utils/status';
 import getRelativeTime from '~/utils/getRelativeTime';
 import DeploymentLogsModal from '~/components/modals/DeploymentLogsModal';
+import AppDeleteButton from '~/components/AppDeleteButton';
 
 interface PageProps {
   params: {
@@ -41,10 +42,7 @@ export default async function SingleAppPage({ params, searchParams }: PageProps)
                 <i className="fas fa-rocket mr-2"></i>
                 Deploy
               </Button>
-              <Button color='red'>
-                <i className="fas fa-trash mr-2"></i>
-                Delete
-              </Button>
+              <AppDeleteButton appName={app.name} />
             </div>
           </>
         }
