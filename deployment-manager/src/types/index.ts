@@ -29,7 +29,7 @@ export interface App {
   db_user?: string;
   db_password?: string;
   cloudflare_zone_id?: string;
-  env: Record<string, string>;
+  env?: Record<string, string>;
   status: string;
   last_deployment?: {
     version: string;

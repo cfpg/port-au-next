@@ -1,6 +1,5 @@
 import { Deployment } from '~/types';
 import { getStatusColor } from '~/utils/status';
-import Button from './general/Button';
 import Table, {
   TableBody,
   TableCell,
@@ -14,12 +13,10 @@ import Link from './general/Link';
 
 interface DeploymentHistoryTableProps {
   deployments: Deployment[];
-  onViewLogs?: (version: string) => void;
 }
 
 export default function DeploymentHistoryTable({
   deployments,
-  onViewLogs,
 }: DeploymentHistoryTableProps) {
   return (
     <div className="overflow-x-auto">
@@ -55,7 +52,7 @@ export default function DeploymentHistoryTable({
               </TableCell>
               <TableCell className="text-left font-medium">
                 <Link
-                  href={`?modalViewLogs=${deployment.id}`}
+                  href={`?modalViewLogs=${deployment.id}&modalAppName=${deployment.app_name}`}
                   color="gray"
                   variant="button"
                 >

@@ -7,19 +7,11 @@ import {App} from '~/types';
 interface AppTableProps {
   apps: App[];
   onDeploy: (appName: string) => void;
-  onViewDeployments: (appName: string) => void;
-  onEditEnvVars: (appName: string) => void;
-  onEditSettings: (appName: string) => void;
-  onDelete: (appName: string) => void;
 }
 
 export default function AppTable({
   apps,
   onDeploy,
-  onViewDeployments,
-  onEditEnvVars,
-  onEditSettings,
-  onDelete,
 }: AppTableProps) {
   return (
     <div className="overflow-x-auto">
@@ -53,7 +45,7 @@ export default function AppTable({
           {apps.map((app) => (
             <tr key={app.id}>
               <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                <Link href={getSingleAppPath(app.name)} variant="nav">{app.name}</Link>
+                <Link href={getSingleAppPath(app.name)} variant="nav" className='underline text-blue-500 hover:text-blue-700'>{app.name}</Link>
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                 {app.repo_url}

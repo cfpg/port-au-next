@@ -4,8 +4,9 @@ import { useEffect, useState } from 'react';
 import AppTable from './AppTable';
 import { useToast } from './general/ToastContainer';
 import DeploymentHistoryTable from './DeploymentHistoryTable';
-import { Deployment, App, AppSettings } from '~/types';
+import { Deployment, App } from '~/types';
 import { triggerDeployment, fetchApps, fetchRecentDeployments } from '~/app/actions';
+import Card, { CardHeader, CardTitle, CardContent } from '~/components/general/Card';
 
 interface AppsSectionProps {
   initialApps: App[];
@@ -15,12 +16,11 @@ interface AppsSectionProps {
 export default function AppsSection({ initialApps, initialDeployments }: AppsSectionProps) {
   const [apps, setApps] = useState<App[]>(initialApps);
   const [deployments, setDeployments] = useState<Deployment[]>(initialDeployments);
-  const [selectedApp, setSelectedApp] = useState<App | null>(null);
   const { showToast } = useToast();
 
   useEffect(() => {
     // Continuously poll for apps data
-    const poolApps = async () => { 
+    const poolApps = async () => {
       const response = await fetchApps();
       setApps(response);
     };
@@ -66,121 +66,30 @@ export default function AppsSection({ initialApps, initialDeployments }: AppsSec
     }
   };
 
-  const handleViewDeployments = async (appName: string) => {
-    try {
-      const response = await fetch(`/api/apps/${appName}/deployments`);
-      if (!response.ok) throw new Error('Failed to fetch deployments');
-      const data = await response.json();
-      setDeployments(data);
-      setSelectedApp(apps.find(app => app.name === appName) || null);
-    } catch (error) {
-      showToast('Failed to fetch deployments', 'error');
-    }
-  };
-
-  const handleViewLogs = async (version: string) => {
-    try {
-      const response = await fetch(`/api/apps/${selectedApp?.name}/deployments/${version}/logs`);
-      if (!response.ok) throw new Error('Failed to fetch logs');
-      const data = await response.json();
-      showToast('Logs fetched successfully', 'success');
-    } catch (error) {
-      showToast('Failed to fetch logs', 'error');
-    }
-  };
-
-  const handleEditEnvVars = async (appName: string) => {
-    try {
-      const response = await fetch(`/api/apps/${appName}/env`);
-      if (!response.ok) throw new Error('Failed to fetch environment variables');
-      const data = await response.json();
-      setSelectedApp(apps.find(app => app.name === appName) || null);
-    } catch (error) {
-      showToast('Failed to fetch environment variables', 'error');
-    }
-  };
-
-  const handleSaveEnvVars = async (branch: string, vars: { key: string; value: string }[]) => {
-    try {
-      const response = await fetch(`/api/apps/${selectedApp?.name}/env`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ branch, vars }),
-      });
-      if (!response.ok) throw new Error('Failed to save environment variables');
-      showToast('Environment variables saved successfully', 'success');
-    } catch (error) {
-      showToast('Failed to save environment variables', 'error');
-    }
-  };
-
-  const handleEditSettings = async (appName: string) => {
-    try {
-      const response = await fetch(`/api/apps/${appName}/settings`);
-      if (!response.ok) throw new Error('Failed to fetch settings');
-      const data = await response.json();
-      setSelectedApp(apps.find(app => app.name === appName) || null);
-    } catch (error) {
-      showToast('Failed to fetch settings', 'error');
-    }
-  };
-
-  const handleSaveSettings = async (settings: AppSettings) => {
-    try {
-      const response = await fetch(`/api/apps/${selectedApp?.name}/settings`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(settings),
-      });
-      if (!response.ok) throw new Error('Failed to save settings');
-      showToast('Settings saved successfully', 'success');
-
-      // Update the local state
-      setApps(apps.map(app =>
-        app.id === selectedApp?.id
-          ? { ...app, ...settings }
-          : app
-      ));
-    } catch (error) {
-      showToast('Failed to save settings', 'error');
-    }
-  };
-
-  const handleDelete = async (appName: string) => {
-    try {
-      const response = await fetch(`/api/apps/${appName}`, {
-        method: 'DELETE',
-      });
-      if (!response.ok) throw new Error('Failed to delete app');
-      showToast('App deleted successfully', 'success');
-    } catch (error) {
-      showToast('Failed to delete app', 'error');
-    }
-  };
-
   return (
     <>
-      <section className="bg-white rounded-lg shadow p-6 mb-8">
-        <h2 className="text-xl font-semibold mb-4 text-black">Applications</h2>
-        <AppTable
-          apps={apps}
-          onDeploy={handleDeploy}
-          onViewDeployments={handleViewDeployments}
-          onEditEnvVars={handleEditEnvVars}
-          onEditSettings={handleEditSettings}
-          onDelete={(appName) => {
-            setSelectedApp(apps.find(app => app.name === appName) || null);
-          }}
-        />
-      </section>
+      <Card className="bg-white mb-8">
+        <CardHeader>
+          <CardTitle>Applications</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <AppTable
+            apps={apps}
+            onDeploy={handleDeploy}
+          />
+        </CardContent>
+      </Card>
 
-      <section className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-xl font-semibold mb-4 text-black">Deployment History</h2>
-        <DeploymentHistoryTable
-          deployments={deployments}
-          onViewLogs={handleViewLogs}
-        />
-      </section>
+      <Card className="bg-white">
+        <CardHeader>
+          <CardTitle>Deployment History</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <DeploymentHistoryTable
+            deployments={deployments}
+          />
+        </CardContent>
+      </Card>
     </>
   );
 } 

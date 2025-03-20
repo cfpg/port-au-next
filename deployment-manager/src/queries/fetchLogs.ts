@@ -1,9 +1,9 @@
 import pool from "~/services/database";
-import { DeploymentLog } from "~/types";
+import { App, DeploymentLog } from "~/types";
 
-export default async function fetchLogs(appName: string, deploymentId: number) {
-  const existingDeployment = await pool.query<{id: number}>(`
-    SELECT d.id 
+export default async function fetchLogs(appName: string, deploymentId: number): Promise<{app: App & {deployed_at: Date}; logs: DeploymentLog[]}> {
+  const existingDeployment = await pool.query<{id: number; name: string; repo_url: string; branch: string; status: string; deployed_at: Date}>(`
+    SELECT a.name, a.repo_url, a.branch, d.status, d.id, d.deployed_at
       FROM deployments d
       JOIN apps a ON a.id = d.app_id
       WHERE a.name = $1 AND d.id = $2
@@ -20,5 +20,5 @@ export default async function fetchLogs(appName: string, deploymentId: number) {
        ORDER BY created_at ASC
   `, [deploymentId]);
 
-  return logs.rows;
+  return {app: existingDeployment.rows[0], logs: logs.rows};
 }

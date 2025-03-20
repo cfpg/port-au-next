@@ -1,27 +1,14 @@
 import { tv } from 'tailwind-variants';
 
 const card = tv({
-  base: 'rounded-lg border bg-card text-card-foreground shadow-sm',
+  slots: {
+    base: 'rounded-lg border border-gray-400 bg-card text-card-foreground shadow-sm',
+    header: 'flex flex-col space-y-1 p-2 bg-gray-100 rounded-t-lg border-b border-gray-400',
+    title: 'text-sm font-bold leading-none tracking-relaxed text-gray-700 py-1 px-2',
+    content: 'p-6'
+  },
   variants: {},
-  defaultVariants: {},
-});
-
-const cardHeader = tv({
-  base: 'flex flex-col space-y-1.5 p-6',
-  variants: {},
-  defaultVariants: {},
-});
-
-const cardTitle = tv({
-  base: 'text-2xl font-semibold leading-none tracking-tight',
-  variants: {},
-  defaultVariants: {},
-});
-
-const cardContent = tv({
-  base: 'p-6 pt-0',
-  variants: {},
-  defaultVariants: {},
+  defaultVariants: {}
 });
 
 interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -29,17 +16,21 @@ interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
 }
 
 export default function Card({ className, ...props }: CardProps) {
-  return <div className={card({ className })} {...props} />;
+  const { base } = card();
+  return <div className={base({ className })} {...props} />;
 }
 
 export function CardHeader({ className, ...props }: CardProps) {
-  return <div className={cardHeader({ className })} {...props} />;
+  const { header } = card();
+  return <div className={header({ className })} {...props} />;
 }
 
 export function CardTitle({ className, ...props }: CardProps) {
-  return <h3 className={cardTitle({ className })} {...props} />;
+  const { title } = card();
+  return <h3 className={title({ className })} {...props} />;
 }
 
 export function CardContent({ className, ...props }: CardProps) {
-  return <div className={cardContent({ className })} {...props} />;
+  const { content } = card();
+  return <div className={content({ className })} {...props} />;
 } 
