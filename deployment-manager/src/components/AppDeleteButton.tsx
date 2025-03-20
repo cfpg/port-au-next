@@ -39,9 +39,11 @@ export default function AppDeleteButton({ appName }: { appName: string }) {
                   router.push("/");
                 });
               }}>
+                <i className="fas fa-trash mr-2"></i>
                 Permanently Delete
               </Button>
               <Button disabled={isLoading} onClick={() => setIsConfirmationModalOpen(false)} color='gray'>
+                <i className="fas fa-times mr-2"></i>
                 Cancel
               </Button>
             </div>
