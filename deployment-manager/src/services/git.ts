@@ -6,7 +6,6 @@ import getAppsDir from '~/utils/getAppsDir';
 
 // Instead of using __dirname, we'll go up from the deployment-manager directory
 const APPS_DIR = getAppsDir();
-console.log("APPS_DIR", APPS_DIR);
 
 export async function isGitRepo(dir: string) {
   return new Promise((resolve) => {

@@ -236,18 +236,3 @@ export async function deleteAppRecord(appId: number) {
   // Finally delete the app record
   await pool.query('DELETE FROM apps WHERE id = $1', [appId]);
 }
-
-export async function getDeploymentLogs(deploymentId: number) {
-  try {
-    const result = await pool.query(
-      `SELECT * FROM deployment_logs 
-       WHERE deployment_id = $1 
-       ORDER BY created_at ASC`,
-      [deploymentId]
-    );
-    return result.rows;
-  } catch (error) {
-    console.error('Error fetching deployment logs:', error);
-    throw error;
-  }
-}

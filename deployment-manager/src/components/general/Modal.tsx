@@ -4,24 +4,24 @@ import { tv, type VariantProps } from 'tailwind-variants';
 const modal = tv({
   slots: {
     backdrop: "fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4",
-    container: "bg-white rounded-lg shadow-xl w-full overflow-y-auto max-h-[90vh]",
-    header: "flex justify-between items-center px-6 py-4 border-b border-gray-200 bg-gray-100",
+    container: "bg-white rounded-lg shadow-xl w-full flex flex-col",
+    header: "flex justify-between items-center px-6 py-4 rounded-t-lg border-b border-gray-200 bg-gray-100",
     title: "text-xl font-bold",
     closeButton: "text-gray-500 hover:text-gray-700 text-2xl",
-    content: "p-6"
+    content: "p-6 overflow-y-auto flex-1"
   },
   variants: {
     size: {
-      sm: { container: "max-w-sm" },
-      md: { container: "max-w-md" },
-      lg: { container: "max-w-lg" },
-      xl: { container: "max-w-xl" },
-      "2xl": { container: "max-w-2xl" },
-      "3xl": { container: "max-w-3xl" },
-      "4xl": { container: "max-w-4xl" },
-      "5xl": { container: "max-w-5xl" },
-      "6xl": { container: "max-w-6xl" },
-      "7xl": { container: "max-w-7xl" },
+      sm: { container: "max-w-sm max-h-[90vh]" },
+      md: { container: "max-w-md max-h-[90vh]" },
+      lg: { container: "max-w-lg max-h-[90vh]" },
+      xl: { container: "max-w-xl max-h-[90vh]" },
+      "2xl": { container: "max-w-2xl max-h-[90vh]" },
+      "3xl": { container: "max-w-3xl max-h-[90vh]" },
+      "4xl": { container: "max-w-4xl max-h-[90vh]" },
+      "5xl": { container: "max-w-5xl max-h-[90vh]" },
+      "6xl": { container: "max-w-6xl max-h-[90vh]" },
+      "7xl": { container: "max-w-7xl max-h-[90vh]" },
     }
   },
   defaultVariants: {

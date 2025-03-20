@@ -56,7 +56,8 @@ export default function DeploymentHistoryTable({
               <TableCell className="text-left font-medium">
                 <Link
                   href={`?modalViewLogs=${deployment.id}`}
-                  color="primary"
+                  color="gray"
+                  variant="button"
                 >
                   View Logs
                 </Link>

@@ -22,7 +22,7 @@ export default async function SingleAppPage({ params, searchParams }: PageProps)
   const app = await fetchApp(params.appName);
   const deployments = await fetchAppDeployments(app.id);
 
-  const {modalViewLogs} = searchParams;
+  const { modalViewLogs } = await searchParams;
 
   return (
     <div>
@@ -57,7 +57,7 @@ export default async function SingleAppPage({ params, searchParams }: PageProps)
                 {app.last_deployment
                   ? `${new Date(app.last_deployment.deployed_at).toLocaleString()}`
                   : 'Never'}
-                  {app.last_deployment && <span className="text-gray-400"> ({getRelativeTime(app.last_deployment.deployed_at)})</span>}
+                {app.last_deployment && <span className="text-gray-400"> ({getRelativeTime(app.last_deployment.deployed_at)})</span>}
               </p>
             </div>
           </div>
@@ -70,7 +70,7 @@ export default async function SingleAppPage({ params, searchParams }: PageProps)
           <CardTitle>Deployment History</CardTitle>
         </CardHeader>
         <CardContent>
-          <DeploymentHistoryTable 
+          <DeploymentHistoryTable
             deployments={deployments}
           />
         </CardContent>
