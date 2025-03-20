@@ -6,6 +6,8 @@ import fetchRecentDeploymentsQuery from '~/queries/fetchRecentDeploymentsQuery';
 import { triggerDeployment } from '~/app/actions';
 import pool from '~/services/database';
 import logger from '~/services/logger';
+import { updateAppEnvVarsQuery } from '~/queries/updateAppEnvVarsQuery';
+import { revalidatePath } from 'next/cache';
 
 export async function fetchApp(appName: string) {
   const app = await fetchSingleAppQuery(appName);
@@ -78,6 +80,12 @@ export async function updateAppSettings(
     await logger.error('Failed to update app settings', error as Error);
     return { success: false, error: 'Failed to update app settings' };
   }
+}
+
+export async function updateEnvVars(appId: number, branch: string, vars: Record<string, string>) {
+  const result = await updateAppEnvVarsQuery(appId, branch, vars);
+  
+  return result;
 }
 
 export { triggerDeployment }; 

@@ -55,34 +55,41 @@ export default function AppsSection({ initialApps, initialDeployments }: AppsSec
   const { showToast } = useToast();
 
   useEffect(() => {
-    // Conntinously pool for apps data
+    // Continuously poll for apps data
     const poolApps = async () => { 
       const response = await fetchApps();
       setApps(response);
     };
 
+    let appsTimeoutId: NodeJS.Timeout;
     const scheduleNextPool = () => {
-      setTimeout(async () => {
+      appsTimeoutId = setTimeout(async () => {
         await poolApps();
         scheduleNextPool();
       }, 10000);
     };
     scheduleNextPool();
 
-    // Continously pool for deployments data
+    // Continuously poll for deployments data
     const poolDeployments = async () => {
       const response = await fetchRecentDeployments();
       setDeployments(response as Deployment[]);
     };
 
+    let deploymentsTimeoutId: NodeJS.Timeout;
     const scheduleNextPoolDeployments = () => {
-      setTimeout(async () => {
+      deploymentsTimeoutId = setTimeout(async () => {
         await poolDeployments();
         scheduleNextPoolDeployments();
       }, 10000);
     };
     scheduleNextPoolDeployments();
-    return () => undefined;
+
+    // Clean up timeouts when component unmounts
+    return () => {
+      clearTimeout(appsTimeoutId);
+      clearTimeout(deploymentsTimeoutId);
+    };
   }, []);
 
   const handleDeploy = async (appName: string) => {

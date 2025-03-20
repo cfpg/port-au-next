@@ -19,7 +19,8 @@ interface PageProps {
 }
 
 export default async function SingleAppPage({ params, searchParams }: PageProps) {
-  const app = await fetchApp(params.appName);
+  const { appName } = await params;
+  const app = await fetchApp(appName);
   const deployments = await fetchAppDeployments(app.id);
 
   const { modalViewLogs } = await searchParams;
@@ -34,7 +35,10 @@ export default async function SingleAppPage({ params, searchParams }: PageProps)
             <Badge className={getStatusColor(app.status)}>
               {app.status}
             </Badge>
-            <Button>Deploy Now</Button>
+            <Button>
+              <i className="fas fa-rocket mr-2"></i>
+              Deploy
+            </Button>
           </div>
         </CardHeader>
         <CardContent>

@@ -53,7 +53,7 @@ const linkStyles = tv({
       variant: 'button',
       color: 'red',
       class: 'bg-red-600 text-white hover:bg-red-900 focus:ring-red-500'
-    }, 
+    },
     {
       variant: 'button',
       color: 'gray',

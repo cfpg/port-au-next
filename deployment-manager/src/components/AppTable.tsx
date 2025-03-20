@@ -100,38 +100,15 @@ export default function AppTable({
                   <i className="fas fa-rocket mr-2"></i>
                   Deploy
                 </Button>
-                <Button
-                  onClick={() => onViewDeployments(app.name)}
-                  color="blue"
-                  size="sm"
-                >
-                  <i className="fas fa-history mr-2"></i>
-                  History
-                </Button>
-                <Button
-                  onClick={() => onEditEnvVars(app.name)}
-                  color="green"
-                  size="sm"
-                >
-                  <i className="fas fa-laptop-code mr-2"></i>
-                  Env Vars
-                </Button>
-                <Button
-                  onClick={() => onEditSettings(app.name)}
+                <Link
+                  href={getSingleAppPath(app.name)}
                   color="yellow"
                   size="sm"
+                  variant="button"
                 >
                   <i className="fas fa-gear mr-2"></i>
                   Settings
-                </Button>
-                <Button
-                  onClick={() => onDelete(app.name)}
-                  color="red"
-                  size="sm"
-                >
-                  <i className="fas fa-trash mr-2"></i>
-                  Delete
-                </Button>
+                </Link>
               </td>
             </tr>
           ))}
