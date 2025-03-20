@@ -72,7 +72,7 @@ export default function AppsSection({ initialApps, initialDeployments }: AppsSec
         <CardHeader>
           <CardTitle>Applications</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent padding="table">
           <AppTable
             apps={apps}
             onDeploy={handleDeploy}
@@ -84,7 +84,7 @@ export default function AppsSection({ initialApps, initialDeployments }: AppsSec
         <CardHeader>
           <CardTitle>Deployment History</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent padding="table">
           <DeploymentHistoryTable
             deployments={deployments}
           />

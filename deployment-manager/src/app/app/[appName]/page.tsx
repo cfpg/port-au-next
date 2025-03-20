@@ -77,7 +77,7 @@ export default async function SingleAppPage({ params, searchParams }: PageProps)
         <CardHeader>
           <CardTitle>Deployment History</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent padding="table">
           <DeploymentHistoryTable
             deployments={deployments}
           />
