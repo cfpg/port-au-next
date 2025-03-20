@@ -1,37 +1,37 @@
 import { tv } from 'tailwind-variants';
 
 const table = tv({
-  base: 'w-full caption-bottom text-sm',
+  base: 'min-w-full divide-y divide-gray-200',
   variants: {},
   defaultVariants: {},
 });
 
 const tableHeader = tv({
-  base: 'border-b bg-muted/50',
+  base: 'bg-gray-50',
   variants: {},
   defaultVariants: {},
 });
 
 const tableBody = tv({
-  base: '[&_tr:last-child]:border-0',
+  base: 'bg-white divide-y divide-gray-200',
   variants: {},
   defaultVariants: {},
 });
 
 const tableRow = tv({
-  base: 'border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted',
+  base: '',
   variants: {},
   defaultVariants: {},
 });
 
 const tableHead = tv({
-  base: 'h-12 px-4 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0',
+  base: 'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider',
   variants: {},
   defaultVariants: {},
 });
 
 const tableCell = tv({
-  base: 'p-4 align-middle [&:has([role=checkbox])]:pr-0',
+  base: 'px-6 py-4 whitespace-nowrap text-sm text-gray-500',
   variants: {},
   defaultVariants: {},
 });

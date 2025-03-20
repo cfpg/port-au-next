@@ -87,7 +87,7 @@ async function initializeDatabase() {
 }
 
 // Initialize database when the service starts
-initializeDatabase().catch(console.error);
+// initializeDatabase().catch(console.error);
 
 export default pool;
 

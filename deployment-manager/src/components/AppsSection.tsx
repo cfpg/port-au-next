@@ -3,11 +3,6 @@
 import { useEffect, useState } from 'react';
 import AppTable from './AppTable';
 import { useToast } from './general/ToastContainer';
-import Modal from './general/Modal';
-import DeploymentModal from './DeploymentModal';
-import EnvironmentVariablesModal from './EnvironmentVariablesModal';
-import SettingsModal from './SettingsModal';
-import DeleteConfirmationModal from './DeleteConfirmationModal';
 import DeploymentHistoryTable from './DeploymentHistoryTable';
 import { Deployment } from '~/types';
 import { triggerDeployment, fetchApps, fetchRecentDeployments } from '~/app/actions';
@@ -215,74 +210,13 @@ export default function AppsSection({ initialApps, initialDeployments }: AppsSec
         />
       </section>
 
-      <section className="bg-white rounded-lg shadow p-6 mb-8">
+      <section className="bg-white rounded-lg shadow p-6">
         <h2 className="text-xl font-semibold mb-4 text-black">Deployment History</h2>
         <DeploymentHistoryTable
           deployments={deployments}
           onViewLogs={handleViewLogs}
         />
       </section>
-
-      <Modal
-        isOpen={isDeploymentModalOpen}
-        onClose={() => setIsDeploymentModalOpen(false)}
-        title={`Deployment History - ${selectedApp?.name}`}
-      >
-        <DeploymentModal
-          appName={selectedApp?.name || ''}
-          deployments={deployments}
-          onViewLogs={handleViewLogs}
-        />
-      </Modal>
-
-      <Modal
-        isOpen={isEnvVarsModalOpen}
-        onClose={() => setIsEnvVarsModalOpen(false)}
-        title={`Environment Variables - ${selectedApp?.name}`}
-      >
-        <EnvironmentVariablesModal
-          appName={selectedApp?.name || ''}
-          initialVars={[]}
-          branch={selectedApp?.branch || 'main'}
-          onSave={handleSaveEnvVars}
-          onClose={() => setIsEnvVarsModalOpen(false)}
-        />
-      </Modal>
-
-      <Modal
-        isOpen={isSettingsModalOpen}
-        onClose={() => setIsSettingsModalOpen(false)}
-        title={`Settings - ${selectedApp?.name}`}
-      >
-        <SettingsModal
-          appName={selectedApp?.name || ''}
-          settings={selectedApp || {
-            name: '',
-            repository: '',
-            branch: 'main',
-            domain: '',
-            db_name: '',
-            db_user: '',
-            db_password: '',
-            cloudflare_zone_id: '',
-            env: {},
-          }}
-          onSave={handleSaveSettings}
-          onClose={() => setIsSettingsModalOpen(false)}
-        />
-      </Modal>
-
-      <Modal
-        isOpen={isDeleteModalOpen}
-        onClose={() => setIsDeleteModalOpen(false)}
-        title={`Delete App - ${selectedApp?.name}`}
-      >
-        <DeleteConfirmationModal
-          appName={selectedApp?.name || ''}
-          onConfirm={() => handleDelete(selectedApp?.name || '')}
-          onCancel={() => setIsDeleteModalOpen(false)}
-        />
-      </Modal>
     </>
   );
 } 

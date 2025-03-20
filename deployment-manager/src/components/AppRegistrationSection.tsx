@@ -8,7 +8,7 @@ interface AppRegistrationData {
   name: string;
   repository: string;
   branch: string;
-  port: number;
+  domain: string;
   env: Record<string, string>;
 }
 

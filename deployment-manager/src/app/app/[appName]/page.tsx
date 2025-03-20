@@ -1,21 +1,28 @@
 import Card, { CardContent, CardHeader, CardTitle } from '~/components/general/Card';
 import Button from '~/components/general/Button';
 import Badge from '~/components/general/Badge';
-import { DeploymentHistory } from '~/components/DeploymentHistory';
+import DeploymentHistoryTable from '~/components/DeploymentHistoryTable';
 import { EnvVarsForm } from '~/components/EnvVarsForm';
 import { AppSettingsForm } from '~/components/AppSettingsForm';
 import { fetchApp, fetchAppDeployments } from './actions';
 import { getStatusColor } from '~/utils/status';
+import getRelativeTime from '~/utils/getRelativeTime';
+import DeploymentLogsModal from '~/components/modals/DeploymentLogsModal';
 
 interface PageProps {
   params: {
     appName: string;
   };
+  searchParams: {
+    modalViewLogs?: string;
+  };
 }
 
-export default async function SingleAppPage({ params }: PageProps) {
+export default async function SingleAppPage({ params, searchParams }: PageProps) {
   const app = await fetchApp(params.appName);
   const deployments = await fetchAppDeployments(app.id);
+
+  const {modalViewLogs} = searchParams;
 
   return (
     <div>
@@ -34,22 +41,23 @@ export default async function SingleAppPage({ params }: PageProps) {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <h3 className="font-semibold mb-2">Repository</h3>
-              <p className="text-sm text-muted-foreground">{app.repository}</p>
+              <p className="text-sm text-gray-500">{app.repository}</p>
             </div>
             <div>
               <h3 className="font-semibold mb-2">Branch</h3>
-              <p className="text-sm text-muted-foreground">{app.branch}</p>
+              <p className="text-sm text-gray-500">{app.branch}</p>
             </div>
             <div>
               <h3 className="font-semibold mb-2">Domain</h3>
-              <p className="text-sm text-muted-foreground">{app.domain || 'Not set'}</p>
+              <p className="text-sm text-gray-500">{app.domain || 'Not set'}</p>
             </div>
             <div>
               <h3 className="font-semibold mb-2">Last Deployment</h3>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-gray-500">
                 {app.last_deployment
-                  ? new Date(app.last_deployment.deployed_at).toLocaleString()
+                  ? `${new Date(app.last_deployment.deployed_at).toLocaleString()}`
                   : 'Never'}
+                  {app.last_deployment && <span className="text-gray-400"> ({getRelativeTime(app.last_deployment.deployed_at)})</span>}
               </p>
             </div>
           </div>
@@ -62,7 +70,9 @@ export default async function SingleAppPage({ params }: PageProps) {
           <CardTitle>Deployment History</CardTitle>
         </CardHeader>
         <CardContent>
-          <DeploymentHistory deployments={deployments} />
+          <DeploymentHistoryTable 
+            deployments={deployments}
+          />
         </CardContent>
       </Card>
 
@@ -92,6 +102,14 @@ export default async function SingleAppPage({ params }: PageProps) {
           />
         </CardContent>
       </Card>
+
+      {modalViewLogs && (
+        <DeploymentLogsModal
+          appName={app.name}
+          deploymentId={Number.parseInt(modalViewLogs)}
+          closeHref={`/app/${app.name}`}
+        />
+      )}
     </div>
   );
 }

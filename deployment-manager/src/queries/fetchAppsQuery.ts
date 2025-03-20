@@ -20,8 +20,12 @@ export interface App {
   };
 }
 
-export default async function fetchAppsQuery(): Promise<App[]> {
+export default async function fetchAppsQuery({ where: { appId, appName } = {} }: { where?: { appId?: number, appName?: string } } = {}): Promise<App[]> {
   try {
+    const where: { appId?: number, appName?: string } = {}
+    if (appId) where.appId = appId;
+    if (appName) where.appName = appName;
+
     // Get apps with their latest deployment status and environment variables
     const result = await pool.query<App>(`
       SELECT 
@@ -52,6 +56,7 @@ export default async function fetchAppsQuery(): Promise<App[]> {
           ELSE NULL
         END as last_deployment
       FROM apps a
+      ${Object.keys(where).length > 0 ? `WHERE ${Object.entries(where).map(([key, value]) => `${key} = ${value}`).join(' AND ')}` : ''}
       LEFT JOIN LATERAL (
         SELECT *
         FROM deployments d

@@ -5,7 +5,7 @@ interface AppRegistrationFormProps {
     name: string;
     repository: string;
     branch: string;
-    port: number;
+    domain: string;
     env: Record<string, string>;
   }) => void;
 }
@@ -15,7 +15,7 @@ export default function AppRegistrationForm({ onSubmit }: AppRegistrationFormPro
     name: '',
     repository: '',
     branch: 'main',
-    port: 3000,
+    domain: '',
     env: {},
   });
 
@@ -26,7 +26,7 @@ export default function AppRegistrationForm({ onSubmit }: AppRegistrationFormPro
       name: '',
       repository: '',
       branch: 'main',
-      port: 3000,
+      domain: '',
       env: {},
     });
   };
@@ -76,14 +76,14 @@ export default function AppRegistrationForm({ onSubmit }: AppRegistrationFormPro
       </div>
 
       <div>
-        <label htmlFor="port" className="block text-sm font-medium text-gray-700 mb-2">
-          Port:
+        <label htmlFor="domain" className="block text-sm font-medium text-gray-700 mb-2">
+          Domain:
         </label>
         <input
-          type="number"
-          id="port"
-          value={formData.port}
-          onChange={(e) => setFormData({ ...formData, port: parseInt(e.target.value) })}
+          type="text"
+          id="domain"
+          value={formData.domain}
+          onChange={(e) => setFormData({ ...formData, domain: e.target.value })}
           required
           className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
         />

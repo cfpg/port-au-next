@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname } from 'next/navigation';
-
+import { useEffect, useState } from 'react';
 import Link from '~/components/general/Link';
 import getSingleAppPath from '~/utils/getSingleAppPath';
 
@@ -11,6 +11,14 @@ interface SidebarProps {
 
 export default function Sidebar({ apps }: SidebarProps) {
   const pathname = usePathname();
+
+  const [isNavOpen, setIsNavOpen] = useState(false);
+
+  useEffect(() => {
+    if (window.innerWidth > 768) {
+      setIsNavOpen(true);
+    }
+  }, []);
 
   const isActive = (path: string) => {
     if (path === '/') {
@@ -24,13 +32,16 @@ export default function Sidebar({ apps }: SidebarProps) {
   };
 
   return (
-    <nav className="p-4 h-full">
-      <div className="mb-8">
+    <nav className="p-4 h-auto">
+      <div className="flex justify-between items-center">
         <h1 className="text-xl font-bold text-gray-800">Port-au-Next</h1>
+        <button onClick={() => setIsNavOpen(!isNavOpen)} className="md:hidden">
+          <i className="fas fa-bars" />
+        </button>
       </div>
       
-      <ul className="space-y-2">
-        <li>
+      <ul className={`space-y-2 h-0 md:h-auto overflow-y-auto transition-all duration-300 ease-in-out ${isNavOpen ? 'h-auto' : 'h-0'}`}>
+        <li className="mt-8">
           <Link 
             href="/" 
             variant="nav"
