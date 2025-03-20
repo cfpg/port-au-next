@@ -97,10 +97,10 @@ export default async function SingleAppPage({ params, searchParams }: PageProps)
           <AppSettingsForm
             appId={app.id}
             initialSettings={{
+              name: app.name,
               domain: app.domain,
-              db_name: app.db_name,
-              db_user: app.db_user,
-              db_password: app.db_password,
+              repo_url: app.repo_url,
+              branch: app.branch,
               cloudflare_zone_id: app.cloudflare_zone_id,
             }}
           />

@@ -2,26 +2,7 @@ import { getStatusColor } from '~/utils/status';
 import Button from '~/components/general/Button';
 import Link from '~/components/general/Link';
 import getSingleAppPath from '~/utils/getSingleAppPath';
-
-interface App {
-  id: number;
-  name: string;
-  repository: string;
-  branch: string;
-  domain?: string;
-  db_name?: string;
-  db_user?: string;
-  db_password?: string;
-  cloudflare_zone_id?: string;
-  env: Record<string, string>;
-  status: string;
-  last_deployment?: {
-    version: string;
-    commit_id: string;
-    status: string;
-    deployed_at: Date;
-  };
-}
+import {App} from '~/types';
 
 interface AppTableProps {
   apps: App[];
@@ -75,7 +56,7 @@ export default function AppTable({
                 <Link href={getSingleAppPath(app.name)} variant="nav">{app.name}</Link>
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                {app.repository}
+                {app.repo_url}
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                 {app.branch}

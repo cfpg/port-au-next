@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Button from '~/components/general/Button';
 import Input from '~/components/general/Input';
 import Label from '~/components/general/Label';
-import { updateEnvVars } from '~/app/app/[appName]/actions';
+import { updateAppEnvVars } from '~/app/app/[appName]/actions';
 import { useToast } from '~/components/general/ToastContainer';
 
 interface EnvVarsFormProps {
@@ -41,7 +41,7 @@ export function EnvVarsForm({ appId, branch, initialEnvVars }: EnvVarsFormProps)
       return acc;
     }, {} as Record<string, string>);
 
-    const result = await updateEnvVars(appId, branch, envVarsMap);
+    const result = await updateAppEnvVars(appId, branch, envVarsMap);
     
     if (result.success) {
       showToast('Environment variables updated successfully');

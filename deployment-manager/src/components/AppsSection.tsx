@@ -4,40 +4,8 @@ import { useEffect, useState } from 'react';
 import AppTable from './AppTable';
 import { useToast } from './general/ToastContainer';
 import DeploymentHistoryTable from './DeploymentHistoryTable';
-import { Deployment } from '~/types';
+import { Deployment, App, AppSettings } from '~/types';
 import { triggerDeployment, fetchApps, fetchRecentDeployments } from '~/app/actions';
-
-interface App {
-  id: number;
-  name: string;
-  repository: string;
-  branch: string;
-  domain?: string;
-  db_name?: string;
-  db_user?: string;
-  db_password?: string;
-  cloudflare_zone_id?: string;
-  env: Record<string, string>;
-  status: string;
-  last_deployment?: {
-    version: string;
-    commit_id: string;
-    status: string;
-    deployed_at: Date;
-  };
-}
-
-interface AppSettings {
-  name: string;
-  repository: string;
-  branch: string;
-  domain?: string;
-  db_name?: string;
-  db_user?: string;
-  db_password?: string;
-  cloudflare_zone_id?: string;
-  env: Record<string, string>;
-}
 
 interface AppsSectionProps {
   initialApps: App[];

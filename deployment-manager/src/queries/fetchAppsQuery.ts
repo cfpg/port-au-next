@@ -1,24 +1,5 @@
 import pool from '~/services/database';
-
-export interface App {
-  id: number;
-  name: string;
-  repository: string;
-  branch: string;
-  domain?: string;
-  db_name?: string;
-  db_user?: string;
-  db_password?: string;
-  cloudflare_zone_id?: string;
-  env: Record<string, string>;
-  status: string;
-  last_deployment?: {
-    version: string;
-    commit_id: string;
-    status: string;
-    deployed_at: Date;
-  };
-}
+import { App } from '~/types';
 
 export default async function fetchAppsQuery({ where: { appId, appName } = {} }: { where?: { appId?: number, appName?: string } } = {}): Promise<App[]> {
   try {
@@ -31,7 +12,7 @@ export default async function fetchAppsQuery({ where: { appId, appName } = {} }:
       SELECT 
         a.id,
         a.name,
-        a.repo_url as repository,
+        a.repo_url,
         a.branch,
         a.domain,
         a.db_name,

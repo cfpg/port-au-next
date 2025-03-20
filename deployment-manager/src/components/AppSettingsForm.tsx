@@ -4,16 +4,16 @@ import { useState } from 'react';
 import Button from '~/components/general/Button';
 import Input from '~/components/general/Input';
 import Label from '~/components/general/Label';
-import { updateAppSettings } from '~/app/app/[appName]/actions';
+import { fetchZoneId, updateAppSettings } from '~/app/app/[appName]/actions';
 import { useToast } from '~/components/general/ToastContainer';
 
 interface AppSettingsFormProps {
   appId: number;
   initialSettings: {
+    name?: string;
     domain?: string;
-    db_name?: string;
-    db_user?: string;
-    db_password?: string;
+    repo_url?: string;
+    branch?: string;
     cloudflare_zone_id?: string;
   };
 }
@@ -28,9 +28,9 @@ export function AppSettingsForm({ appId, initialSettings }: AppSettingsFormProps
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     const result = await updateAppSettings(appId, settings);
-    
+
     if (result.success) {
       showToast("App settings updated successfully.");
     } else {
@@ -40,6 +40,16 @@ export function AppSettingsForm({ appId, initialSettings }: AppSettingsFormProps
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="space-y-2">
+        <Label htmlFor="name">App Name</Label>
+        <Input
+          id="name"
+          value={settings.name || ''}
+          onChange={(e) => handleChange('name', e.target.value)}
+          placeholder="myapp"
+        />
+      </div>
+
       <div className="space-y-2">
         <Label htmlFor="domain">Domain</Label>
         <Input
@@ -51,44 +61,36 @@ export function AppSettingsForm({ appId, initialSettings }: AppSettingsFormProps
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="db_name">Database Name</Label>
+        <Label htmlFor="repository">Repository</Label>
         <Input
-          id="db_name"
-          value={settings.db_name || ''}
-          onChange={(e) => handleChange('db_name', e.target.value)}
-          placeholder="myapp_db"
+          id="repository"
+          value={settings.repo_url || ''}
+          onChange={(e) => handleChange('repo_url', e.target.value)}
+          placeholder="https://github.com/myapp/myapp"
         />
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="db_user">Database User</Label>
+        <Label htmlFor="branch">Branch</Label>
         <Input
-          id="db_user"
-          value={settings.db_user || ''}
-          onChange={(e) => handleChange('db_user', e.target.value)}
-          placeholder="myapp_user"
-        />
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="db_password">Database Password</Label>
-        <Input
-          id="db_password"
-          type="password"
-          value={settings.db_password || ''}
-          onChange={(e) => handleChange('db_password', e.target.value)}
-          placeholder="••••••••"
+          id="branch"
+          value={settings.branch || ''}
+          onChange={(e) => handleChange('branch', e.target.value)}
+          placeholder="main"
         />
       </div>
 
       <div className="space-y-2">
         <Label htmlFor="cloudflare_zone_id">Cloudflare Zone ID</Label>
-        <Input
-          id="cloudflare_zone_id"
-          value={settings.cloudflare_zone_id || ''}
-          onChange={(e) => handleChange('cloudflare_zone_id', e.target.value)}
-          placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-        />
+        <div className="flex items-center flex-row">
+          <Input
+            id="cloudflare_zone_id"
+            value={settings.cloudflare_zone_id || ''}
+            onChange={(e) => handleChange('cloudflare_zone_id', e.target.value)}
+            placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+          />
+          <Button onClick={() => fetchZoneId(settings.name || '')} className="ml-4" color='gray'>Fetch Zone ID</Button>
+        </div>
       </div>
 
       <Button type="submit">Save Changes</Button>

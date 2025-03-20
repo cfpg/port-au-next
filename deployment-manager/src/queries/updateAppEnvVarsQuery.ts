@@ -13,13 +13,11 @@ export async function updateAppEnvVarsQuery(appId: number, branch: string, vars:
     // Fetch all existing env vars for the app
     const existingVars = await pool.query('SELECT * FROM app_env_vars WHERE app_id = $1', [appId]);
     
-    // Find env vars that don't exist in the existing vars
-    const newVars = Object.entries(vars).filter(([key, value]) => !existingVars.rows.some((row) => row.key === key));
     // Find vars that should be removed
     const varsToRemove = existingVars.rows.filter((row) => !Object.keys(vars).includes(row.key));
     
     // Insert new env vars
-    for (const [key, value] of newVars) {
+    for (const [key, value] of Object.entries(vars)) {
       await pool.query(`
         INSERT INTO app_env_vars (app_id, branch, key, value)
         VALUES ($1, $2, $3, $4)

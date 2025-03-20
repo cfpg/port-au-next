@@ -7,7 +7,7 @@ export default async function fetchSingleAppQuery(appName: string): Promise<App 
       SELECT 
         a.id,
         a.name,
-        a.repo_url as repository,
+        a.repo_url,
         a.branch,
         a.domain,
         a.db_name,

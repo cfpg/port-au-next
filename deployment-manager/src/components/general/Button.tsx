@@ -11,6 +11,7 @@ const button = tv({
       green: 'bg-green-600 text-white hover:bg-green-900 focus:ring-green-500',
       yellow: 'bg-yellow-600 text-white hover:bg-yellow-900 focus:ring-yellow-500',
       red: 'bg-red-600 text-white hover:bg-red-900 focus:ring-red-500',
+      gray: 'bg-gray-600 text-white hover:bg-gray-900 focus:ring-gray-500',
     },
     size: {
       sm: 'text-sm px-2 py-1',
@@ -25,7 +26,7 @@ const button = tv({
 });
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  color?: 'primary' | 'blue' | 'green' | 'yellow' | 'red';
+  color?: 'primary' | 'blue' | 'green' | 'yellow' | 'red' | 'gray';
   size?: 'sm' | 'md' | 'lg';
   children: React.ReactNode;
 }

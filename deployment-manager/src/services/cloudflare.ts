@@ -1,3 +1,4 @@
+import 'cloudflare/shims/web';
 import Cloudflare from 'cloudflare';
 import { exec } from 'child_process';
 import path from 'path';
