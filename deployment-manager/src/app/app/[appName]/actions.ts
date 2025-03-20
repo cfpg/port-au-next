@@ -54,7 +54,6 @@ export async function updateAppSettings(
       ]
     );
 
-    await logger.info('App settings updated', { appId, settings });
     return { success: true };
   } catch (error) {
     await logger.error('Failed to update app settings', error as Error);
@@ -80,7 +79,7 @@ export async function fetchZoneId(appName: string) {
   if (zoneId) {
     await updateAppSettings(app.id, { cloudflare_zone_id: zoneId });
   }
-  
+
   return zoneId;
 }
 

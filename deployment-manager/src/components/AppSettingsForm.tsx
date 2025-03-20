@@ -82,7 +82,7 @@ export function AppSettingsForm({ appId, initialSettings }: AppSettingsFormProps
 
       <div className="space-y-2">
         <Label htmlFor="cloudflare_zone_id">Cloudflare Zone ID</Label>
-        <div className="flex items-center flex-row">
+        <div className="flex items-center flex-row gap-4">
           <Input
             id="cloudflare_zone_id"
             value={settings.cloudflare_zone_id || ''}
@@ -94,14 +94,17 @@ export function AppSettingsForm({ appId, initialSettings }: AppSettingsFormProps
               fetchZoneId(settings.name || '')
                 .then((zoneId) => handleChange('cloudflare_zone_id', typeof zoneId === 'string' ? zoneId : ''));
             }}
-            className="ml-4"
             color='gray'>
+            <i className="fas fa-sync mr-2"></i>
             Fetch Zone ID
           </Button>
         </div>
       </div>
 
-      <Button type="submit">Save Changes</Button>
+      <Button type="submit" color='green'>
+        <i className="fas fa-save mr-2"></i>
+        Save Changes
+      </Button>
     </form>
   );
 } 
