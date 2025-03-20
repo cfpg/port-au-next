@@ -39,13 +39,17 @@ export default async function SingleAppPage({ params, searchParams }: PageProps)
               <i className="fas fa-rocket mr-2"></i>
               Deploy
             </Button>
+            <Button color='red'>
+              <i className="fas fa-trash mr-2"></i>
+              Delete
+            </Button>
           </div>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <h3 className="font-semibold mb-2">Repository</h3>
-              <p className="text-sm text-gray-500">{app.repository}</p>
+              <p className="text-sm text-gray-500">{app.repo_url}</p>
             </div>
             <div>
               <h3 className="font-semibold mb-2">Branch</h3>

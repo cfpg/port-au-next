@@ -74,3 +74,17 @@ export async function fetchZoneId(appName: string) {
   const zoneId = await cloudflare.getZoneId(app.domain);
   return zoneId;
 }
+
+export async function createApp({name, repo_url, branch, domain}: {name: string, repo_url: string, branch: string, domain: string,}) {
+  // Try catch inserting a new app into the table apps and return the app id
+  try {
+    const result = await pool.query(
+      `INSERT INTO apps (name, repo_url, branch, domain) VALUES ($1, $2, $3, $4) RETURNING id`,
+      [name, repo_url, branch, domain]
+    );
+    return result.rows[0].id;
+  } catch (error) {
+    await logger.error('Failed to create app', error as Error);
+    return { success: false, error: 'Failed to create app' };
+  }
+}

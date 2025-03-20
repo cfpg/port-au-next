@@ -1,100 +1,81 @@
-import { useState } from 'react';
+import { createApp } from "~/app/app/[appName]/actions";
 
-interface AppRegistrationFormProps {
-  onSubmit: (data: {
-    name: string;
-    repository: string;
-    branch: string;
-    domain: string;
-    env: Record<string, string>;
-  }) => void;
-}
+export default async function AppRegistrationForm() {
+  async function handleSubmit(formData: FormData) {
+    "use server";
 
-export default function AppRegistrationForm({ onSubmit }: AppRegistrationFormProps) {
-  const [formData, setFormData] = useState({
-    name: '',
-    repository: '',
-    branch: 'main',
-    domain: '',
-    env: {},
-  });
+    const name = formData.get('name') as string;
+    const repo_url = formData.get('repository') as string;
+    const branch = formData.get('branch') as string;
+    const domain = formData.get('domain') as string;
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onSubmit(formData);
-    setFormData({
-      name: '',
-      repository: '',
-      branch: 'main',
-      domain: '',
-      env: {},
-    });
-  };
+    await createApp({ name, repo_url, branch, domain });
+  }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
-          App Name:
-        </label>
-        <input
-          type="text"
-          id="name"
-          value={formData.name}
-          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-          required
-          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-        />
-      </div>
+    <section className="bg-white rounded-lg shadow p-6">
+      <h2 className="text-xl font-semibold mb-4 text-black">Register New App</h2>
+      <form action={handleSubmit} className="space-y-4">
+        <div>
+          <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
+            App Name:
+          </label>
+          <input
+            type="text"
+            id="name"
+            name="name"
+            required
+            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+          />
+        </div>
 
-      <div>
-        <label htmlFor="repository" className="block text-sm font-medium text-gray-700 mb-2">
-          Repository URL:
-        </label>
-        <input
-          type="text"
-          id="repository"
-          value={formData.repository}
-          onChange={(e) => setFormData({ ...formData, repository: e.target.value })}
-          required
-          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-        />
-      </div>
+        <div>
+          <label htmlFor="repository" className="block text-sm font-medium text-gray-700 mb-2">
+            Repository URL:
+          </label>
+          <input
+            type="text"
+            id="repository"
+            name="repository"
+            required
+            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+          />
+        </div>
 
-      <div>
-        <label htmlFor="branch" className="block text-sm font-medium text-gray-700 mb-2">
-          Branch:
-        </label>
-        <input
-          type="text"
-          id="branch"
-          value={formData.branch}
-          onChange={(e) => setFormData({ ...formData, branch: e.target.value })}
-          required
-          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-        />
-      </div>
+        <div>
+          <label htmlFor="branch" className="block text-sm font-medium text-gray-700 mb-2">
+            Branch:
+          </label>
+          <input
+            type="text"
+            id="branch"
+            name="branch"
+            defaultValue="main"
+            required
+            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+          />
+        </div>
 
-      <div>
-        <label htmlFor="domain" className="block text-sm font-medium text-gray-700 mb-2">
-          Domain:
-        </label>
-        <input
-          type="text"
-          id="domain"
-          value={formData.domain}
-          onChange={(e) => setFormData({ ...formData, domain: e.target.value })}
-          required
-          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-        />
-      </div>
+        <div>
+          <label htmlFor="domain" className="block text-sm font-medium text-gray-700 mb-2">
+            Domain:
+          </label>
+          <input
+            type="text"
+            id="domain"
+            name="domain"
+            required
+            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+          />
+        </div>
 
-      <button
-        type="submit"
-        className="w-full px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors"
-      >
-        Register App
-      </button>
-    </form>
+        <button
+          type="submit"
+          className="w-full px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors"
+        >
+          Register App
+        </button>
+      </form>
+    </section>
   );
 }

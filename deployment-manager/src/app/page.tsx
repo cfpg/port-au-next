@@ -1,5 +1,5 @@
 import AppsSection from '~/components/AppsSection';
-import AppRegistrationSection from '~/components/AppRegistrationSection';
+import AppRegistrationForm from '~/components/AppRegistrationForm';
 import { fetchApps, fetchRecentDeployments } from '~/app/actions';
 import { Deployment, App } from '~/types';
 
@@ -23,7 +23,7 @@ export default async function Home() {
         </div>
 
         <div className="col-span-12" id="new">
-          <AppRegistrationSection />
+          <AppRegistrationForm />
         </div>
       </div>
     </main>

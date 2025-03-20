@@ -16,10 +16,6 @@ export default function AppsSection({ initialApps, initialDeployments }: AppsSec
   const [apps, setApps] = useState<App[]>(initialApps);
   const [deployments, setDeployments] = useState<Deployment[]>(initialDeployments);
   const [selectedApp, setSelectedApp] = useState<App | null>(null);
-  const [isDeploymentModalOpen, setIsDeploymentModalOpen] = useState(false);
-  const [isEnvVarsModalOpen, setIsEnvVarsModalOpen] = useState(false);
-  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const { showToast } = useToast();
 
   useEffect(() => {
@@ -77,7 +73,6 @@ export default function AppsSection({ initialApps, initialDeployments }: AppsSec
       const data = await response.json();
       setDeployments(data);
       setSelectedApp(apps.find(app => app.name === appName) || null);
-      setIsDeploymentModalOpen(true);
     } catch (error) {
       showToast('Failed to fetch deployments', 'error');
     }
@@ -100,7 +95,6 @@ export default function AppsSection({ initialApps, initialDeployments }: AppsSec
       if (!response.ok) throw new Error('Failed to fetch environment variables');
       const data = await response.json();
       setSelectedApp(apps.find(app => app.name === appName) || null);
-      setIsEnvVarsModalOpen(true);
     } catch (error) {
       showToast('Failed to fetch environment variables', 'error');
     }
@@ -115,7 +109,6 @@ export default function AppsSection({ initialApps, initialDeployments }: AppsSec
       });
       if (!response.ok) throw new Error('Failed to save environment variables');
       showToast('Environment variables saved successfully', 'success');
-      setIsEnvVarsModalOpen(false);
     } catch (error) {
       showToast('Failed to save environment variables', 'error');
     }
@@ -127,7 +120,6 @@ export default function AppsSection({ initialApps, initialDeployments }: AppsSec
       if (!response.ok) throw new Error('Failed to fetch settings');
       const data = await response.json();
       setSelectedApp(apps.find(app => app.name === appName) || null);
-      setIsSettingsModalOpen(true);
     } catch (error) {
       showToast('Failed to fetch settings', 'error');
     }
@@ -142,7 +134,6 @@ export default function AppsSection({ initialApps, initialDeployments }: AppsSec
       });
       if (!response.ok) throw new Error('Failed to save settings');
       showToast('Settings saved successfully', 'success');
-      setIsSettingsModalOpen(false);
 
       // Update the local state
       setApps(apps.map(app =>
@@ -162,7 +153,6 @@ export default function AppsSection({ initialApps, initialDeployments }: AppsSec
       });
       if (!response.ok) throw new Error('Failed to delete app');
       showToast('App deleted successfully', 'success');
-      setIsDeleteModalOpen(false);
     } catch (error) {
       showToast('Failed to delete app', 'error');
     }
@@ -180,7 +170,6 @@ export default function AppsSection({ initialApps, initialDeployments }: AppsSec
           onEditSettings={handleEditSettings}
           onDelete={(appName) => {
             setSelectedApp(apps.find(app => app.name === appName) || null);
-            setIsDeleteModalOpen(true);
           }}
         />
       </section>
