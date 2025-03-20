@@ -44,6 +44,12 @@ async function initializeDatabase() {
       ADD COLUMN IF NOT EXISTS cloudflare_zone_id TEXT
     `);
 
+    // Add updated_at column to apps table
+    await pool.query(`
+      ALTER TABLE apps
+      ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    `);
+
     await pool.query(`
       CREATE TABLE IF NOT EXISTS deployments (
         id SERIAL PRIMARY KEY,

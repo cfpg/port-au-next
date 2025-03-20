@@ -76,6 +76,11 @@ export async function fetchZoneId(appName: string) {
   }
 
   const zoneId = await cloudflare.getZoneId(app.domain);
+
+  if (zoneId) {
+    await updateAppSettings(app.id, { cloudflare_zone_id: zoneId });
+  }
+  
   return zoneId;
 }
 

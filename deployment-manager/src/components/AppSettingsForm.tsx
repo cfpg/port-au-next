@@ -89,7 +89,15 @@ export function AppSettingsForm({ appId, initialSettings }: AppSettingsFormProps
             onChange={(e) => handleChange('cloudflare_zone_id', e.target.value)}
             placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
           />
-          <Button onClick={() => fetchZoneId(settings.name || '')} className="ml-4" color='gray'>Fetch Zone ID</Button>
+          <Button
+            onClick={() => {
+              fetchZoneId(settings.name || '')
+                .then((zoneId) => handleChange('cloudflare_zone_id', typeof zoneId === 'string' ? zoneId : ''));
+            }}
+            className="ml-4"
+            color='gray'>
+            Fetch Zone ID
+          </Button>
         </div>
       </div>
 
