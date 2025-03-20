@@ -2,7 +2,7 @@ import { getStatusColor } from '~/utils/status';
 import Button from '~/components/general/Button';
 import Link from '~/components/general/Link';
 import getSingleAppPath from '~/utils/getSingleAppPath';
-import {App} from '~/types';
+import { App } from '~/types';
 
 interface AppTableProps {
   apps: App[];
@@ -15,7 +15,7 @@ export default function AppTable({
 }: AppTableProps) {
   return (
     <div className="overflow-x-auto">
-      <table className="min-w-full divide-y divide-gray-200">
+      <table className="min-w-full divide-y divide-gray-200 rounded-b-lg">
         <thead className="bg-gray-50">
           <tr>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -41,7 +41,7 @@ export default function AppTable({
             </th>
           </tr>
         </thead>
-        <tbody className="bg-white divide-y divide-gray-200">
+        <tbody className="bg-white divide-y divide-gray-200 rounded-b-lg">
           {apps.map((app) => (
             <tr key={app.id}>
               <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">

@@ -6,7 +6,7 @@ import { useToast } from './general/ToastContainer';
 import DeploymentHistoryTable from './DeploymentHistoryTable';
 import { Deployment, App } from '~/types';
 import { triggerDeployment, fetchApps, fetchRecentDeployments } from '~/app/actions';
-import Card, { CardHeader, CardTitle, CardContent } from '~/components/general/Card';
+import Card from '~/components/general/Card';
 
 interface AppsSectionProps {
   initialApps: App[];
@@ -68,28 +68,28 @@ export default function AppsSection({ initialApps, initialDeployments }: AppsSec
 
   return (
     <>
-      <Card className="bg-white mb-8">
-        <CardHeader>
-          <CardTitle>Applications</CardTitle>
-        </CardHeader>
-        <CardContent padding="table">
+      <Card
+        className="bg-white mb-8"
+        padding="table"
+        title="Applications"
+        content={
           <AppTable
             apps={apps}
             onDeploy={handleDeploy}
           />
-        </CardContent>
-      </Card>
+        }
+      />
 
-      <Card className="bg-white">
-        <CardHeader>
-          <CardTitle>Deployment History</CardTitle>
-        </CardHeader>
-        <CardContent padding="table">
+      <Card
+        className="bg-white"
+        padding="table"
+        title="Deployment History"
+        content={
           <DeploymentHistoryTable
             deployments={deployments}
           />
-        </CardContent>
-      </Card>
+        }
+      />
     </>
   );
 } 

@@ -1,4 +1,4 @@
-import Card, { CardContent, CardHeader, CardTitle } from '~/components/general/Card';
+import Card from '~/components/general/Card';
 import Button from '~/components/general/Button';
 import Badge from '~/components/general/Badge';
 import DeploymentHistoryTable from '~/components/DeploymentHistoryTable';
@@ -28,24 +28,27 @@ export default async function SingleAppPage({ params, searchParams }: PageProps)
   return (
     <div>
       {/* App Information Section */}
-      <Card className="bg-white text-black mb-8">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-2xl font-bold">{app.name}</CardTitle>
-          <div className="flex items-center gap-4">
-            <Badge className={getStatusColor(app.status)}>
-              {app.status}
-            </Badge>
-            <Button>
-              <i className="fas fa-rocket mr-2"></i>
-              Deploy
-            </Button>
-            <Button color='red'>
-              <i className="fas fa-trash mr-2"></i>
-              Delete
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
+      <Card
+        className="bg-white text-black mb-8"
+        header={
+          <>
+            <h3 className="text-2xl font-bold">{app.name}</h3>
+            <div className="flex items-center gap-4">
+              <Badge className={getStatusColor(app.status)}>
+                {app.status}
+              </Badge>
+              <Button>
+                <i className="fas fa-rocket mr-2"></i>
+                Deploy
+              </Button>
+              <Button color='red'>
+                <i className="fas fa-trash mr-2"></i>
+                Delete
+              </Button>
+            </div>
+          </>
+        }
+        content={
           <div className="grid grid-cols-2 gap-4">
             <div>
               <h3 className="font-semibold mb-2">Repository</h3>
@@ -68,36 +71,39 @@ export default async function SingleAppPage({ params, searchParams }: PageProps)
                 {app.last_deployment && <span className="text-gray-400"> ({getRelativeTime(app.last_deployment.deployed_at)})</span>}
               </p>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </div>}
+      />
 
       {/* Deployment Section */}
-      <Card className='bg-white text-black mb-8'>
-        <CardHeader>
-          <CardTitle>Deployment History</CardTitle>
-        </CardHeader>
-        <CardContent padding="table">
+      <Card
+        className='bg-white text-black mb-8'
+        title="Deployment History"
+        padding="table"
+        content={
           <DeploymentHistoryTable
             deployments={deployments}
           />
-        </CardContent>
-      </Card>
+        }
+      />
 
-      <Card className='bg-white text-black mb-8'>
-        <CardHeader>
-          <CardTitle>Environment Variables</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <EnvVarsForm appId={app.id} branch={app.branch} initialEnvVars={app.env} />
-        </CardContent>
-      </Card>
+      <Card
+        className='bg-white text-black mb-8'
+        title="Environment Variables"
+        padding="content"
+        content={
+          <EnvVarsForm
+            appId={app.id}
+            branch={app.branch}
+            initialEnvVars={app.env}
+          />
+        }
+      />
 
-      <Card className='bg-white text-black mb-8'>
-        <CardHeader>
-          <CardTitle>App Settings</CardTitle>
-        </CardHeader>
-        <CardContent>
+      <Card
+        className='bg-white text-black mb-8'
+        title="App Settings"
+        padding="content"
+        content={
           <AppSettingsForm
             appId={app.id}
             initialSettings={{
@@ -108,8 +114,8 @@ export default async function SingleAppPage({ params, searchParams }: PageProps)
               cloudflare_zone_id: app.cloudflare_zone_id,
             }}
           />
-        </CardContent>
-      </Card>
+        }
+      />
 
       {modalViewLogs && (
         <DeploymentLogsModal

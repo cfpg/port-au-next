@@ -1,15 +1,15 @@
-import { tv } from 'tailwind-variants';
+import { tv, type VariantProps } from 'tailwind-variants';
 
 const card = tv({
   slots: {
-    base: 'rounded-lg border border-gray-400 bg-card text-card-foreground shadow-sm',
-    header: 'flex flex-col space-y-1 p-2 bg-gray-100 rounded-t-lg border-b border-gray-400',
-    title: 'text-sm font-bold leading-none tracking-relaxed text-gray-700 py-1 px-2',
+    base: 'rounded-lg border border-gray-400 bg-card text-card-foreground shadow-sm bg-white',
+    header: 'flex flex-row items-center justify-between space-2 px-4 py-2 bg-gray-100 rounded-t-lg border-b border-gray-400',
+    title: 'text-sm font-bold leading-none tracking-relaxed text-gray-700 py-1',
     content: ''
   },
   variants: {
     padding: {
-      table: { content: 'p-0' },
+      table: { content: 'p-0', base: 'overflow-hidden' },
       content: { content: 'p-6' }
     }
   },
@@ -18,26 +18,36 @@ const card = tv({
   }
 });
 
-interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
-  children: React.ReactNode;
+interface CardProps extends VariantProps<typeof card> {
+  header?: React.ReactNode;
+  title?: React.ReactNode;
+  content?: React.ReactNode;
+  className?: string;
 }
 
-export default function Card({ className, ...props }: CardProps) {
-  const { base } = card();
-  return <div className={base({ className })} {...props} />;
-}
+export default function Card({ 
+  header,
+  title,
+  content,
+  className,
+  padding,
+  ...props 
+}: CardProps) {
+  const styles = card({ padding });
 
-export function CardHeader({ className, ...props }: CardProps) {
-  const { header } = card();
-  return <div className={header({ className })} {...props} />;
-}
-
-export function CardTitle({ className, ...props }: CardProps) {
-  const { title } = card();
-  return <h3 className={title({ className })} {...props} />;
-}
-
-export function CardContent({ className, padding, ...props }: CardProps & { padding?: 'table' | 'content' }) {
-  const { content } = card({ padding });
-  return <div className={content({ className })} {...props} />;
+  return (
+    <div className={styles.base({ className })} {...props}>
+      {(header || title) && (
+        <div className={styles.header()}>
+          {title && <h3 className={styles.title()}>{title}</h3>}
+          {header}
+        </div>
+      )}
+      {content && (
+        <div className={styles.content()}>
+          {content}
+        </div>
+      )}
+    </div>
+  );
 } 

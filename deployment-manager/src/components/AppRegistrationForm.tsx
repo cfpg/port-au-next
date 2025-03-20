@@ -1,5 +1,5 @@
 import { createApp } from "~/app/app/[appName]/actions";
-import Card, { CardHeader, CardTitle, CardContent } from '~/components/general/Card';
+import Card from '~/components/general/Card';
 
 export default async function AppRegistrationForm() {
   async function handleSubmit(formData: FormData) {
@@ -14,11 +14,10 @@ export default async function AppRegistrationForm() {
   }
 
   return (
-    <Card className="bg-white">
-      <CardHeader>
-        <CardTitle>Register New App</CardTitle>
-      </CardHeader>
-      <CardContent>
+    <Card
+      className="bg-white"
+      title="Register New App"
+      content={
         <form action={handleSubmit} className="space-y-4">
           <div>
             <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
@@ -79,8 +78,7 @@ export default async function AppRegistrationForm() {
           >
             Register App
           </button>
-        </form>
-      </CardContent>
-    </Card>
+        </form>}
+    />
   );
 }
