@@ -9,6 +9,9 @@ import { modifyNextConfig } from '~/services/nextConfig';
 
 import { execCommand } from '~/utils/docker';
 import getAppsDir from '~/utils/getAppsDir';
+import { ServiceStatus } from '~/types';
+import { Service } from '~/types';
+import { ServiceHealth } from '~/types';
 
 // Types
 interface EnvVar {
@@ -101,7 +104,7 @@ CMD ["node", "server.js"]
 
 async function buildImage(appName: string, version: string): Promise<string> {
   const logFile = `./log-build-${appName}.log`;
-  
+
   try {
     const imageTag = `${appName}:${version}`;
     const appDir = path.join(APPS_DIR, appName);
@@ -423,6 +426,42 @@ async function deleteAppContainers(appName: string): Promise<void> {
   }
 }
 
+async function getServicesHealth(): Promise<ServiceHealth[]> {
+  // Use docker compose ps to get status of services containers: postgres, nginx, redis, thumbor
+  const containers = await execCommand(`docker compose ps --format "{{.ID}} {{.Name}} {{.Status}}"`) as string;
+  
+  // Split output into lines and parse each line
+  const lines = containers.split('\n').filter(line => line.trim());
+  
+  const healthStatus: ServiceHealth[] = lines.map(line => {
+    const [id, fullName, ...statusParts] = line.split(' ');
+    // Extract service name from full container name (e.g., "port-au-next-nginx-1" -> "nginx")
+    const service = fullName.split('-').slice(-2, -1)[0] as Service;
+    
+    // Parse status string to determine service status
+    const statusString = statusParts.join(' ').toLowerCase();
+    let status: ServiceStatus = 'unknown';
+    
+    if (statusString.includes('up') || statusString.includes('running')) {
+      status = 'running';
+    } else if (statusString.includes('exited') || statusString.includes('stopped')) {
+      status = 'stopped';
+    }
+    
+    return {
+      id,
+      name: fullName,
+      status,
+      service
+    };
+  }).filter(status => 
+    // Only include our core services
+    ['postgres', 'nginx', 'redis', 'thumbor'].includes(status.service)
+  );
+
+  return healthStatus;
+}
+
 export {
   buildAndStartContainer,
   startContainer,
@@ -430,5 +469,6 @@ export {
   waitForHealthyContainer,
   recoverContainers,
   containerExists,
-  deleteAppContainers
+  deleteAppContainers,
+  getServicesHealth
 }; 

@@ -5,6 +5,7 @@ import Link from '~/components/general/Link';
 import getSingleAppPath from '~/utils/getSingleAppPath';
 import { App } from '~/types';
 import AppDeployButton from '~/components/buttons/AppDeployButton';
+import Badge from '../general/Badge';
 
 interface AppsTableProps {
   apps: App[];
@@ -57,9 +58,7 @@ export default function AppsTable({
                 <a href={`https://${app.domain}`} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700 underline">{app.domain}</a>
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
-                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(app.status)}`}>
-                  {app.status}
-                </span>
+                <Badge className={getStatusColor(app.status)}>{app.status}</Badge>
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                 {app.last_deployment ? new Date(app.last_deployment.deployed_at).toLocaleString() : 'Never'}

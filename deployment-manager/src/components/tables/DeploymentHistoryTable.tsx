@@ -10,6 +10,7 @@ import Table, {
 import getRelativeTime from '~/utils/getRelativeTime';
 import getGithubRepoPath from '~/utils/getGithubRepoPath';
 import Link from '../general/Link';
+import Badge from '../general/Badge';
 
 interface DeploymentHistoryTableProps {
   deployments: Deployment[];
@@ -42,9 +43,7 @@ export default function DeploymentHistoryTable({
                 {deployment.commit_id ? <a href={`https://github.com/${getGithubRepoPath(deployment.app_repository)}/commit/${deployment.commit_id}`} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700 underline">{deployment.commit_id.substring(0, 7)}</a> : 'N/A'}
               </TableCell>
               <TableCell>
-                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(deployment.status)}`}>
-                  {deployment.status}
-                </span>
+                <Badge className={getStatusColor(deployment.status)}>{deployment.status}</Badge>
               </TableCell>
               <TableCell>
                 {new Date(deployment.deployed_at).toLocaleString()}

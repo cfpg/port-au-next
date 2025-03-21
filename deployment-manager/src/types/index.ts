@@ -46,3 +46,14 @@ export interface AppSettings {
   domain?: string;
   cloudflare_zone_id?: string;
 } 
+
+
+export type Service = 'postgres' | 'nginx' | 'redis' | 'thumbor';
+export type ServiceStatus = 'running' | 'stopped' | 'unknown';
+
+export interface ServiceHealth {
+  id: string;
+  name: string;
+  status: ServiceStatus;
+  service: Service;
+}

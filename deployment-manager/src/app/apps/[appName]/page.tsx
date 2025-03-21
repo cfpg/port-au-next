@@ -9,6 +9,7 @@ import { getStatusColor } from '~/utils/status';
 import getRelativeTime from '~/utils/getRelativeTime';
 import DeploymentLogsModal from '~/components/modals/DeploymentLogsModal';
 import AppDeleteButton from '~/components/buttons/AppDeleteButton';
+import getSingleAppPath from '~/utils/getSingleAppPath';
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
@@ -122,7 +123,7 @@ export default async function SingleAppPage({ params, searchParams }: PageProps)
         <DeploymentLogsModal
           appName={app.name}
           deploymentId={Number.parseInt(modalViewLogs)}
-          closeHref={`/app/${app.name}`}
+          closeHref={getSingleAppPath(app.name)}
         />
       )}
     </div>
