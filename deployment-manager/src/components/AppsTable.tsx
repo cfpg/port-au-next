@@ -1,18 +1,21 @@
+"use client";
+
 import { getStatusColor } from '~/utils/status';
-import Button from '~/components/general/Button';
 import Link from '~/components/general/Link';
 import getSingleAppPath from '~/utils/getSingleAppPath';
 import { App } from '~/types';
+import { useToast } from '~/components/general/ToastContainer';
+import AppDeployButton from '~/components/buttons/AppDeployButton';
 
-interface AppTableProps {
+interface AppsTableProps {
   apps: App[];
-  onDeploy: (appName: string) => void;
 }
 
-export default function AppTable({
+export default function AppsTable({
   apps,
-  onDeploy,
-}: AppTableProps) {
+}: AppsTableProps) {
+  const { showToast } = useToast();
+
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-200 rounded-b-lg">
@@ -65,14 +68,7 @@ export default function AppTable({
                 {app.last_deployment ? new Date(app.last_deployment.deployed_at).toLocaleString() : 'Never'}
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
-                <Button
-                  onClick={() => onDeploy(app.name)}
-                  color="primary"
-                  size="sm"
-                >
-                  <i className="fas fa-rocket mr-2"></i>
-                  Deploy
-                </Button>
+                <AppDeployButton appName={app.name} />
                 <Link
                   href={getSingleAppPath(app.name)}
                   color="yellow"

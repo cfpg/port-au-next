@@ -9,6 +9,7 @@ import { getLatestCommit } from '~/services/git';
 import { pullLatestChanges } from '~/services/git';
 import fetchAppsQuery from '~/queries/fetchAppsQuery';
 import fetchRecentDeploymentsQuery from '~/queries/fetchRecentDeploymentsQuery';
+import { revalidatePath } from 'next/cache';
 
 export async function fetchApps() {
   const apps = await fetchAppsQuery();
@@ -20,7 +21,7 @@ export async function fetchRecentDeployments() {
   return deployments;
 }
 
-export async function triggerDeployment(appName: string) {
+export async function triggerDeployment(appName: string, { pathname }: { pathname?: string } = {}) {
   let deploymentId: number;
 
   try {
@@ -154,6 +155,11 @@ export async function triggerDeployment(appName: string) {
           ['failed', deploymentId]
         );
       } finally {
+        // Revalidate path if available
+        if (pathname) {
+          revalidatePath(pathname);
+        }
+        
         // Clear the deployment context when done
         logger.clearDeploymentContext();
       }

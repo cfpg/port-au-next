@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import Button from "./general/Button";
-import Modal from "./general/Modal";
-import { deleteApp } from "~/app/app/[appName]/actions";
-import Input from "./general/Input";
+import Button from "../general/Button";
+import Modal from "../general/Modal";
+import { deleteApp } from "~/app/apps/[appName]/actions";
+import Input from "../general/Input";
 import { useRouter } from "next/navigation";
 
 export default function AppDeleteButton({ appName }: { appName: string }) {

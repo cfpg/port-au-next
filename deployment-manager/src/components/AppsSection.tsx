@@ -1,11 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import AppTable from './AppTable';
+import AppsTable from './AppsTable';
 import { useToast } from './general/ToastContainer';
 import DeploymentHistoryTable from './DeploymentHistoryTable';
 import { Deployment, App } from '~/types';
-import { triggerDeployment, fetchApps, fetchRecentDeployments } from '~/app/actions';
+import { fetchApps, fetchRecentDeployments } from '~/app/actions';
 import Card from '~/components/general/Card';
 
 interface AppsSectionProps {
@@ -16,7 +16,6 @@ interface AppsSectionProps {
 export default function AppsSection({ initialApps, initialDeployments }: AppsSectionProps) {
   const [apps, setApps] = useState<App[]>(initialApps);
   const [deployments, setDeployments] = useState<Deployment[]>(initialDeployments);
-  const { showToast } = useToast();
 
   useEffect(() => {
     // Continuously poll for apps data
@@ -56,16 +55,6 @@ export default function AppsSection({ initialApps, initialDeployments }: AppsSec
     };
   }, []);
 
-  const handleDeploy = async (appName: string) => {
-    try {
-      const result = await triggerDeployment(appName);
-      if (!result.success) throw new Error(result.error);
-      showToast('Deployment started successfully', 'success');
-    } catch (error) {
-      showToast('Failed to start deployment', 'error');
-    }
-  };
-
   return (
     <>
       <Card
@@ -73,9 +62,8 @@ export default function AppsSection({ initialApps, initialDeployments }: AppsSec
         padding="table"
         title="Applications"
         content={
-          <AppTable
+          <AppsTable
             apps={apps}
-            onDeploy={handleDeploy}
           />
         }
       />

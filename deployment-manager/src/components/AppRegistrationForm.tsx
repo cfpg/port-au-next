@@ -1,4 +1,4 @@
-import { createApp } from "~/app/app/[appName]/actions";
+import { createApp } from "~/app/apps/[appName]/actions";
 import Card from '~/components/general/Card';
 
 export default async function AppRegistrationForm() {

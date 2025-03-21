@@ -3,7 +3,6 @@
 import { notFound } from 'next/navigation';
 import fetchSingleAppQuery from '~/queries/fetchSingleAppQuery';
 import fetchRecentDeploymentsQuery from '~/queries/fetchRecentDeploymentsQuery';
-import { triggerDeployment } from '~/app/actions';
 import pool from '~/services/database';
 import logger from '~/services/logger';
 import { updateAppEnvVarsQuery } from '~/queries/updateAppEnvVarsQuery';

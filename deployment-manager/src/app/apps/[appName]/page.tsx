@@ -8,7 +8,7 @@ import { fetchApp, fetchAppDeployments } from './actions';
 import { getStatusColor } from '~/utils/status';
 import getRelativeTime from '~/utils/getRelativeTime';
 import DeploymentLogsModal from '~/components/modals/DeploymentLogsModal';
-import AppDeleteButton from '~/components/AppDeleteButton';
+import AppDeleteButton from '~/components/buttons/AppDeleteButton';
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';

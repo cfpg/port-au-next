@@ -28,7 +28,7 @@ export default function DeploymentHistoryTable({
             <TableHead>Commit</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Deployed At</TableHead>
-            <TableHead>Actions</TableHead>
+            <TableHead className='text-right'>Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -50,12 +50,14 @@ export default function DeploymentHistoryTable({
                 {new Date(deployment.deployed_at).toLocaleString()}
                 {deployment.deployed_at && <span className="text-gray-400"> ({getRelativeTime(deployment.deployed_at)})</span>}
               </TableCell>
-              <TableCell className="text-left font-medium">
+              <TableCell className="text-right font-medium">
                 <Link
                   href={`?modalViewLogs=${deployment.id}&modalAppName=${deployment.app_name}`}
                   color="gray"
                   variant="button"
+                  size="sm"
                 >
+                  <i className="fas fa-eye mr-2"></i>
                   View Logs
                 </Link>
               </TableCell>
