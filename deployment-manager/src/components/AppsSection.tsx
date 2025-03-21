@@ -1,9 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import AppsTable from './AppsTable';
-import { useToast } from './general/ToastContainer';
-import DeploymentHistoryTable from './DeploymentHistoryTable';
+import AppsTable from '~/components/tables/AppsTable';
+import DeploymentHistoryTable from '~/components/tables/DeploymentHistoryTable';
 import { Deployment, App } from '~/types';
 import { fetchApps, fetchRecentDeployments } from '~/app/actions';
 import Card from '~/components/general/Card';
@@ -16,6 +15,14 @@ interface AppsSectionProps {
 export default function AppsSection({ initialApps, initialDeployments }: AppsSectionProps) {
   const [apps, setApps] = useState<App[]>(initialApps);
   const [deployments, setDeployments] = useState<Deployment[]>(initialDeployments);
+
+  useEffect(() => {
+    setApps(initialApps);
+  }, [initialApps]);
+
+  useEffect(() => {
+    setDeployments(initialDeployments);
+  }, [initialDeployments]);
 
   useEffect(() => {
     // Continuously poll for apps data

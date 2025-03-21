@@ -1,6 +1,6 @@
 import Card from "~/components/general/Card";
 import { fetchApps } from "../actions"
-import AppsTable from "~/components/AppsTable";
+import AppsTable from "~/components/tables/AppsTable";
 
 const AppsPage = async () => {
   const apps = await fetchApps();

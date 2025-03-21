@@ -6,10 +6,10 @@ import Table, {
   TableHead,
   TableHeader,
   TableRow,
-} from './general/Table';
+} from '../general/Table';
 import getRelativeTime from '~/utils/getRelativeTime';
 import getGithubRepoPath from '~/utils/getGithubRepoPath';
-import Link from './general/Link';
+import Link from '../general/Link';
 
 interface DeploymentHistoryTableProps {
   deployments: Deployment[];

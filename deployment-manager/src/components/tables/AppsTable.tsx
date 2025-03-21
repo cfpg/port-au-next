@@ -4,7 +4,6 @@ import { getStatusColor } from '~/utils/status';
 import Link from '~/components/general/Link';
 import getSingleAppPath from '~/utils/getSingleAppPath';
 import { App } from '~/types';
-import { useToast } from '~/components/general/ToastContainer';
 import AppDeployButton from '~/components/buttons/AppDeployButton';
 
 interface AppsTableProps {
@@ -14,8 +13,6 @@ interface AppsTableProps {
 export default function AppsTable({
   apps,
 }: AppsTableProps) {
-  const { showToast } = useToast();
-
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-200 rounded-b-lg">

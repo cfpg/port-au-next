@@ -1,7 +1,7 @@
 import Card from '~/components/general/Card';
 import Button from '~/components/general/Button';
 import Badge from '~/components/general/Badge';
-import DeploymentHistoryTable from '~/components/DeploymentHistoryTable';
+import DeploymentHistoryTable from '~/components/tables/DeploymentHistoryTable';
 import { EnvVarsForm } from '~/components/EnvVarsForm';
 import { AppSettingsForm } from '~/components/AppSettingsForm';
 import { fetchApp, fetchAppDeployments } from './actions';

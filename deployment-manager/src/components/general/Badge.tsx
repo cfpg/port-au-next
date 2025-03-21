@@ -14,10 +14,10 @@ const badge = tv({
   },
 });
 
-interface BadgeProps extends React.HTMLAttributes<HTMLDivElement> {
+interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
   variant?: 'default' | 'secondary' | 'destructive';
 }
 
 export default function Badge({ variant, className, ...props }: BadgeProps) {
-  return <div className={badge({ variant, className })} {...props} />;
+  return <span className={badge({ variant, className })} {...props} />;
 } 

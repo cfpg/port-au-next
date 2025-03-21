@@ -50,6 +50,11 @@ export async function triggerDeployment(appName: string, { pathname }: { pathnam
     logger.setDeploymentContext(deploymentId);
     await logger.info('Deployment record created', { version });
 
+    // Revalidate path if available
+    if (pathname) {
+      revalidatePath(pathname);
+    }
+
     // Async deployment process
     (async () => {
       try {
@@ -154,12 +159,7 @@ export async function triggerDeployment(appName: string, { pathname }: { pathnam
           'UPDATE deployments SET status = $1 WHERE id = $2',
           ['failed', deploymentId]
         );
-      } finally {
-        // Revalidate path if available
-        if (pathname) {
-          revalidatePath(pathname);
-        }
-        
+      } finally {       
         // Clear the deployment context when done
         logger.clearDeploymentContext();
       }
