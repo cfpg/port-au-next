@@ -1,16 +1,33 @@
 {
-  "name": "port-au-next-deployment-manager",
+  "name": "deployment-manager",
   "version": "0.1.0",
-  "description": "Deployment manager for Next.js apps",
-  "main": "app.js",
+  "private": true,
   "scripts": {
-    "start": "node app.js"
+    "dev": "next dev --turbopack",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "db:migrate": "ts-node src/scripts/migrate.ts"
   },
   "dependencies": {
-    "axios": ">=1.8.2",
-    "cloudflare": "^4.1.0",
-    "express": "^4.18.2",
-    "js-yaml": "^4.1.0",
-    "pg": "^8.13.3"
+    "@types/pg": "^8.11.11",
+    "cloudflare": "^4.2.0",
+    "next": "15.2.3",
+    "pg": "^8.14.1",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "tailwind-variants": "^1.0.0"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3",
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "15.2.3",
+    "tailwindcss": "^4",
+    "typescript": "^5",
+    "ts-node": "^10.9.2"
   }
 }

@@ -1,31 +1,67 @@
-FROM node:20-alpine
+# syntax=docker.io/docker/dockerfile:1
+
+FROM node:18-alpine AS base
+
+# Install dependencies only when needed
+FROM base AS deps
+# Install system dependencies
+RUN apk add --no-cache libc6-compat docker-cli git openssh-client
 
 WORKDIR /app
 
-# Install required tools including openssh-client
-RUN apk add --no-cache curl docker-cli docker-compose git openssh-client util-linux-login
+# Install dependencies based on the preferred package manager
+COPY package.json package-lock.json* ./
 
-# Create docker group with GID 1001 to match host system and add node user
-RUN addgroup -g 1001 docker && \
-    addgroup node docker &&\
-    newgrp docker
+# Install regular dependencies
+RUN npm ci
 
-# Create necessary directories
-RUN mkdir -p /app/apps && \
-    mkdir -p /home/node/.ssh && \
-    chown -R node:node /app /home/node/.ssh
+# Rebuild the source code only when needed
+FROM base AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
 
-# Add github.com to known hosts
-RUN ssh-keyscan github.com > /home/node/.ssh/known_hosts && \
-    chown node:node /home/node/.ssh/known_hosts
+# Disable telemetry during build
+ENV NEXT_TELEMETRY_DISABLED=1
 
-COPY --chown=node:node package.json package-lock.json ./
-RUN npm ci --production
+# Compile migration script
+RUN npx tsc src/scripts/migrate.ts --outDir dist/scripts --esModuleInterop
 
-COPY --chown=node:node . .
+# Build Next.js app
+RUN npm run build -- -d
 
-# Copy and set up entrypoint script
-COPY docker-entrypoint.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+# Production image, copy all the files and run next
+FROM base AS runner
+WORKDIR /app
 
-ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+
+# Install production dependencies
+RUN apk add --no-cache docker-cli git openssh-client
+
+# Create a non-root user
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
+
+# Set up SSH directory for the nextjs user
+RUN mkdir -p /home/nextjs/.ssh && chown -R nextjs:nodejs /home/nextjs/.ssh
+
+# Copy public directory and standalone build
+COPY --from=builder /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+# Copy compiled migration script
+COPY --from=builder /app/dist/scripts/migrate.js ./scripts/
+
+# Switch to non-root user
+USER nextjs
+
+EXPOSE 3000
+
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
+
+# Run migration before starting the server
+CMD ["sh", "-c", "node scripts/migrate.js && node server.js"] 
