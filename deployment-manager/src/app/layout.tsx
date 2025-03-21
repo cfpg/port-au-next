@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import Sidebar from "~/components/Sidebar";
-import fetchApps from "~/queries/fetchAppsQuery";
+import SidebarContainer from "~/components/SidebarContainer";
 const inter = Inter({ subsets: ["latin"] });
+
+export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
   title: "Port-au-Next Dashboard",
@@ -15,7 +16,6 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const apps = await fetchApps();
   return (
     <html lang="en">
       <head>
@@ -37,7 +37,7 @@ export default async function RootLayout({
             transition-all duration-300 ease-in-out
             mb-4 md:mb-0
           ">
-            <Sidebar apps={apps} />
+            <SidebarContainer />
           </aside>
 
           {/* Main content */}

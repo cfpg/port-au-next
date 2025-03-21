@@ -10,6 +10,9 @@ import getRelativeTime from '~/utils/getRelativeTime';
 import DeploymentLogsModal from '~/components/modals/DeploymentLogsModal';
 import AppDeleteButton from '~/components/AppDeleteButton';
 
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
+
 interface PageProps {
   params: {
     appName: string;

@@ -55,18 +55,18 @@ services:
       context: ./deployment-manager
       dockerfile: Dockerfile
     restart: always
-    # user: "1000:1000"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./apps:/app/apps:rw
       - ./deployment-manager/public:/app/public:ro
-      - ~/.ssh/id_rsa:/home/node/.ssh/id_rsa:ro
-      - ~/.ssh/id_rsa.pub:/home/node/.ssh/id_rsa.pub:ro
+      - ~/.ssh/id_rsa:/home/nextjs/.ssh/id_rsa:ro
+      - ~/.ssh/id_rsa.pub:/home/nextjs/.ssh/id_rsa.pub:ro
       - ./nginx:/app/nginx:rw
       - ./docker-compose.yml:/app/docker-compose.yml:ro
     environment:
       - NODE_ENV=production
       - PORT=3000
+      - POSTGRES_HOST=postgres
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=${POSTGRES_DB}

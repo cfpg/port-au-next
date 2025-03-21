@@ -1,8 +1,11 @@
 import AppsSection from '~/components/AppsSection';
 import AppRegistrationForm from '~/components/AppRegistrationForm';
 import { fetchApps, fetchRecentDeployments } from '~/app/actions';
-import { Deployment, App } from '~/types';
+import { Deployment } from '~/types';
 import DeploymentLogsModal from '~/components/modals/DeploymentLogsModal';
+
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
 
 export default async function Home({ searchParams }: { searchParams: { modalViewLogs?: string; modalAppName?: string } }) {
   // Fetch both apps and deployments in parallel
