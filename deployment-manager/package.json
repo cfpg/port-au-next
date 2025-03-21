@@ -1,6 +1,6 @@
 {
   "name": "port-au-next-deployment-manager",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Deployment manager for Next.js apps",
   "main": "app.js",
   "scripts": {
