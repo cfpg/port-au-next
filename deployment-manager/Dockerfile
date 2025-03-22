@@ -38,25 +38,34 @@ ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
 # Install production dependencies
-RUN apk add --no-cache docker-cli git openssh-client
+RUN apk add --no-cache \
+    docker-cli \
+    docker-compose \
+    git \
+    openssh-client \
+    shadow
 
-# Create a non-root user
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+# Create docker group with GID 1001 and add node user to it
+RUN addgroup -g 1001 docker && \
+    addgroup node docker
 
-# Set up SSH directory for the nextjs user
-RUN mkdir -p /home/nextjs/.ssh && chown -R nextjs:nodejs /home/nextjs/.ssh
+# Set up SSH directory and add GitHub's host key
+RUN mkdir -p /home/node/.ssh && \
+    chown -R node:node /home/node/.ssh && \
+    ssh-keyscan github.com > /home/node/.ssh/known_hosts && \
+    chown node:node /home/node/.ssh/known_hosts && \
+    chmod 644 /home/node/.ssh/known_hosts
 
 # Copy public directory and standalone build
 COPY --from=builder /app/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
 
 # Copy compiled migration script
 COPY --from=builder /app/dist/scripts/migrate.js ./scripts/
 
-# Switch to non-root user
-USER nextjs
+# Switch to node user
+USER node
 
 EXPOSE 3000
 

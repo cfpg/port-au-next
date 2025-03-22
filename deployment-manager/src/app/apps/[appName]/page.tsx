@@ -10,6 +10,7 @@ import getRelativeTime from '~/utils/getRelativeTime';
 import DeploymentLogsModal from '~/components/modals/DeploymentLogsModal';
 import AppDeleteButton from '~/components/buttons/AppDeleteButton';
 import getSingleAppPath from '~/utils/getSingleAppPath';
+import AppDeployButton from '~/components/buttons/AppDeployButton';
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
@@ -42,10 +43,7 @@ export default async function SingleAppPage({ params, searchParams }: PageProps)
               <Badge className={getStatusColor(app.status)}>
                 {app.status}
               </Badge>
-              <Button>
-                <i className="fas fa-rocket mr-2"></i>
-                Deploy
-              </Button>
+              <AppDeployButton appName={app.name} />
               <AppDeleteButton appName={app.name} />
             </div>
           </>
