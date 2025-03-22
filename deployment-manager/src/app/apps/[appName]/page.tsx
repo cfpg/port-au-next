@@ -60,7 +60,12 @@ export default async function SingleAppPage({ params, searchParams }: PageProps)
             </div>
             <div>
               <h3 className="font-semibold mb-2">Domain</h3>
-              <p className="text-sm text-gray-500">{app.domain || 'Not set'}</p>
+              <p className="text-sm text-gray-500">
+                {
+                  app.domain ?
+                    <a href={`https://${app.domain}`} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700 underline">{app.domain}</a> : 'Not set'
+                }
+              </p>
             </div>
             <div>
               <h3 className="font-semibold mb-2">Last Deployment</h3>

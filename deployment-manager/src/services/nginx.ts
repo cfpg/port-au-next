@@ -6,7 +6,7 @@ import { getContainerIp, execCommand } from '~/utils/docker';
 import getAppsDir from '~/utils/getAppsDir';
 
 // Use absolute path from project root
-const NGINX_CONFIG_DIR = path.join(getAppsDir(), 'nginx/conf.d');
+const NGINX_CONFIG_DIR = path.join(getAppsDir(), '../nginx/conf.d');
 
 export async function updateNginxConfig(appName: string, domain: string, containerId: string | null = null) {
   try {
