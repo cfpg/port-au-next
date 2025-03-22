@@ -103,13 +103,14 @@ CMD ["node", "server.js"]
 }
 
 async function buildImage(appName: string, version: string): Promise<string> {
-  const logFile = `./log-build-${appName}.log`;
+  const logFile = path.join(APPS_DIR, `log-build-${appName}.log`);
 
   try {
     const imageTag = `${appName}:${version}`;
     const appDir = path.join(APPS_DIR, appName);
     
     await logger.info('Building Docker image', { imageTag });
+    await logger.info('You can find the build log in the file', { logFile });
     await execCommand(`docker build -t ${imageTag} ${appDir} &> ${logFile}`);
     
     await logger.info('Docker image built successfully', { imageTag });

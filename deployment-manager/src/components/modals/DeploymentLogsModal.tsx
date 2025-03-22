@@ -51,7 +51,7 @@ export default async function DeploymentLogsModal({ appName, deploymentId, close
                         <div className="mt-1">{log.message}</div>
                         {log.metadata && (
                           <pre className="text-xs mt-2 text-gray-600 whitespace-pre-wrap break-words">
-                            {JSON.stringify(log.metadata, null, 2)}
+                            <span dangerouslySetInnerHTML={{ __html: JSON.stringify(log.metadata, null, 2).replace(/\\n/g, '<br />') }} />
                           </pre>
                         )}
                       </div>

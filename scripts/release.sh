@@ -120,25 +120,43 @@ fi
 # Calculate new version
 VERSION=$(increment_version $CURRENT_VERSION $VERSION_TYPE)
 
-# Generate changelog updates
-PREV_VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
-if [ -n "$PREV_VERSION" ]; then
+# Enhanced commit message parsing function
+parse_commit_messages() {
+    local type=$1
+    local pattern=""
+    case $type in
+        "feat")
+            pattern="^feat\|^feature\|^add"
+            ;;
+        "fix")
+            pattern="^fix\|^bug\|^hotfix"
+            ;;
+        "security")
+            pattern="^security\|^deps\|^dependency"
+            ;;
+    esac
+    
+    git log $PREV_VERSION..HEAD --pretty=format:"* %s" --reverse | grep -iE "$pattern" | sed 's/^\([^:]*\): */\1: /' || true
+}
+
+# Improved changelog generation
+generate_changelog() {
     echo "## [$VERSION] - $(date +%Y-%m-%d)" > CHANGELOG.tmp
     echo "" >> CHANGELOG.tmp
     
-    # Group changes by type
+    # Group changes by type with improved parsing
     echo "### Added" >> CHANGELOG.tmp
-    git log $PREV_VERSION..HEAD --pretty=format:"* %s" --reverse | grep -i "^feat" >> CHANGELOG.tmp || true
+    parse_commit_messages "feat" >> CHANGELOG.tmp
     echo "" >> CHANGELOG.tmp
     
     echo "### Fixed" >> CHANGELOG.tmp
-    git log $PREV_VERSION..HEAD --pretty=format:"* %s" --reverse | grep -i "^fix" >> CHANGELOG.tmp || true
+    parse_commit_messages "fix" >> CHANGELOG.tmp
     echo "" >> CHANGELOG.tmp
     
     echo "### Security" >> CHANGELOG.tmp
-    git log $PREV_VERSION..HEAD --pretty=format:"* %s" --reverse | grep -i "^security\|^deps" >> CHANGELOG.tmp || true
+    parse_commit_messages "security" >> CHANGELOG.tmp
     echo "" >> CHANGELOG.tmp
-fi
+}
 
 # Show changes and confirm
 echo "Current version: $CURRENT_VERSION"
@@ -183,12 +201,67 @@ fi
 git add VERSION deployment-manager/package.json CHANGELOG.md
 git commit -m "chore: release version $VERSION"
 
+# Enhanced merge handling
+handle_merge() {
+    local source=$1
+    local target=$2
+    local message=$3
+    
+    echo "Attempting to merge $source into $target..."
+    
+    if ! git checkout $target; then
+        echo "Failed to checkout $target branch"
+        return 1
+    }
+    
+    if ! git pull origin $target; then
+        echo "Failed to update $target branch"
+        return 1
+    }
+    
+    if ! git merge --no-ff $source -m "$message"; then
+        echo "Merge conflict detected while merging $source into $target"
+        echo "Options:"
+        echo "1. Abort merge and exit"
+        echo "2. Open merge tool to resolve conflicts"
+        read -p "Choose option (1/2): " merge_option
+        
+        case $merge_option in
+            1)
+                git merge --abort
+                echo "Merge aborted"
+                return 1
+                ;;
+            2)
+                echo "Please resolve conflicts in your preferred editor"
+                echo "After resolving, save files and press any key to continue"
+                read -n 1
+                
+                # Check if conflicts were resolved
+                if git diff --check; then
+                    git add .
+                    git commit --no-edit
+                    return 0
+                else
+                    echo "Conflicts still exist"
+                    git merge --abort
+                    return 1
+                fi
+                ;;
+            *)
+                git merge --abort
+                echo "Invalid option"
+                return 1
+                ;;
+        esac
+    fi
+    return 0
+}
+
 # Try to merge to main
 echo "Merging to main..."
 git checkout main
-if ! git merge --no-ff temp-release-v$VERSION -m "chore: merge release $VERSION"; then
-    echo "Merge conflict detected. Rolling back..."
-    git merge --abort
+if ! handle_merge temp-release-v$VERSION main "chore: merge release $VERSION"; then
     cleanup
 fi
 
@@ -209,25 +282,9 @@ fi
 
 # Update dev branch
 echo "Updating dev branch..."
-if ! git checkout dev; then
-    echo "Failed to checkout dev branch"
-    cleanup
-fi
-
-if ! git pull origin dev; then
-    echo "Failed to pull latest dev changes"
-    cleanup
-fi
-
-if ! git merge --no-ff main -m "chore: sync dev with main after release $VERSION"; then
-    echo "Merge conflict detected in dev. Manual intervention required."
-    echo "Please resolve conflicts in dev branch and push changes manually."
-    exit 1
-fi
-
-if ! git push origin dev; then
-    echo "Failed to push to dev"
-    echo "Please push dev branch manually after resolving any issues"
+if ! handle_merge main dev "chore: sync dev with main after release $VERSION"; then
+    echo "Failed to merge main into dev"
+    echo "Please resolve conflicts manually and push changes"
     exit 1
 fi
 
