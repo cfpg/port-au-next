@@ -59,8 +59,8 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./apps:/app/apps:rw
       - ./deployment-manager/public:/app/public:ro
-      - ~/.ssh/id_rsa:/home/nextjs/.ssh/id_rsa:ro
-      - ~/.ssh/id_rsa.pub:/home/nextjs/.ssh/id_rsa.pub:ro
+      - ~/.ssh/id_rsa:/home/node/.ssh/id_rsa:ro
+      - ~/.ssh/id_rsa.pub:/home/node/.ssh/id_rsa.pub:ro
       - ./nginx:/app/nginx:rw
       - ./docker-compose.yml:/app/docker-compose.yml:ro
     environment:
