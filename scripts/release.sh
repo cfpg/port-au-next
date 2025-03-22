@@ -158,6 +158,12 @@ generate_changelog() {
     echo "" >> CHANGELOG.tmp
 }
 
+# Get previous version and generate changelog
+PREV_VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+if [ -n "$PREV_VERSION" ]; then
+    generate_changelog
+fi
+
 # Show changes and confirm
 echo "Current version: $CURRENT_VERSION"
 echo "New version: $VERSION"
