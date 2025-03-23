@@ -11,6 +11,17 @@ const execAsync = util.promisify(exec);
 // Use absolute path from project root
 const NGINX_CONFIG_DIR = path.join(getAppsDir(), '../nginx/conf.d');
 
+async function hasValidCertificate(domain: string): Promise<boolean> {
+  const certPath = path.join('/etc/nginx/ssl/live', domain);
+  try {
+    await fs.promises.access(path.join(certPath, 'fullchain.pem'));
+    await fs.promises.access(path.join(certPath, 'privkey.pem'));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function configureNginxForBetterAuth() {
   const authHost = process.env.BETTER_AUTH_HOST;
   if (!authHost) {
@@ -19,8 +30,9 @@ export async function configureNginxForBetterAuth() {
   }
 
   const nginxConfigPath = path.join(NGINX_CONFIG_DIR, 'service-auth.conf');
+  const hasCert = await hasValidCertificate(authHost);
   
-  const config = `
+  let config = `
 server {
     listen 80;
     server_name ${authHost};
@@ -28,9 +40,58 @@ server {
     # Let's Encrypt challenge location
     location /.well-known/acme-challenge/ {
         root /var/www/certbot;
-    }
+    }`;
+
+  if (hasCert) {
+    config += `
     
-    # Better Auth service
+    # Redirect all HTTP traffic to HTTPS
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl http2;
+    server_name ${authHost};
+
+    # SSL configuration
+    ssl_certificate /etc/nginx/ssl/live/${authHost}/fullchain.pem;
+    ssl_certificate_key /etc/nginx/ssl/live/${authHost}/privkey.pem;
+    ssl_trusted_certificate /etc/nginx/ssl/live/${authHost}/chain.pem;
+
+    # SSL settings
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
+    ssl_prefer_server_ciphers off;
+    ssl_session_timeout 1d;
+    ssl_session_cache shared:SSL:50m;
+    ssl_session_tickets off;
+
+    # OCSP Stapling
+    ssl_stapling on;
+    ssl_stapling_verify on;
+    resolver 8.8.8.8 8.8.4.4 valid=300s;
+    resolver_timeout 5s;
+
+    # Security headers
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "no-referrer-when-downgrade" always;
+    add_header Content-Security-Policy "default-src 'self' http: https: data: blob: 'unsafe-inline'" always;
+
+    # Logging
+    access_log /var/log/nginx/auth.access.log combined buffer=512k flush=1m;
+    error_log /var/log/nginx/auth.error.log warn;`;
+  } else {
+    config += `
+    
+    # Better Auth service (HTTP only)`;
+  }
+
+  config += `
+    
     location / {
         proxy_pass http://better-auth:3001;
         proxy_http_version 1.1;

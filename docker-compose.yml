@@ -50,8 +50,7 @@ services:
     image: certbot/certbot
     volumes:
       - ./nginx/ssl:/etc/letsencrypt
-      - ./nginx/conf.d:/etc/nginx/conf.d:ro
-      - ./nginx/certbot:/var/www/certbot
+      - ./certbot/www:/var/www/certbot:rw
       - ./certbot/cloudflare.ini:/cloudflare.ini:ro
     command: sh -c "certbot --help"
     networks:
@@ -68,7 +67,7 @@ services:
       - ./nginx/conf.d:/etc/nginx/conf.d
       - ./nginx/ssl:/etc/nginx/ssl
       - ./nginx/logs:/var/log/nginx
-      - ./nginx/certbot:/var/www/certbot
+      - ./certbot/www:/var/www/certbot:ro
     networks:
       - port_au_next_network
   
@@ -115,6 +114,7 @@ services:
       - HOST_APPS_DIR=/app/apps
       - CLOUDFLARE_API_EMAIL=${CLOUDFLARE_API_EMAIL}
       - CLOUDFLARE_API_KEY=${CLOUDFLARE_API_KEY}
+      - CERTBOT_EMAIL=${CERTBOT_EMAIL}
       - BETTER_AUTH_HOST=${BETTER_AUTH_HOST}
       - BETTER_AUTH_URL=https://${BETTER_AUTH_HOST}
       - BETTER_AUTH_DB_USER=${BETTER_AUTH_DB_USER}

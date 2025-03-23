@@ -11,7 +11,13 @@ interface CertificateConfig {
   staging?: boolean;
 }
 
-async function generateCertificate(config: CertificateConfig) {
+interface CertificateResult {
+  domain: string;
+  success: boolean;
+  error?: string;
+}
+
+async function generateCertificate(config: CertificateConfig): Promise<CertificateResult> {
   const { domain, email, staging = false } = config;
   const certPath = path.join('/app/nginx/ssl', domain);
 
@@ -52,16 +58,21 @@ async function generateCertificate(config: CertificateConfig) {
       }
     }
 
+    return { domain, success: true };
   } catch (error) {
     console.error(`Failed to generate certificate for ${domain}:`, error);
-    throw error;
+    return { 
+      domain, 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown error' 
+    };
   }
 }
 
-async function generateSharedServiceCertificates() {
-  if (!process.env.CLOUDFLARE_API_EMAIL) {
+export async function generateCertificates(): Promise<CertificateResult[]> {
+  if (!process.env.CERTBOT_EMAIL) {
     console.log('No email provided, skipping certificate generation.');
-    return;
+    return [];
   }
 
   // Add required services here or add optional services using conditional env var logic
@@ -71,22 +82,25 @@ async function generateSharedServiceCertificates() {
     console.log("Generating certificate for better-auth...");
     services.push({
       domain: process.env.BETTER_AUTH_HOST,
-      staging: false
+      staging: process.env.NODE_ENV !== 'production'
     });
   }
 
   if (!services.length) {
     console.log('No services to generate certificates for, skipping.');
-    return;
+    return [];
   }
 
-  for (const service of services) {
-    await generateCertificate({
-      domain: service.domain,
-      email: process.env.CLOUDFLARE_API_EMAIL,
-      staging: service.staging
-    });
-  }
+  // Use Promise.all to generate certificates in parallel
+  const results = await Promise.all(
+    services.map(service => 
+      generateCertificate({
+        domain: service.domain,
+        email: process.env.CERTBOT_EMAIL!,
+        staging: service.staging
+      })
+    )
+  );
+
+  return results;
 }
-
-export default generateSharedServiceCertificates;

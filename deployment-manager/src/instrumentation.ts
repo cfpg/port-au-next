@@ -1,5 +1,6 @@
 import { recoverContainers } from './services/docker';
 import { configureNginxForBetterAuth } from './services/nginx';
+import { generateCertificates } from './scripts/generateCertificates';
 import dbMigrate from './scripts/migrate';
 
 export async function register() {
@@ -13,7 +14,11 @@ export async function register() {
       // Recover any existing containers
       await recoverContainers();
       
-      // Configure nginx for better-auth (HTTP only for now)
+      // Generate SSL certificates if needed
+      const certResults = await generateCertificates();
+      console.log('Certificate generation results:', certResults);
+      
+      // Configure nginx for better-auth (HTTP or HTTPS based on certificate availability)
       await configureNginxForBetterAuth();
       
       console.log('Startup tasks completed successfully');
