@@ -1,6 +1,6 @@
 import { recoverContainers } from './services/docker';
 import { configureNginxForBetterAuth } from './services/nginx';
-import { generateCertificates } from './scripts/generateCertificates';
+import { generateCertificates } from './services/certbot';
 import dbMigrate from './scripts/migrate';
 
 export async function register() {

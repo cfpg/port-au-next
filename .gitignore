@@ -35,4 +35,5 @@ nginx/conf.d/app-*.conf
 nginx/conf.d/service-*.conf
 nginx/ssl/*
 nginx/certbot/*
-
+certbot/www/*
+certbot/conf/*
