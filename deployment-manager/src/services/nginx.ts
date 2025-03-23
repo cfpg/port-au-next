@@ -4,9 +4,55 @@ import { exec } from 'child_process';
 import logger from '~/services/logger';
 import { getContainerIp, execCommand } from '~/utils/docker';
 import getAppsDir from '~/utils/getAppsDir';
+import util from 'util';
+
+const execAsync = util.promisify(exec);
 
 // Use absolute path from project root
 const NGINX_CONFIG_DIR = path.join(getAppsDir(), '../nginx/conf.d');
+
+export async function configureNginxForBetterAuth() {
+  const authHost = process.env.BETTER_AUTH_HOST;
+  if (!authHost) {
+    logger.info('No auth host provided, skipping nginx configuration.');
+    return;
+  }
+
+  const nginxConfigPath = path.join(NGINX_CONFIG_DIR, 'service-auth.conf');
+  
+  const config = `
+server {
+    listen 80;
+    server_name ${authHost};
+    
+    # Let's Encrypt challenge location
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+    
+    # Better Auth service
+    location / {
+        proxy_pass http://better-auth:3001;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}`;
+
+  try {
+    await fs.promises.writeFile(nginxConfigPath, config);
+    logger.info('Nginx configuration updated successfully');
+
+    // Reload nginx configuration
+    await execAsync('docker compose -p port-au-next exec -T nginx nginx -s reload');
+    logger.info('Nginx configuration reloaded successfully');
+  } catch (error) {
+    logger.error('Error configuring nginx:', error as Error);
+    throw error;
+  }
+}
 
 export async function updateNginxConfig(appName: string, domain: string, containerId: string | null = null) {
   try {

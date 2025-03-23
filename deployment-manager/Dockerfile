@@ -30,15 +30,6 @@ RUN mkdir -p /etc/letsencrypt && \
 # Disable telemetry during build
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Compile startup scripts
-RUN npx tsc src/scripts/*.ts \
-    --outDir dist/scripts \
-    --module ESNext \
-    --moduleResolution node \
-    --esModuleInterop \
-    --target es2017 \
-    --skipLibCheck
-
 # Build Next.js app
 RUN npm run build -- -d
 
@@ -68,11 +59,10 @@ RUN mkdir -p /home/node/.ssh && \
     chown node:node /home/node/.ssh/known_hosts && \
     chmod 644 /home/node/.ssh/known_hosts
 
-# Copy only the compiled scripts and standalone app
+# Copy only the compiled app
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
-COPY --from=builder /app/dist/scripts ./scripts
 COPY --from=builder /etc/letsencrypt/cloudflare.ini /etc/letsencrypt/cloudflare.ini
 
 # Switch to node user
@@ -83,5 +73,5 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-# Run compiled script before starting the server
-CMD ["sh", "-c", "node --experimental-specifier-resolution=node scripts/run-once-on-startup.js && node server.js"] 
+# Run the Next.js server
+CMD ["node", "server.js"] 

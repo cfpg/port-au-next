@@ -282,6 +282,13 @@ async function recoverContainers(): Promise<void> {
     const deployments = await getActiveDeployments();
     await logger.info('Recovering active containers...', { count: deployments.length });
 
+    // Iterate each of the containers and check:
+    // 1. If the container exists
+    // 2. If the container is running
+    // 3. If the container is healthy
+    // 4. If the container is not healthy, start it
+    // 5. If the container is healthy, do nothing
+    
     for (const deployment of deployments) {
       try {
         const exists = await containerExists(deployment.container_id);
