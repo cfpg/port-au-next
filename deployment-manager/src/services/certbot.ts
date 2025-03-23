@@ -1,7 +1,6 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
-import fs from 'fs';
 import logger from '~/services/logger';
 
 const execAsync = promisify(exec);
@@ -18,7 +17,7 @@ interface CertificateResult {
   error?: string;
 }
 
-async function verifyCertificatesExist(domain: string): Promise<boolean> {
+export async function verifyCertificatesExist(domain: string): Promise<boolean> {
   try {
     const requiredFiles = [
       'fullchain.pem',

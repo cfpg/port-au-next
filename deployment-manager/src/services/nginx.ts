@@ -5,22 +5,12 @@ import logger from '~/services/logger';
 import { getContainerIp, execCommand } from '~/utils/docker';
 import getAppsDir from '~/utils/getAppsDir';
 import util from 'util';
+import { verifyCertificatesExist } from './certbot';
 
 const execAsync = util.promisify(exec);
 
 // Use absolute path from project root
 const NGINX_CONFIG_DIR = path.join(getAppsDir(), '../nginx/conf.d');
-
-async function hasValidCertificate(domain: string): Promise<boolean> {
-  const certPath = path.join('/etc/nginx/ssl/live', domain);
-  try {
-    await fs.promises.access(path.join(certPath, 'fullchain.pem'));
-    await fs.promises.access(path.join(certPath, 'privkey.pem'));
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 export async function configureNginxForBetterAuth() {
   const authHost = process.env.BETTER_AUTH_HOST;
@@ -30,7 +20,7 @@ export async function configureNginxForBetterAuth() {
   }
 
   const nginxConfigPath = path.join(NGINX_CONFIG_DIR, 'service-auth.conf');
-  const hasCert = await hasValidCertificate(authHost);
+  const hasCert = await verifyCertificatesExist(authHost);
   
   let config = `
 server {
@@ -56,9 +46,9 @@ server {
     server_name ${authHost};
 
     # SSL configuration
-    ssl_certificate /etc/nginx/ssl/live/${authHost}/fullchain.pem;
-    ssl_certificate_key /etc/nginx/ssl/live/${authHost}/privkey.pem;
-    ssl_trusted_certificate /etc/nginx/ssl/live/${authHost}/chain.pem;
+    ssl_certificate /etc/letsencrypt/live/${authHost}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${authHost}/privkey.pem;
+    ssl_trusted_certificate /etc/letsencrypt/live/${authHost}/chain.pem;
 
     # SSL settings
     ssl_protocols TLSv1.2 TLSv1.3;
