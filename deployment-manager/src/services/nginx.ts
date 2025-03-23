@@ -12,20 +12,35 @@ const execAsync = util.promisify(exec);
 // Use absolute path from project root
 const NGINX_CONFIG_DIR = path.join(getAppsDir(), '../nginx/conf.d');
 
-export async function configureNginxForBetterAuth() {
-  const authHost = process.env.BETTER_AUTH_HOST;
-  if (!authHost) {
-    logger.info('No auth host provided, skipping nginx configuration.');
-    return;
-  }
+interface ServiceConfig {
+  name: string;
+  host: string;
+  port: number;
+  internalHost: string;
+}
 
-  const nginxConfigPath = path.join(NGINX_CONFIG_DIR, 'service-auth.conf');
-  const hasCert = await verifyCertificatesExist(authHost);
+const SHARED_SERVICES: ServiceConfig[] = [
+  {
+    name: 'deployment-manager',
+    host: process.env.DEPLOYMENT_MANAGER_HOST || '',
+    port: 3000,
+    internalHost: 'deployment-manager:3000'
+  },
+  {
+    name: 'better-auth',
+    host: process.env.BETTER_AUTH_HOST || '',
+    port: 3001,
+    internalHost: 'better-auth:3001'
+  }
+];
+
+async function generateNginxConfig(service: ServiceConfig): Promise<string> {
+  const hasCert = await verifyCertificatesExist(service.host);
   
   let config = `
 server {
     listen 80;
-    server_name ${authHost};
+    server_name ${service.host};
     
     # Let's Encrypt challenge location
     location /.well-known/acme-challenge/ {
@@ -43,12 +58,12 @@ server {
 
 server {
     listen 443 ssl http2;
-    server_name ${authHost};
+    server_name ${service.host};
 
     # SSL configuration
-    ssl_certificate /etc/letsencrypt/live/${authHost}/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/${authHost}/privkey.pem;
-    ssl_trusted_certificate /etc/letsencrypt/live/${authHost}/chain.pem;
+    ssl_certificate /etc/letsencrypt/live/${service.host}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${service.host}/privkey.pem;
+    ssl_trusted_certificate /etc/letsencrypt/live/${service.host}/chain.pem;
 
     # SSL settings
     ssl_protocols TLSv1.2 TLSv1.3;
@@ -57,11 +72,12 @@ server {
     ssl_session_timeout 1d;
     ssl_session_cache shared:SSL:50m;
     ssl_session_tickets off;
+    ssl_verify_client off;
 
     # OCSP Stapling
     ssl_stapling on;
     ssl_stapling_verify on;
-    resolver 8.8.8.8 8.8.4.4 valid=300s;
+    resolver 1.1.1.1 1.0.0.1 8.8.8.8 8.8.4.4 valid=300s;
     resolver_timeout 5s;
 
     # Security headers
@@ -70,37 +86,60 @@ server {
     add_header X-Content-Type-Options "nosniff" always;
     add_header Referrer-Policy "no-referrer-when-downgrade" always;
     add_header Content-Security-Policy "default-src 'self' http: https: data: blob: 'unsafe-inline'" always;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
 
     # Logging
-    access_log /var/log/nginx/auth.access.log combined buffer=512k flush=1m;
-    error_log /var/log/nginx/auth.error.log warn;`;
+    access_log /var/log/nginx/${service.name}.access.log combined buffer=512k flush=1m;
+    error_log /var/log/nginx/${service.name}.error.log warn;`;
   } else {
     config += `
     
-    # Better Auth service (HTTP only)`;
+    # ${service.name} service (HTTP only)`;
   }
 
   config += `
     
     location / {
-        proxy_pass http://better-auth:3001;
+        proxy_pass http://${service.internalHost};
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Ssl on;
+        proxy_set_header X-Forwarded-Port 443;
     }
 }`;
 
-  try {
-    await fs.promises.writeFile(nginxConfigPath, config);
-    logger.info('Nginx configuration updated successfully');
+  return config;
+}
 
-    // Reload nginx configuration
+export async function configureSharedServices() {
+  for (const service of SHARED_SERVICES) {
+    if (!service.host) {
+      logger.info(`No host provided for ${service.name}, skipping nginx configuration.`);
+      continue;
+    }
+
+    try {
+      const nginxConfigPath = path.join(NGINX_CONFIG_DIR, `service-${service.name}.conf`);
+      console.log(`Checking existing nginx config for ${service.name} at`, nginxConfigPath);
+      const config = await generateNginxConfig(service);
+      
+      await fs.promises.writeFile(nginxConfigPath, config);
+      logger.info(`Nginx configuration updated successfully for ${service.name}`);
+    } catch (error) {
+      logger.error(`Error configuring nginx for ${service.name}:`, error as Error);
+      throw error;
+    }
+  }
+
+  // Reload nginx configuration after all services are configured
+  try {
     await execAsync('docker compose -p port-au-next exec -T nginx nginx -s reload');
     logger.info('Nginx configuration reloaded successfully');
   } catch (error) {
-    logger.error('Error configuring nginx:', error as Error);
+    logger.error('Error reloading nginx:', error as Error);
     throw error;
   }
 }

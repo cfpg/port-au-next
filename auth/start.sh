@@ -2,7 +2,7 @@
 
 # Run migrations
 echo "Running better-auth migrations..."
-npx @better-auth/cli migrate
+npx @better-auth/cli migrate --y
 
 # Start the application
 echo "Starting better-auth service..."

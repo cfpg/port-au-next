@@ -1,6 +1,6 @@
 import { recoverContainers } from './services/docker';
-import { configureNginxForBetterAuth } from './services/nginx';
-import { generateCertificates } from './services/certbot';
+import { configureSharedServices } from './services/nginx';
+import { generateServiceCertificates } from './services/certbot';
 import dbMigrate from './scripts/migrate';
 
 export async function register() {
@@ -15,11 +15,11 @@ export async function register() {
       await recoverContainers();
       
       // Generate SSL certificates if needed
-      const certResults = await generateCertificates();
-      console.log('Certificate generation results:', certResults);
+      const certResults = await generateServiceCertificates();
+      console.log('Service Certificate generation results:', certResults);
       
-      // Configure nginx for better-auth (HTTP or HTTPS based on certificate availability)
-      await configureNginxForBetterAuth();
+      // Configure nginx for shared services (HTTP or HTTPS based on certificate availability)
+      await configureSharedServices();
       
       console.log('Startup tasks completed successfully');
     } catch (error) {

@@ -112,7 +112,7 @@ export async function generateCertificate({ domain, email, staging = false }: Ce
   }
 }
 
-export async function generateCertificates(): Promise<CertificateResult[]> {
+export async function generateServiceCertificates(): Promise<CertificateResult[]> {
   if (!process.env.CERTBOT_EMAIL) {
     logger.info('No email provided, skipping certificate generation.');
     return [];
@@ -120,6 +120,14 @@ export async function generateCertificates(): Promise<CertificateResult[]> {
 
   // Add required services here or add optional services using conditional env var logic
   const services = [];
+
+  if (process.env.DEPLOYMENT_MANAGER_HOST) {
+    logger.info("Generating certificate for deployment-manager...");
+    services.push({
+      domain: process.env.DEPLOYMENT_MANAGER_HOST,
+      staging: process.env.NODE_ENV !== 'production'
+    });
+  }
 
   if (process.env.BETTER_AUTH_HOST) {
     logger.info("Generating certificate for better-auth...");
