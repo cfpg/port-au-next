@@ -32,3 +32,5 @@ log-build*.log
 
 # Ignore nginx configs
 nginx/conf.d/app-*.conf
+nginx/ssl/*
+nginx/certbot/*
