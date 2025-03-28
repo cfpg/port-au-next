@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Button from "../general/Button";
-import { triggerDeployment } from "~/app/actions";
+import { triggerDeployment } from "~/app/(dashboard)/actions";
 import { useToast } from "~/components/general/ToastContainer";
 import { usePathname } from "next/navigation";
 

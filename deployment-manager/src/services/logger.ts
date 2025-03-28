@@ -53,7 +53,7 @@ class Logger {
     return this.log('info', message, metadata);
   }
 
-  async error(message: string, error: (Error & { code?: string; status?: string; headers?: any; stdout?: string; stderr?: string; }) | null = null) {
+  async error(message: string, error: (Error & { code?: string; status?: string; headers?: any; stdout?: string; stderr?: string; statusText?: string; error?: string }) | null = null) {
     const metadata = error ? {
       error: {
         message: error.message,

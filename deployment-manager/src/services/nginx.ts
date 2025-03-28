@@ -6,6 +6,7 @@ import { getContainerIp, execCommand } from '~/utils/docker';
 import getAppsDir from '~/utils/getAppsDir';
 import util from 'util';
 import { verifyCertificatesExist } from './certbot';
+import { getAppDomains } from '~/services/database';
 
 const execAsync = util.promisify(exec);
 
@@ -34,8 +35,66 @@ const SHARED_SERVICES: ServiceConfig[] = [
   }
 ];
 
+async function getAllowedCorsOrigins(): Promise<string[]> {
+  try {
+    // Fetch all domains from the apps table
+    const appDomains = await getAppDomains();
+
+    // Always include the better-auth host from environment
+    const betterAuthHost = process.env.BETTER_AUTH_HOST 
+      ? `https://${process.env.BETTER_AUTH_HOST}` 
+      : '';
+    
+    // Always include deployment manager host if it exists
+    const deploymentManagerHost = process.env.DEPLOYMENT_MANAGER_HOST 
+      ? `https://${process.env.DEPLOYMENT_MANAGER_HOST}` 
+      : '';
+
+    // Combine and deduplicate origins
+    const uniqueOrigins = Array.from(new Set([
+      ...appDomains, 
+      betterAuthHost, 
+      deploymentManagerHost
+    ])).filter(Boolean);
+
+    return uniqueOrigins.length > 0 ? uniqueOrigins : ['*'];
+  } catch (error) {
+    console.error('Error fetching CORS origins:', error);
+    // Fallback to wildcard if there's an error
+    return ['*'];
+  }
+}
+
+function formatCorsOriginsForNginx(origins: string[]): { 
+  regexString: string, 
+  headerString: string 
+} {
+  // Escape special regex characters in the origins
+  const escapedOrigins = origins.map(origin => 
+    origin
+      .replace(/\./g, '\\.')    // Escape dots
+      .replace(/\//g, '\\/')    // Escape slashes
+      .replace(/\:/g, '\\:')    // Escape colons
+  );
+
+  // Regex string for Nginx validation
+  const regexString = escapedOrigins.join('|');
+
+  // Space-separated string for the CORS header
+  const headerString = origins.join(' ');
+
+  return {
+    regexString,
+    headerString
+  };
+}
+
 async function generateNginxConfig(service: ServiceConfig): Promise<string> {
   const hasCert = await verifyCertificatesExist(service.host);
+  
+  // Dynamically get CORS origins
+  const corsOrigins = await getAllowedCorsOrigins();
+  const { regexString, headerString } = formatCorsOriginsForNginx(corsOrigins);
   
   let config = `
 server {
@@ -100,6 +159,34 @@ server {
   config += `
     
     location / {
+        # Log the origin for debugging
+        add_header 'X-Debug-Origin' '$http_origin';
+
+        # Dynamic CORS Configuration with origin validation
+        set $cors_origin '';
+        if ($http_origin ~* ^(${regexString})$) {
+            set $cors_origin $http_origin;
+        }
+
+         # Preflight OPTIONS request handling
+        if ($request_method = 'OPTIONS') {
+            add_header 'Access-Control-Allow-Origin' '$cors_origin';
+            add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, PUT, DELETE, PATCH';
+            add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization';
+            add_header 'Access-Control-Allow-Credentials' 'true';
+            add_header 'Access-Control-Max-Age' 1728000;
+            add_header 'Content-Type' 'text/plain charset=UTF-8';
+            add_header 'Content-Length' 0;
+            return 204;
+        }
+
+        # Regular request handling
+        add_header 'Access-Control-Allow-Origin' '$cors_origin' always;
+        add_header 'Access-Control-Allow-Credentials' 'true' always;
+        add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, PUT, DELETE, PATCH' always;
+        add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization' always;
+        add_header 'Access-Control-Expose-Headers' 'Content-Length,Content-Range' always;
+
         proxy_pass http://${service.internalHost};
         proxy_http_version 1.1;
         proxy_set_header Host $host;
