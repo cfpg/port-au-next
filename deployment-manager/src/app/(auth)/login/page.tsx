@@ -5,10 +5,9 @@ import Button from "~/components/general/Button";
 import Input from "~/components/general/Input";
 import Label from "~/components/general/Label";
 import Link from "~/components/general/Link";
-import { signIn } from "./actions";
 import { useFormStatus } from "react-dom";
 import { useSearchParams } from "next/navigation";
-import { signIn as signInBetterAuth } from '~/lib/authClient';
+import { signIn } from "~/app/(auth)/login/actions";
 
 export default function SignIn() {
   const { pending } = useFormStatus();
@@ -20,14 +19,7 @@ export default function SignIn() {
       className="max-w-md mx-auto"
       title="Sign In"
       content={
-        <form className="space-y-4" onSubmit={async (e) => {
-          e.preventDefault();
-          // Get email and password from the FormData
-          const email = (e.target as HTMLFormElement).email.value;
-          const password = (e.target as HTMLFormElement).password.value;
-          const res = await signInBetterAuth.email({ email, password });
-          console.log("RES", res, res?.error);
-        }}>
+        <form className="space-y-4" action={signIn}>
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input

@@ -21,6 +21,14 @@ app.get("/health", (req, res) => {
   res.json({ status: "ok" });
 });
 
+app.use((req, res, next) => {
+  console.log('Incoming request:', {
+    origin: req.get('origin'),
+    headers: req.headers
+  });
+  next();
+});
+
 // Mount express json middleware after Better Auth handler
 app.use(express.json());
 

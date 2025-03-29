@@ -6,6 +6,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 export const auth = betterAuth({
+  trustedOrigins: [process.env.DEPLOYMENT_MANAGER_HOST ? `https://${process.env.DEPLOYMENT_MANAGER_HOST}` : ""],
   plugins: [
     organization({
       // Disable organization creation by default - it will be managed by the deployment manager
@@ -57,5 +58,5 @@ export const auth = betterAuth({
     }
   },
   secret: process.env.BETTER_AUTH_SECRET || "your-secret-key",
-  baseURL: process.env.BETTER_AUTH_URL || "http://localhost:3000"
+  baseURL: process.env.BETTER_AUTH_URL || "http://localhost:3000",
 }); 

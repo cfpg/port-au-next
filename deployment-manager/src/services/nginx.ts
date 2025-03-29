@@ -159,20 +159,21 @@ server {
   config += `
     
     location / {
-        # Log the origin for debugging
-        add_header 'X-Debug-Origin' '$http_origin';
-
         # Dynamic CORS Configuration with origin validation
         set $cors_origin '';
         if ($http_origin ~* ^(${regexString})$) {
-            set $cors_origin $http_origin;
+          set $cors_origin $http_origin;
         }
-
-         # Preflight OPTIONS request handling
+        
+        # Log the origin for debugging
+        add_header 'X-Debug-Origin' '$http_origin';
+        add_header 'X-Debug-Cors-Origin' '$cors_origin';
+      
+        # Preflight OPTIONS request handling
         if ($request_method = 'OPTIONS') {
             add_header 'Access-Control-Allow-Origin' '$cors_origin';
             add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, PUT, DELETE, PATCH';
-            add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization';
+            add_header 'Access-Control-Allow-Headers' 'DNT,Set-Cookie,User-Agent,Pragma,Priority,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization';
             add_header 'Access-Control-Allow-Credentials' 'true';
             add_header 'Access-Control-Max-Age' 1728000;
             add_header 'Content-Type' 'text/plain charset=UTF-8';
@@ -184,7 +185,7 @@ server {
         add_header 'Access-Control-Allow-Origin' '$cors_origin' always;
         add_header 'Access-Control-Allow-Credentials' 'true' always;
         add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, PUT, DELETE, PATCH' always;
-        add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization' always;
+        add_header 'Access-Control-Allow-Headers' 'DNT,Set-Cookie,User-Agent,Pragma,Priority,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization' always;
         add_header 'Access-Control-Expose-Headers' 'Content-Length,Content-Range' always;
 
         proxy_pass http://${service.internalHost};

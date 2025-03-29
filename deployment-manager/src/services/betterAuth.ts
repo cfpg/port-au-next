@@ -1,9 +1,10 @@
 import logger from '~/services/logger';
 
-async function authServerFetch(path: string, options: RequestInit = {}): Promise<Response> {
+async function authServerFetch(path: string, options: RequestInit = {}, headers: HeadersInit = {}): Promise<Response> {
   const response = await fetch(`${process.env.BETTER_AUTH_URL}${path}`, {
     ...options,
     headers: {
+      ...headers,
       'Content-Type': 'application/json',
     },
   });
@@ -13,11 +14,17 @@ async function authServerFetch(path: string, options: RequestInit = {}): Promise
 export async function signIn(email: string, password: string): Promise<string[]> {
   // This response returns cookies used to identificate the user which need to be returned so the server action calling this
   // can set the cookie sin the response headers  
-  const response = await authServerFetch('/api/auth/sign-in/email', {
-    method: 'POST',
-    body: JSON.stringify({ email, password }),
-    credentials: 'omit',
-  });
+  const response = await authServerFetch(
+    '/api/auth/sign-in/email',
+    {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+      credentials: 'omit',
+    },
+    {
+      "Access-Control-Allow-Headers": "Set-Cookie"
+    }
+  );
 
   // Get all Set-Cookie headers using the Headers API
   const cookies = response.headers.getSetCookie();
@@ -65,7 +72,7 @@ export async function configureBetterAuthForDeploymentManager(): Promise<void> {
         })
       });
       logger.info('Deployment manager user created');
-      logger.info('Sign up response:', { response: JSON.stringify(signUpResponse, null, 2) });
+      logger.info('Sign up response:', { response: JSON.stringify(signUpResponse, null, 2), status: signUpResponse.status });
     } catch (error) {
       // user exists, continue without failing
       logger.error('Error response while signing up deployment manager user:', error as Error);
