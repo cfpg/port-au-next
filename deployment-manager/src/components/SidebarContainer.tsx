@@ -1,9 +1,7 @@
-import { fetchApps } from "~/app/(dashboard)/actions";
-
 import Sidebar from "~/components/Sidebar";
+import { App } from "~/types";
 
-export default async function SidebarContainer() {
-  const apps = await fetchApps();
+export default function SidebarContainer({ apps }: { apps: App[] }) {
   return (
     <Sidebar apps={apps} />
   )

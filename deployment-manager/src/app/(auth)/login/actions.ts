@@ -15,11 +15,29 @@ export async function signIn(formData: FormData) {
 
     // Set cookies
     const cookieStore = await cookies();
-    responseCookies.forEach((cookie) => {
-      const [name, value] = cookie.split("=");
-      cookieStore.set(name, value);
+    responseCookies.forEach((cookieStr) => {
+      // Parse the full cookie string
+      const [nameValue, ...parts] = cookieStr.split(';').map(p => p.trim());
+      const [name, value] = nameValue.split('=');
+      
+      // Parse cookie attributes
+      const attributes: { [key: string]: string | boolean | number } = {};
+      parts.forEach(part => {
+        const [key, val] = part.split('=').map(p => p.trim());
+        attributes[key.toLowerCase()] = val || true;
+      });
+
+      // Set cookie with all its attributes
+      cookieStore.set(name, value, {
+        path: attributes.path as string || '/',
+        secure: 'secure' in attributes,
+        httpOnly: 'httponly' in attributes,
+        sameSite: (attributes.samesite as 'lax' | 'strict' | 'none') || 'lax',
+        maxAge: attributes['max-age'] ? parseInt(attributes['max-age'] as string) : undefined
+      });
     });
   } catch (e) {
+    console.error('Sign in error:', e);
     return redirect("/login?error=true");
   }
 
