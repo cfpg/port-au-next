@@ -4,9 +4,233 @@ import { exec } from 'child_process';
 import logger from '~/services/logger';
 import { getContainerIp, execCommand } from '~/utils/docker';
 import getAppsDir from '~/utils/getAppsDir';
+import util from 'util';
+import { verifyCertificatesExist } from './certbot';
+import { getAppDomains } from '~/services/database';
+
+const execAsync = util.promisify(exec);
 
 // Use absolute path from project root
 const NGINX_CONFIG_DIR = path.join(getAppsDir(), '../nginx/conf.d');
+
+interface ServiceConfig {
+  name: string;
+  host: string;
+  port: number;
+  internalHost: string;
+}
+
+const SHARED_SERVICES: ServiceConfig[] = [
+  {
+    name: 'deployment-manager',
+    host: process.env.DEPLOYMENT_MANAGER_HOST || '',
+    port: 3000,
+    internalHost: 'deployment-manager:3000'
+  },
+  {
+    name: 'better-auth',
+    host: process.env.BETTER_AUTH_HOST || '',
+    port: 3001,
+    internalHost: 'better-auth:3001'
+  }
+];
+
+async function getAllowedCorsOrigins(): Promise<string[]> {
+  try {
+    // Fetch all domains from the apps table
+    const appDomains = await getAppDomains();
+
+    // Always include the better-auth host from environment
+    const betterAuthHost = process.env.BETTER_AUTH_HOST 
+      ? `https://${process.env.BETTER_AUTH_HOST}` 
+      : '';
+    
+    // Always include deployment manager host if it exists
+    const deploymentManagerHost = process.env.DEPLOYMENT_MANAGER_HOST 
+      ? `https://${process.env.DEPLOYMENT_MANAGER_HOST}` 
+      : '';
+
+    // Combine and deduplicate origins
+    const uniqueOrigins = Array.from(new Set([
+      ...appDomains, 
+      betterAuthHost, 
+      deploymentManagerHost
+    ])).filter(Boolean);
+
+    return uniqueOrigins.length > 0 ? uniqueOrigins : ['*'];
+  } catch (error) {
+    console.error('Error fetching CORS origins:', error);
+    // Fallback to wildcard if there's an error
+    return ['*'];
+  }
+}
+
+function formatCorsOriginsForNginx(origins: string[]): { 
+  regexString: string, 
+  headerString: string 
+} {
+  // Escape special regex characters in the origins
+  const escapedOrigins = origins.map(origin => 
+    origin
+      .replace(/\./g, '\\.')    // Escape dots
+      .replace(/\//g, '\\/')    // Escape slashes
+      .replace(/\:/g, '\\:')    // Escape colons
+  );
+
+  // Regex string for Nginx validation
+  const regexString = escapedOrigins.join('|');
+
+  // Space-separated string for the CORS header
+  const headerString = origins.join(' ');
+
+  return {
+    regexString,
+    headerString
+  };
+}
+
+async function generateNginxConfig(service: ServiceConfig): Promise<string> {
+  const hasCert = await verifyCertificatesExist(service.host);
+  
+  // Dynamically get CORS origins
+  const corsOrigins = await getAllowedCorsOrigins();
+  const { regexString, headerString } = formatCorsOriginsForNginx(corsOrigins);
+  
+  let config = `
+server {
+    listen 80;
+    server_name ${service.host};
+    
+    # Let's Encrypt challenge location
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }`;
+
+  if (hasCert) {
+    config += `
+    
+    # Redirect all HTTP traffic to HTTPS
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl http2;
+    server_name ${service.host};
+
+    # SSL configuration
+    ssl_certificate /etc/letsencrypt/live/${service.host}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${service.host}/privkey.pem;
+    ssl_trusted_certificate /etc/letsencrypt/live/${service.host}/chain.pem;
+
+    # SSL settings
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
+    ssl_prefer_server_ciphers off;
+    ssl_session_timeout 1d;
+    ssl_session_cache shared:SSL:50m;
+    ssl_session_tickets off;
+    ssl_verify_client off;
+
+    # OCSP Stapling
+    ssl_stapling on;
+    ssl_stapling_verify on;
+    resolver 1.1.1.1 1.0.0.1 8.8.8.8 8.8.4.4 valid=300s;
+    resolver_timeout 5s;
+
+    # Security headers
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "no-referrer-when-downgrade" always;
+    add_header Content-Security-Policy "default-src 'self' http: https: data: blob: 'unsafe-inline'" always;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+
+    # Logging
+    access_log /var/log/nginx/${service.name}.access.log combined buffer=512k flush=1m;
+    error_log /var/log/nginx/${service.name}.error.log warn;`;
+  } else {
+    config += `
+    
+    # ${service.name} service (HTTP only)`;
+  }
+
+  config += `
+    
+    location / {
+        # Dynamic CORS Configuration with origin validation
+        set $cors_origin '';
+        if ($http_origin ~* ^(${regexString})$) {
+          set $cors_origin $http_origin;
+        }
+        
+        # Log the origin for debugging
+        add_header 'X-Debug-Origin' '$http_origin';
+        add_header 'X-Debug-Cors-Origin' '$cors_origin';
+      
+        # Preflight OPTIONS request handling
+        if ($request_method = 'OPTIONS') {
+            add_header 'Access-Control-Allow-Origin' '$cors_origin';
+            add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, PUT, DELETE, PATCH';
+            add_header 'Access-Control-Allow-Headers' 'DNT,Set-Cookie,User-Agent,Pragma,Priority,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization';
+            add_header 'Access-Control-Allow-Credentials' 'true';
+            add_header 'Access-Control-Max-Age' 1728000;
+            add_header 'Content-Type' 'text/plain charset=UTF-8';
+            add_header 'Content-Length' 0;
+            return 204;
+        }
+
+        # Regular request handling
+        add_header 'Access-Control-Allow-Origin' '$cors_origin' always;
+        add_header 'Access-Control-Allow-Credentials' 'true' always;
+        add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, PUT, DELETE, PATCH' always;
+        add_header 'Access-Control-Allow-Headers' 'DNT,Set-Cookie,User-Agent,Pragma,Priority,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization' always;
+        add_header 'Access-Control-Expose-Headers' 'Content-Length,Content-Range' always;
+
+        proxy_pass http://${service.internalHost};
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Ssl on;
+        proxy_set_header X-Forwarded-Port 443;
+    }
+}`;
+
+  return config;
+}
+
+export async function configureSharedServices() {
+  for (const service of SHARED_SERVICES) {
+    if (!service.host) {
+      logger.info(`No host provided for ${service.name}, skipping nginx configuration.`);
+      continue;
+    }
+
+    try {
+      const nginxConfigPath = path.join(NGINX_CONFIG_DIR, `service-${service.name}.conf`);
+      console.log(`Checking existing nginx config for ${service.name} at`, nginxConfigPath);
+      const config = await generateNginxConfig(service);
+      
+      await fs.promises.writeFile(nginxConfigPath, config);
+      logger.info(`Nginx configuration updated successfully for ${service.name}`);
+    } catch (error) {
+      logger.error(`Error configuring nginx for ${service.name}:`, error as Error);
+      throw error;
+    }
+  }
+
+  // Reload nginx configuration after all services are configured
+  try {
+    await execAsync('docker compose -p port-au-next exec -T nginx nginx -s reload');
+    logger.info('Nginx configuration reloaded successfully');
+  } catch (error) {
+    logger.error('Error reloading nginx:', error as Error);
+    throw error;
+  }
+}
 
 export async function updateNginxConfig(appName: string, domain: string, containerId: string | null = null) {
   try {

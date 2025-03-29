@@ -12,12 +12,48 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_DB: ${POSTGRES_DB}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready", "-d", "db_prod"]
+      interval: 30s
+      timeout: 60s
+      retries: 5
+      start_period: 80s
+    networks:
+      - port_au_next_network
+
+  # Better Auth service
+  better-auth:
+    build:
+      context: ./auth
+      dockerfile: Dockerfile
+    restart: always
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - POSTGRES_HOST=postgres
+      - POSTGRES_USER=${BETTER_AUTH_DB_USER}
+      - POSTGRES_PASSWORD=${BETTER_AUTH_DB_PASSWORD}
+      - POSTGRES_DB=${BETTER_AUTH_DB}
+      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
+      - BETTER_AUTH_URL=https://${BETTER_AUTH_HOST}
+      - NEXT_PUBLIC_BETTER_AUTH_URL=https://${BETTER_AUTH_HOST}
+      - DEPLOYMENT_MANAGER_HOST=${DEPLOYMENT_MANAGER_HOST}
+    volumes:
+      - ./auth:/app
+      - /app/node_modules
+    ports:
+      - "3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
     networks:
       - port_au_next_network
 
   # Nginx reverse proxy
   nginx:
-    image: nginx:alpine
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
     restart: always
     ports:
       - "80:80"
@@ -26,8 +62,8 @@ services:
       - ./nginx/conf.d:/etc/nginx/conf.d
       - ./nginx/ssl:/etc/nginx/ssl
       - ./nginx/logs:/var/log/nginx
-    depends_on:
-      - deployment-manager
+      - ./certbot/www:/var/www/certbot:rw
+      - ./certbot/conf:/etc/letsencrypt:rw
     networks:
       - port_au_next_network
   
@@ -66,18 +102,32 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3000
+      - API_URL=http://127.0.0.1:3000
+      - HOSTNAME=0.0.0.0
       - POSTGRES_HOST=postgres
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=${POSTGRES_DB}
       - THUMBOR_SECURITY_KEY=${THUMBOR_SECURITY_KEY}
+      - DEPLOYMENT_MANAGER_HOST=${DEPLOYMENT_MANAGER_HOST}
+      - DEPLOYMENT_MANAGER_EMAIL=${DEPLOYMENT_MANAGER_EMAIL}
+      - DEPLOYMENT_MANAGER_PASSWORD=${DEPLOYMENT_MANAGER_PASSWORD}
       - HOST_APPS_DIR=/app/apps
       - CLOUDFLARE_API_EMAIL=${CLOUDFLARE_API_EMAIL}
       - CLOUDFLARE_API_KEY=${CLOUDFLARE_API_KEY}
+      - CERTBOT_EMAIL=${CERTBOT_EMAIL}
+      - BETTER_AUTH_HOST=${BETTER_AUTH_HOST}
+      - BETTER_AUTH_URL=https://${BETTER_AUTH_HOST}
+      - BETTER_AUTH_DB_USER=${BETTER_AUTH_DB_USER}
+      - BETTER_AUTH_DB_PASSWORD=${BETTER_AUTH_DB_PASSWORD}
+      - BETTER_AUTH_DB=${BETTER_AUTH_DB}
+      - NEXT_PUBLIC_BETTER_AUTH_URL=https://${BETTER_AUTH_HOST}
+      - NODE_TLS_REJECT_UNAUTHORIZED=0
     ports:
       - "3000:3000"
     depends_on:
       - postgres
+      - better-auth
     networks:
       - port_au_next_network
 

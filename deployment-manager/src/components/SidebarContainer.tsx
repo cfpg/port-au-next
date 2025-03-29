@@ -1,6 +1,6 @@
-import { fetchApps } from "~/app/actions";
+import { fetchApps } from "~/app/(dashboard)/actions";
 
-import Sidebar from "./Sidebar";
+import Sidebar from "~/components/Sidebar";
 
 export default async function SidebarContainer() {
   const apps = await fetchApps();

@@ -21,11 +21,14 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
+# Create Cloudflare credentials file for certbot
+RUN mkdir -p /etc/letsencrypt && \
+    echo "dns_cloudflare_email = ${CLOUDFLARE_API_EMAIL}" > /etc/letsencrypt/cloudflare.ini && \
+    echo "dns_cloudflare_api_key = ${CLOUDFLARE_API_KEY}" >> /etc/letsencrypt/cloudflare.ini && \
+    chmod 600 /etc/letsencrypt/cloudflare.ini
+
 # Disable telemetry during build
 ENV NEXT_TELEMETRY_DISABLED=1
-
-# Compile migration script
-RUN npx tsc src/scripts/migrate.ts --outDir dist/scripts --esModuleInterop
 
 # Build Next.js app
 RUN npm run build -- -d
@@ -56,13 +59,11 @@ RUN mkdir -p /home/node/.ssh && \
     chown node:node /home/node/.ssh/known_hosts && \
     chmod 644 /home/node/.ssh/known_hosts
 
-# Copy public directory and standalone build
+# Copy only the compiled app
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
-
-# Copy compiled migration script
-COPY --from=builder /app/dist/scripts/migrate.js ./scripts/
+COPY --from=builder /etc/letsencrypt/cloudflare.ini /etc/letsencrypt/cloudflare.ini
 
 # Switch to node user
 USER node
@@ -72,5 +73,5 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-# Run migration before starting the server
-CMD ["sh", "-c", "node scripts/migrate.js && node server.js"] 
+# Run the Next.js server
+CMD ["node", "server.js"] 

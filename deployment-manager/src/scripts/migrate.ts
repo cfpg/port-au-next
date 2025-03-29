@@ -1,4 +1,5 @@
-const { Client } = require('pg');
+import pkg from 'pg';
+const { Client } = pkg;
 
 const config = {
   user: process.env.POSTGRES_USER,
@@ -79,6 +80,61 @@ async function initializeDatabase() {
   }
 }
 
+async function setupBetterAuthDatabase() {
+  try {
+    console.log('Setting up Better Auth database...');
+    console.log('Log env vars: DB USER: ', process.env.BETTER_AUTH_DB_USER, 'DB PASSWORD: ', process.env.BETTER_AUTH_DB_PASSWORD);
+    console.log('Log env vars: DB: ', process.env.BETTER_AUTH_DB);
+    
+    // Create better-auth user if it doesn't exist
+    await client.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT FROM pg_user WHERE usename = '${process.env.BETTER_AUTH_DB_USER}') THEN
+          CREATE USER ${process.env.BETTER_AUTH_DB_USER} WITH PASSWORD '${process.env.BETTER_AUTH_DB_PASSWORD}';
+        ELSE
+          ALTER USER ${process.env.BETTER_AUTH_DB_USER} WITH PASSWORD '${process.env.BETTER_AUTH_DB_PASSWORD}';
+        END IF;
+      END
+      $$;
+    `);
+
+    // Check if database exists
+    const dbExists = await client.query(`
+      SELECT 1 FROM pg_database WHERE datname = '${process.env.BETTER_AUTH_DB}'
+    `);
+
+    if (dbExists.rows.length === 0) {
+      // Create database if it doesn't exist
+      await client.query(`CREATE DATABASE ${process.env.BETTER_AUTH_DB}`);
+    }
+
+    // Grant privileges
+    await client.query(`
+      GRANT ALL PRIVILEGES ON DATABASE ${process.env.BETTER_AUTH_DB} TO ${process.env.BETTER_AUTH_DB_USER};
+    `);
+
+    // Connect to the better-auth database to set up schema privileges
+    const betterAuthClient = new Client({
+      ...config,
+      database: process.env.BETTER_AUTH_DB
+    });
+    await betterAuthClient.connect();
+
+    await betterAuthClient.query(`
+      GRANT ALL ON SCHEMA public TO ${process.env.BETTER_AUTH_DB_USER};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO ${process.env.BETTER_AUTH_DB_USER};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO ${process.env.BETTER_AUTH_DB_USER};
+    `);
+
+    await betterAuthClient.end();
+    console.log('Better Auth database setup completed');
+  } catch (error) {
+    console.error('Error setting up Better Auth database:', error);
+    throw error;
+  }
+}
+
 async function migrate() {
   try {
     console.log('Connecting to database...');
@@ -86,14 +142,14 @@ async function migrate() {
 
     console.log('Starting database migration...');
     await initializeDatabase();
+    await setupBetterAuthDatabase();
     console.log('Migration completed successfully');
     await client.end(); // Close the pool connection
-    process.exit(0);
   } catch (error) {
     console.error('Migration failed:', error);
     await client.end(); // Make sure to close the pool even on error
-    process.exit(1);
+    throw error;
   }
 }
 
-migrate();
+export default migrate;

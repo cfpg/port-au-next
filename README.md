@@ -108,6 +108,39 @@ Environment variables can be configured:
 
 This flexibility enables managing multiple environments (development, staging, production) within the same Port-Au-Next instance.
 
+### SSL Certificates
+
+The project uses Let's Encrypt for SSL certificates. Before starting the services:
+
+1. Create required directories:
+   ```bash
+   ./scripts/init-certbot.sh
+   ```
+
+2. Make sure your domain's DNS is properly configured:
+   - Add an A record for `auth.yourdomain.com` pointing to your server's IP
+   - Wait for DNS propagation (can take up to 24 hours)
+
+3. Set the correct domain in your `.env` file:
+   ```
+   BETTER_AUTH_HOST=auth.yourdomain.com
+   ```
+
+4. Start the services:
+   ```bash
+   docker compose up -d
+   ```
+
+The certbot service will automatically:
+- Generate SSL certificates for your domain
+- Store them in `./nginx/ssl`
+- Auto-renew them when needed
+
+Note: The first time you run the services, certbot will attempt to verify domain ownership. Make sure:
+- Your domain's DNS is properly configured
+- Port 80 is accessible from the internet
+- The domain matches your `BETTER_AUTH_HOST` setting
+
 ## API Reference
 
 Port-Au-Next exposes a REST API for programmatic control. Here are key endpoints:

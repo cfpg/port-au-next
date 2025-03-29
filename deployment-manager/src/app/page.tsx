@@ -1,6 +1,6 @@
 import AppsSection from '~/components/AppsSection';
 import AppRegistrationForm from '~/components/AppRegistrationForm';
-import { fetchApps, fetchRecentDeployments } from '~/app/actions';
+import { fetchApps, fetchRecentDeployments } from '~/app/(dashboard)/actions';
 import { Deployment } from '~/types';
 import DeploymentLogsModal from '~/components/modals/DeploymentLogsModal';
 

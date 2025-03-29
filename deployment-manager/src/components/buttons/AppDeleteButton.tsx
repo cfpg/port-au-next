@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Button from "../general/Button";
 import Modal from "../general/Modal";
-import { deleteApp } from "~/app/apps/[appName]/actions";
+import { deleteApp } from "~/app/(dashboard)/apps/[appName]/actions";
 import Input from "../general/Input";
 import { useRouter } from "next/navigation";
 
