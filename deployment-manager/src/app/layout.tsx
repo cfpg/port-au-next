@@ -25,11 +25,6 @@ export default async function RootLayout({
         />
       </head>
       <body className={`${inter.className} bg-gray-100 font-sans`}>
-        <div className="flex flex-row justify-between items-center px-2">
-          <div className="text-center w-full py-8">
-            <h1 className="text-xl font-bold text-gray-800">Port-au-Next</h1>
-          </div>
-        </div>
         {children}
       </body>
     </html>

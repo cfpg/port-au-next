@@ -13,9 +13,9 @@ export const metadata: Metadata = {
 
 export default async function DashboardLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   const apps = await fetchApps();
 
   return (
