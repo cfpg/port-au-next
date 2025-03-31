@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Button from '~/components/general/Button';
 import Input from '~/components/general/Input';
 import Label from '~/components/general/Label';
-import { fetchZoneId, updateAppSettings } from '~/app/apps/[appName]/actions';
+import { fetchZoneId, updateAppSettings } from '~/app/(dashboard)/apps/[appName]/actions';
 import { useToast } from '~/components/general/ToastContainer';
 
 interface AppSettingsFormProps {
