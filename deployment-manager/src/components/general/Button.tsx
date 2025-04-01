@@ -1,6 +1,6 @@
 "use client";
 
-import { tv } from 'tailwind-variants';
+import { tv, VariantProps } from 'tailwind-variants';
 
 const button = tv({
   base: 'inline-flex items-center cursor-pointer justify-center rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none',
@@ -12,6 +12,9 @@ const button = tv({
       yellow: 'bg-yellow-600 text-white hover:bg-yellow-900 focus:ring-yellow-500',
       red: 'bg-red-600 text-white hover:bg-red-900 focus:ring-red-500',
       gray: 'bg-gray-600 text-white hover:bg-gray-900 focus:ring-gray-500',
+      'gray-light': 'bg-gray-200 text-gray-700 hover:bg-gray-300 focus:ring-gray-500',
+      white: 'bg-white text-gray-700 hover:bg-gray-100 focus:ring-gray-500',
+      transparent: 'bg-transparent text-gray-700 hover:bg-gray-100 focus:ring-gray-500',
     },
     size: {
       sm: 'text-sm px-2 py-1',
@@ -28,9 +31,7 @@ const button = tv({
   },
 });
 
-interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  color?: 'primary' | 'blue' | 'green' | 'yellow' | 'red' | 'gray';
-  size?: 'sm' | 'md' | 'lg';
+interface ButtonProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'color'>, VariantProps<typeof button> {
   children: React.ReactNode;
 }
 

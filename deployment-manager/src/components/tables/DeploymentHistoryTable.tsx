@@ -1,16 +1,16 @@
-import { Deployment } from '~/types';
-import { getStatusColor } from '~/utils/status';
+import { Deployment, ServiceStatus } from '~/types';
 import Table, {
   TableBody,
   TableCell,
   TableHead,
   TableHeader,
   TableRow,
-} from '../general/Table';
+} from '~/components/general/Table';
 import getRelativeTime from '~/utils/getRelativeTime';
 import getGithubRepoPath from '~/utils/getGithubRepoPath';
-import Link from '../general/Link';
-import Badge from '../general/Badge';
+import Badge from '~/components/general/Badge';
+import { getServiceStatusColor } from '~/utils/serviceColors';
+import ViewLogsButton from '~/components/deployments/ViewLogsButton';
 
 interface DeploymentHistoryTableProps {
   deployments: Deployment[];
@@ -43,22 +43,17 @@ export default function DeploymentHistoryTable({
                 {deployment.commit_id ? <a href={`https://github.com/${getGithubRepoPath(deployment.app_repository)}/commit/${deployment.commit_id}`} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700 underline">{deployment.commit_id.substring(0, 7)}</a> : 'N/A'}
               </TableCell>
               <TableCell>
-                <Badge className={getStatusColor(deployment.status)}>{deployment.status}</Badge>
+                <Badge color={getServiceStatusColor(deployment.status as ServiceStatus)} withDot>{deployment.status}</Badge>
               </TableCell>
               <TableCell>
                 {new Date(deployment.deployed_at).toLocaleString()}
                 {deployment.deployed_at && <span className="text-gray-400"> ({getRelativeTime(deployment.deployed_at)})</span>}
               </TableCell>
-              <TableCell className="text-right font-medium">
-                <Link
-                  href={`?modalViewLogs=${deployment.id}&modalAppName=${deployment.app_name}`}
-                  color="gray"
-                  variant="button"
-                  size="sm"
-                >
-                  <i className="fas fa-eye mr-2"></i>
-                  View Logs
-                </Link>
+              <TableCell className="font-medium flex justify-end">
+                <ViewLogsButton
+                  deploymentId={deployment.id}
+                  appName={deployment.app_name}
+                />
               </TableCell>
             </TableRow>
           ))}

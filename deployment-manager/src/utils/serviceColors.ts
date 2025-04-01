@@ -12,7 +12,20 @@ export function getServiceColor(serviceName: Service): string {
 } 
 
 export const getServiceStatusColor = (status: ServiceStatus) => {
-  if (status === 'running') return 'green';
-  if (status === 'stopped') return 'red';
-  return 'gray';
+  switch (status.toLowerCase()) {
+    case 'running':
+    case 'success':
+    case 'active':
+      return 'green';
+    case 'stopped':
+      return 'gray';
+    case 'error':
+    case 'failed':
+      return 'red';
+    case 'pending':
+    case 'building':
+      return 'yellow';
+    default:
+      return 'gray';
+  }
 }
