@@ -1,23 +1,23 @@
-import {ComponentProps} from 'react';
-import {default as NextLink} from 'next/link';
+import { ComponentProps } from 'react';
+import { default as NextLink } from 'next/link';
 import { tv, type VariantProps } from 'tailwind-variants';
 
 const linkStyles = tv({
   base: 'transition-colors duration-200 cursor-pointer',
   variants: {
     variant: {
-      default: 'text-gray-700 hover:bg-gray-100 rounded',
+      default: 'text-gray-700',
       nav: 'flex items-center p-2 text-gray-700 rounded hover:bg-gray-100',
       subNav: 'block p-2 text-gray-700 rounded hover:bg-gray-100',
       button: 'inline-flex items-center justify-center rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2',
     },
     color: {
-      primary: '',
-      blue: '',
-      green: '',
-      yellow: '',
-      red: '',
-      gray: '',
+      primary: 'text-blue-600 hover:text-blue-900',
+      blue: 'text-blue-600 hover:text-blue-900',
+      green: 'text-green-600 hover:text-green-900',
+      yellow: 'text-yellow-600 hover:text-yellow-900',
+      red: 'text-red-600 hover:text-red-900',
+      gray: 'text-gray-700 hover:text-gray-900',
     },
     size: {
       sm: 'text-sm px-2 py-1',
@@ -26,9 +26,21 @@ const linkStyles = tv({
     },
     isActive: {
       true: 'bg-gray-100',
+    },
+    underline: {
+      true: 'underline',
+      false: 'no-underline',
     }
   },
   compoundVariants: [
+    {
+      variant: "nav",
+      class: 'no-underline',
+    },
+    {
+      variant: "subNav",
+      class: 'no-underline',
+    },
     {
       variant: 'button',
       color: 'primary',
@@ -64,23 +76,24 @@ const linkStyles = tv({
     variant: 'default',
     isActive: false,
     size: 'md',
-    color: 'primary'
+    color: 'primary',
+    underline: true,
   }
 });
 
-type LinkProps = ComponentProps<typeof NextLink> & 
+type LinkProps = ComponentProps<typeof NextLink> &
   VariantProps<typeof linkStyles> & {
     className?: string;
   };
 
-export default function Link({ 
-  variant, 
+export default function Link({
+  variant,
   color,
   size,
-  isActive, 
+  isActive,
   className,
   children,
-  ...props 
+  ...props
 }: LinkProps) {
   return (
     <NextLink

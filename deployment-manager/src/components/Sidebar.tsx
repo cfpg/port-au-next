@@ -47,6 +47,7 @@ export default function Sidebar({ apps }: SidebarProps) {
           <Link 
             href="/" 
             variant="nav"
+            color="primary"
             className={getNavClassName('/')}
           >
             <i className="fas fa-home mr-3" />
@@ -57,17 +58,19 @@ export default function Sidebar({ apps }: SidebarProps) {
           <Link 
             href="/apps" 
             variant="nav"
-            className={getNavClassName('/apps')}
+            color="primary"
+            className={`mb-2 ${getNavClassName('/apps')}`}
           >
             <i className="fas fa-rocket mr-3" />
             Applications
           </Link>
-          <ul className="ml-6 hidden md:block">
+          <ul className="ml-6 hidden md:block space-y-2">
             {apps.map((app) => (
               <li key={app.id}>
                 <Link 
                   href={getSingleAppPath(app.name)} 
                   variant="subNav"
+                  color="gray"
                   className={getNavClassName(getSingleAppPath(app.name))}
                 >
                   {app.domain}
@@ -78,6 +81,7 @@ export default function Sidebar({ apps }: SidebarProps) {
               <Link 
                 href="/#new" 
                 variant="nav"
+                color="gray"
               >
                 <i className="fas fa-plus mr-3" />
                 Add App
@@ -89,6 +93,7 @@ export default function Sidebar({ apps }: SidebarProps) {
           <Link 
             href="/settings" 
             variant="nav"
+            color="primary"
             className={getNavClassName('/settings')}
           >
             <i className="fas fa-gear mr-3" />

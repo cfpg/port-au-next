@@ -11,6 +11,7 @@ import getGithubRepoPath from '~/utils/getGithubRepoPath';
 import Badge from '~/components/general/Badge';
 import { getServiceStatusColor } from '~/utils/serviceColors';
 import ViewLogsButton from '~/components/deployments/ViewLogsButton';
+import Link from '~/components/general/Link';
 
 interface DeploymentHistoryTableProps {
   deployments: Deployment[];
@@ -36,7 +37,9 @@ export default function DeploymentHistoryTable({
           {deployments.map((deployment) => (
             <TableRow key={deployment.id}>
               <TableCell className="font-medium text-gray-900">
-                {deployment.app_name}
+                <Link href={`/apps/${deployment.app_name}/deployments/${deployment.id}`}>
+                  {deployment.app_name}
+                </Link>
               </TableCell>
               <TableCell>{deployment.version}</TableCell>
               <TableCell>

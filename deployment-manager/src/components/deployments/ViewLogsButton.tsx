@@ -17,7 +17,7 @@ export default function ViewLogsButton({ deploymentId, appName }: ViewLogsButton
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const { data, error, isLoading } = useSWR<{ app: AppDeployment; logs: DeploymentLog[] }>(
-    isModalOpen ? `/deployments?appName=${appName}&deploymentId=${deploymentId}` : null,
+    isModalOpen ? `/apps/${appName}/deployments?appName=${appName}&deploymentId=${deploymentId}` : null,
     fetcher
   );
 
