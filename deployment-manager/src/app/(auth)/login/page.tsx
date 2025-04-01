@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { signIn } from '~/lib/auth-client';
 import { useRouter } from 'next/navigation';
 import Card from '~/components/general/Card';
+import Input from '~/components/general/Input';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -42,35 +43,25 @@ export default function LoginPage() {
       <Card
         title="Sign In"
         content={
-          <form onSubmit={handleSubmit}>
-            <div className="mb-4">
-              <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="email">
-                Email
-              </label>
-              <input
-                className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-            </div>
-            <div className="mb-6">
-              <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="password">
-                Password
-              </label>
-              <input
-                className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 mb-3 leading-tight focus:outline-none focus:shadow-outline"
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </div>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <Input
+              type="email"
+              id="email"
+              label="Email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+            <Input
+              type="password"
+              id="password"
+              label="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
             {error && (
-              <div className="mb-4 text-red-500 text-sm">
+              <div className="text-red-500 text-sm bg-red-50 p-2 rounded-md">
                 {error}
               </div>
             )}

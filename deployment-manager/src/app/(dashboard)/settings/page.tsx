@@ -1,15 +1,26 @@
 import Card from "~/components/general/Card";
-import ServicesHealthTable from "~/components/tables/ServicesHealthTable";
 import { fetchServicesHealth } from "./actions";
 import SettingsAdminUser from "~/components/settings/SettingsAdminUser";
 import { auth } from "~/lib/auth";
 import { headers } from "next/headers";
+import CardGrid from "~/components/general/CardGrid";
+import ServiceCard from "~/components/services/ServiceCard";
 
 const SettingsPage = async () => {
   const servicesHealth = await fetchServicesHealth();
   const session = await auth.api.getSession({
     headers: await headers()
   });
+  
+  const serviceCards = servicesHealth.map(service => (
+    <ServiceCard
+      key={service.id}
+      name={service.name}
+      status={service.status}
+      service={service.service}
+      id={service.id}
+    />
+  ));
   
   return (
     <main>
@@ -22,12 +33,9 @@ const SettingsPage = async () => {
         />
       </div>
 
-      <Card
-        padding="table"
+      <CardGrid
         title="Services Health"
-        content={
-          <ServicesHealthTable servicesHealth={servicesHealth} />
-        }
+        cards={serviceCards}
       />
     </main>
   );
