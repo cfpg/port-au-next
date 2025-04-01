@@ -10,18 +10,19 @@ import { pullLatestChanges } from '~/services/git';
 import fetchAppsQuery from '~/queries/fetchAppsQuery';
 import fetchRecentDeploymentsQuery from '~/queries/fetchRecentDeploymentsQuery';
 import { revalidatePath } from 'next/cache';
+import { withAuth } from '~/lib/auth-utils';
 
-export async function fetchApps() {
+export const fetchApps = withAuth(async () => {
   const apps = await fetchAppsQuery();
   return apps;
-}
+});
 
-export async function fetchRecentDeployments() {
+export const fetchRecentDeployments = withAuth(async () => {
   const deployments = await fetchRecentDeploymentsQuery();
   return deployments;
-}
+});
 
-export async function triggerDeployment(appName: string, { pathname }: { pathname?: string } = {}) {
+export const triggerDeployment = withAuth(async (appName: string, { pathname }: { pathname?: string } = {}) => {
   let deploymentId: number;
 
   try {
@@ -178,4 +179,4 @@ export async function triggerDeployment(appName: string, { pathname }: { pathnam
       error: 'Deployment failed'
     };
   }
-}
+});

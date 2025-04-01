@@ -3,7 +3,7 @@ import crypto from 'crypto';
 
 import logger from '~/services/logger';
 
-const config: PoolConfig = {
+export const config: PoolConfig = {
   user: process.env.POSTGRES_USER,
   password: process.env.POSTGRES_PASSWORD,
   host: process.env.POSTGRES_HOST || 'localhost',
