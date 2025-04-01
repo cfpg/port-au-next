@@ -1,16 +1,14 @@
 import Card from '~/components/general/Card';
-import Button from '~/components/general/Button';
 import Badge from '~/components/general/Badge';
 import DeploymentHistoryTable from '~/components/tables/DeploymentHistoryTable';
 import { EnvVarsForm } from '~/components/EnvVarsForm';
 import { AppSettingsForm } from '~/components/AppSettingsForm';
 import { fetchApp, fetchAppDeployments } from './actions';
-import { getStatusColor } from '~/utils/status';
+import { getServiceStatusColor } from '~/utils/serviceColors';
 import getRelativeTime from '~/utils/getRelativeTime';
-import DeploymentLogsModal from '~/components/modals/DeploymentLogsModal';
 import AppDeleteButton from '~/components/buttons/AppDeleteButton';
-import getSingleAppPath from '~/utils/getSingleAppPath';
 import AppDeployButton from '~/components/buttons/AppDeployButton';
+import { ServiceStatus } from '~/types';
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
@@ -19,17 +17,12 @@ interface PageProps {
   params: {
     appName: string;
   };
-  searchParams: {
-    modalViewLogs?: string;
-  };
 }
 
-export default async function SingleAppPage({ params, searchParams }: PageProps) {
+export default async function SingleAppPage({ params }: PageProps) {
   const { appName } = await params;
   const app = await fetchApp(appName);
   const deployments = await fetchAppDeployments(app.id);
-
-  const { modalViewLogs } = await searchParams;
 
   return (
     <div>
@@ -40,7 +33,7 @@ export default async function SingleAppPage({ params, searchParams }: PageProps)
           <>
             <h3 className="text-2xl font-bold">{app.name}</h3>
             <div className="flex items-center gap-4">
-              <Badge className={getStatusColor(app.status)}>
+              <Badge color={getServiceStatusColor(app.status as ServiceStatus)} withDot>
                 {app.status}
               </Badge>
               <AppDeployButton appName={app.name} />
@@ -121,14 +114,6 @@ export default async function SingleAppPage({ params, searchParams }: PageProps)
           />
         }
       />
-
-      {modalViewLogs && (
-        <DeploymentLogsModal
-          appName={app.name}
-          deploymentId={Number.parseInt(modalViewLogs)}
-          closeHref={getSingleAppPath(app.name)}
-        />
-      )}
     </div>
   );
 }

@@ -73,7 +73,7 @@ export default function AppDeleteButton({ appName }: { appName: string }) {
         </div>
       </Modal>
 
-      <Button color='red' onClick={() => setIsModalOpen(true)}>
+      <Button color='red' size="sm" onClick={() => setIsModalOpen(true)}>
         <i className="fas fa-trash mr-2"></i>
         Delete
       </Button>

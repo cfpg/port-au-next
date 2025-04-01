@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Button from "~/components/general/Button";
 import Modal from "~/components/general/Modal";
-import { DeploymentLog, App } from "~/types";
+import { DeploymentLog, AppDeployment } from "~/types";
 import useSWR from "swr";
 import fetcher from "~/utils/fetcher";
 import DeploymentLogsModal from "~/components/modals/DeploymentLogsModal";
@@ -16,7 +16,7 @@ interface ViewLogsButtonProps {
 export default function ViewLogsButton({ deploymentId, appName }: ViewLogsButtonProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const { data, error, isLoading } = useSWR<{ app: App; logs: DeploymentLog[] }>(
+  const { data, error, isLoading } = useSWR<{ app: AppDeployment; logs: DeploymentLog[] }>(
     isModalOpen ? `/deployments?appName=${appName}&deploymentId=${deploymentId}` : null,
     fetcher
   );

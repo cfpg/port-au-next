@@ -1,6 +1,6 @@
 import Badge from "~/components/general/Badge";
 import { getServiceStatusColor } from "~/utils/serviceColors";
-import { ServiceStatus, DeploymentLog, App, AppDeployment } from "~/types";
+import { ServiceStatus, DeploymentLog, AppDeployment } from "~/types";
 
 interface DeploymentLogsModalProps {
   app: AppDeployment;

@@ -1,5 +1,5 @@
 import { getServiceColor, getServiceStatusColor } from '~/utils/serviceColors';
-import { ServiceHealth, Service, ServiceStatus } from '~/types';
+import { Service, ServiceStatus } from '~/types';
 import Card from '~/components/general/Card';
 import Badge from '~/components/general/Badge';
 

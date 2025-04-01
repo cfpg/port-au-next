@@ -49,6 +49,7 @@ export default function ChangePasswordModal({ isOpen, onClose }: ChangePasswordM
         },
       });
     } catch (err) {
+      console.error(err);
       setError('An unexpected error occurred');
       setIsLoading(false);
     }
