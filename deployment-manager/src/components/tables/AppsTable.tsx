@@ -58,7 +58,7 @@ export default function AppsTable({
                 <a href={`https://${app.domain}`} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700 underline">{app.domain}</a>
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
-                <Badge color={getServiceStatusColor(app.status as ServiceStatus)}>{app.status}</Badge>
+                <Badge color={getServiceStatusColor(app.status as ServiceStatus)} withDot>{app.status}</Badge>
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                 {app.last_deployment ? new Date(app.last_deployment.deployed_at).toLocaleString() : 'Never'}
