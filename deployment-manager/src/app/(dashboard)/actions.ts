@@ -22,7 +22,7 @@ export const fetchRecentDeployments = withAuth(async () => {
   return deployments;
 });
 
-export const triggerDeployment = withAuth(async (appName: string, { pathname }: { pathname?: string } = {}) => {
+export const triggerDeployment = withAuth(async (appName: string, { pathname, branch }: { pathname?: string; branch?: string } = {}) => {
   let deploymentId: number;
 
   try {
@@ -38,18 +38,19 @@ export const triggerDeployment = withAuth(async (appName: string, { pathname }: 
 
     const app = appResult.rows[0];
     const version = new Date().toISOString().replace(/[^0-9]/g, '');
+    const targetBranch = branch || app.branch;
 
     // Start deployment record
     const deploymentResult = await pool.query(
-      `INSERT INTO deployments (app_id, version, status)
-       VALUES ($1, $2, $3)
+      `INSERT INTO deployments (app_id, version, status, branch)
+       VALUES ($1, $2, $3, $4)
        RETURNING id`,
-      [app.id, version, 'pending']
+      [app.id, version, 'pending', targetBranch]
     );
 
     deploymentId = deploymentResult.rows[0].id;
     logger.setDeploymentContext(deploymentId);
-    await logger.info('Deployment record created', { version });
+    await logger.info('Deployment record created', { version, branch: targetBranch });
 
     // Revalidate path if available
     if (pathname) {
@@ -67,8 +68,8 @@ export const triggerDeployment = withAuth(async (appName: string, { pathname }: 
           ['building', deploymentId]
         );
 
-        await logger.info(`Pulling latest changes from branch ${app.branch}`);
-        await pullLatestChanges(appName, app.branch);
+        await logger.info(`Pulling latest changes from branch ${targetBranch}`);
+        await pullLatestChanges(appName, targetBranch);
 
         const commitId = await getLatestCommit(appName);
         await logger.info('Got latest commit', { commitId });

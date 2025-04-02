@@ -6,7 +6,8 @@ export default async function fetchRecentDeploymentsQuery(appId?: number, {limit
       SELECT 
         d.*,
         a.name as app_name,
-        a.repo_url as app_repository
+        a.repo_url as app_repository,
+        d.branch as branch
       FROM deployments d
       JOIN apps a ON a.id = d.app_id
       ${appId ? 'WHERE d.app_id = $1' : ''}

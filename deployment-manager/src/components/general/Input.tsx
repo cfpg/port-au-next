@@ -1,3 +1,5 @@
+"use client";
+
 import { tv } from 'tailwind-variants';
 import { useState } from 'react';
 
@@ -52,7 +54,7 @@ export default function Input({
           type={inputType}
           className={styles.input()}
           {...props}
-          autoComplete={showToggle && isContentHidden ? 'off' : props.autoComplete}
+          autoComplete={showToggle ? 'off' : props.autoComplete}
         />
         {hasToggle && (
           <button

@@ -1,7 +1,6 @@
 import Card from '~/components/general/Card';
 import Badge from '~/components/general/Badge';
 import DeploymentHistoryTable from '~/components/tables/DeploymentHistoryTable';
-import { EnvVarsForm } from '~/components/EnvVarsForm';
 import { AppSettingsForm } from '~/components/AppSettingsForm';
 import { fetchApp, fetchAppDeployments } from './actions';
 import { getServiceStatusColor } from '~/utils/serviceColors';
@@ -38,7 +37,7 @@ export default async function SingleAppPage({ params }: PageProps) {
               <Badge color={getServiceStatusColor(app.status as ServiceStatus)} withDot>
                 {app.status}
               </Badge>
-              <AppDeployButton appName={app.name} />
+              <AppDeployButton appName={app.name} showDropdown={true} />
               <AppDeleteButton appName={app.name} />
             </div>
           </>

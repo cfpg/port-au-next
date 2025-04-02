@@ -363,6 +363,12 @@ export async function migrate() {
       CREATE INDEX IF NOT EXISTS idx_app_features_feature ON app_features(feature);
     `);
 
+    // Alter Table Deploymebnts to add branch nullable columnd
+    await pool.query(`
+      ALTER TABLE deployments
+      ADD COLUMN IF NOT EXISTS branch TEXT
+    `);
+
     await pool.query('COMMIT');
     console.log('Database migration completed successfully');
   } catch (error) {
