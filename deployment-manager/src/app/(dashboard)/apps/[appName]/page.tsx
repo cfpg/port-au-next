@@ -98,8 +98,7 @@ export default async function SingleAppPage({ params }: PageProps) {
         padding="content"
         content={
           <PreviewBranchesCard
-            appId={app.id}
-            appName={app.name}
+            app={app}
             initialPreviewDomain={app.preview_domain}
           />
         }

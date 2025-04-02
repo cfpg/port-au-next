@@ -7,20 +7,20 @@ import fetcher from '~/utils/fetcher';
 import Button from '~/components/general/Button';
 import Input from '~/components/general/Input';
 import { useToast } from '~/components/general/ToastContainer';
+import { App } from '~/types';
 
 interface PreviewBranchesCardProps {
-  appId: number;
-  appName: string;
+  app: App;
   initialPreviewDomain?: string;
 }
 
-export default function PreviewBranchesCard({ appId, appName, initialPreviewDomain }: PreviewBranchesCardProps) {
+export default function PreviewBranchesCard({ app, initialPreviewDomain }: PreviewBranchesCardProps) {
   const { showToast } = useToast();
   const [previewDomain, setPreviewDomain] = useState(initialPreviewDomain || '');
   const [isUpdating, setIsUpdating] = useState(false);
 
   const { data: features, mutate: mutateFeatures } = useSWR(
-    `/api/apps/${appId}/features`,
+    `/api/apps/${app.id}/features`,
     fetcher
   );
 
@@ -29,7 +29,7 @@ export default function PreviewBranchesCard({ appId, appName, initialPreviewDoma
   const handleToggle = async () => {
     setIsUpdating(true);
     try {
-      const response = await fetch(`/api/apps/${appId}/features`, {
+      const response = await fetch(`/api/apps/${app.id}/features`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -61,7 +61,7 @@ export default function PreviewBranchesCard({ appId, appName, initialPreviewDoma
 
     setIsUpdating(true);
     try {
-      const response = await fetch(`/api/apps/${appId}/preview-domain`, {
+      const response = await fetch(`/api/apps/${app.id}/preview-domain`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -104,29 +104,30 @@ export default function PreviewBranchesCard({ appId, appName, initialPreviewDoma
       {isEnabled && (
         <div className="space-y-6">
           <div>
-            <label htmlFor="preview-domain" className="block text-sm font-medium text-gray-700">
-              Preview Domain
-            </label>
-            <div className="mt-1 flex rounded-md shadow-sm">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Input
                 type="text"
+                label="Preview Domain"
                 id="preview-domain"
                 value={previewDomain}
                 onChange={(e) => setPreviewDomain(e.target.value)}
-                placeholder={`*.${appName}.example.com`}
+                placeholder={`preview.${app.domain}`}
                 className="flex-1"
               />
-              <Button
-                color="blue"
-                onClick={handleUpdatePreviewDomain}
-                disabled={isUpdating}
-                className="ml-2"
-              >
-                Update
-              </Button>
+              <div className="flex items-end">
+                <Button
+                  color="blue"
+                  onClick={handleUpdatePreviewDomain}
+                  disabled={isUpdating}
+                >
+                  Update
+                </Button>
+              </div>
             </div>
             <p className="mt-1 text-sm text-gray-500">
-              This domain will be used for all preview branch deployments
+              We will use subdomains from your domain to access preview branches.<br />
+              For example, <i>{previewDomain ? `dev.${previewDomain}` : `dev.preview.${app.domain}`}</i> will be used to access <i>dev</i> branch.<br />
+              And <i>{previewDomain ? `pr-123.${previewDomain}` : `pr-123.preview.${app.domain}`}</i> will be used to access <i>pr-123</i> branch.
             </p>
           </div>
 
@@ -137,7 +138,7 @@ export default function PreviewBranchesCard({ appId, appName, initialPreviewDoma
             </p>
             <div className="mt-2 bg-white p-3 rounded border border-blue-200">
               <code className="text-sm">
-                *.{previewDomain || `${appName}.example.com`} IN A {process.env.NEXT_PUBLIC_DEPLOYMENT_MANAGER_HOST}
+                *.{previewDomain.replace(/^\*\./g, '') || `preview.${app.domain}`} IN CNAME {process.env.NEXT_PUBLIC_DEPLOYMENT_MANAGER_HOST}
               </code>
             </div>
             <p className="mt-2 text-sm text-blue-700">
