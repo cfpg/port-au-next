@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import Toaster from '~/components/general/Toaster';
+
 const inter = Inter({ subsets: ["latin"] });
 
 export const dynamic = 'force-dynamic';
@@ -25,6 +27,7 @@ export default async function RootLayout({
       </head>
       <body className={`${inter.className} bg-gray-100 font-sans`}>
         {children}
+        <Toaster />
       </body>
     </html>
   );
