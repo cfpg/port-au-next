@@ -6,27 +6,29 @@ import Input from '~/components/general/Input';
 import Label from '~/components/general/Label';
 import { updateAppEnvVars } from '~/app/(dashboard)/apps/[appName]/actions';
 import { useToast } from '~/components/general/ToastContainer';
+import { AppEnvVar } from '~/queries/fetchAppEnvVars';
 
 interface EnvVarsFormProps {
   appId: number;
   branch: string;
-  initialEnvVars: Record<string, string>;
+  initialEnvVars: AppEnvVar[];
 }
 
 export function EnvVarsForm({ appId, branch, initialEnvVars }: EnvVarsFormProps) {
   const { showToast } = useToast();
-  const [envVars, setEnvVars] = useState<Array<{ key: string; value: string }>>(
-    Object.entries(initialEnvVars).map(([key, value]) => ({ key, value }))
-  );
+  const [envVars, setEnvVars] = useState<AppEnvVar[]>(initialEnvVars);
   const [unsavedChanges, setUnsavedChanges] = useState(false);
 
   const calculateUnsavedChanges = () => {
-    const unsaved = envVars.some((envVar) => envVar.key !== initialEnvVars[envVar.key]);
+    const unsaved = envVars.some((envVar, index) => {
+      const initialVar = initialEnvVars[index];
+      return !initialVar || envVar.key !== initialVar.key || envVar.value !== initialVar.value;
+    });
     setUnsavedChanges(unsaved);
   };
 
   const handleAdd = () => {
-    setEnvVars([...envVars, { key: '', value: '' }]);
+    setEnvVars([...envVars, { key: '', value: '', branch: null, is_preview: branch === 'preview' }]);
     calculateUnsavedChanges();
   };
 

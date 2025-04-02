@@ -9,6 +9,7 @@ import getRelativeTime from '~/utils/getRelativeTime';
 import AppDeleteButton from '~/components/buttons/AppDeleteButton';
 import AppDeployButton from '~/components/buttons/AppDeployButton';
 import { ServiceStatus } from '~/types';
+import EnvVarsSettings from '~/components/env-vars/EnvVarsSettings';
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
@@ -89,10 +90,8 @@ export default async function SingleAppPage({ params }: PageProps) {
         title="Environment Variables"
         padding="content"
         content={
-          <EnvVarsForm
+          <EnvVarsSettings
             appId={app.id}
-            branch={app.branch}
-            initialEnvVars={app.env}
           />
         }
       />
