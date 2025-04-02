@@ -44,32 +44,32 @@ const linkStyles = tv({
     {
       variant: 'button',
       color: 'primary',
-      class: 'bg-indigo-600 text-white hover:bg-indigo-900 focus:ring-indigo-500'
+      class: 'bg-indigo-600 text-white hover:bg-indigo-900 hover:text-white focus:ring-indigo-500 no-underline'
     },
     {
       variant: 'button',
       color: 'blue',
-      class: 'bg-blue-600 text-white hover:bg-blue-900 focus:ring-blue-500'
+      class: 'bg-blue-600 text-white hover:bg-blue-900 hover:text-white focus:ring-blue-500 no-underline'
     },
     {
       variant: 'button',
       color: 'green',
-      class: 'bg-green-600 text-white hover:bg-green-900 focus:ring-green-500'
+      class: 'bg-green-600 text-white hover:bg-green-900 hover:text-white focus:ring-green-500 no-underline'
     },
     {
       variant: 'button',
       color: 'yellow',
-      class: 'bg-yellow-600 text-white hover:bg-yellow-900 focus:ring-yellow-500'
+      class: 'bg-yellow-600 text-white hover:bg-yellow-900 hover:text-white focus:ring-yellow-500 no-underline'
     },
     {
       variant: 'button',
       color: 'red',
-      class: 'bg-red-600 text-white hover:bg-red-900 focus:ring-red-500'
+      class: 'bg-red-600 text-white hover:bg-red-900 hover:text-white focus:ring-red-500 no-underline'
     },
     {
       variant: 'button',
       color: 'gray',
-      class: 'bg-gray-100 text-gray-900 hover:bg-gray-300 focus:ring-gray-500'
+      class: 'bg-gray-100 text-gray-900 hover:bg-gray-300 hover:text-gray-900 focus:ring-gray-500 no-underline'
     }
   ],
   defaultVariants: {
