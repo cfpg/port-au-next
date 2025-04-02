@@ -5,7 +5,8 @@ import { withAuth } from '~/lib/auth-utils';
 export const GET = withAuth(async (request: Request, { params }: { params: { appId: string } }) => {
   const { searchParams } = new URL(request.url);
   const isPreview = searchParams.get('isPreview') === 'true';
-  const appId = parseInt(params.appId);
+  const { appId: appIdParam } = await params;
+  const appId = parseInt(appIdParam);
 
   if (isNaN(appId)) {
     return NextResponse.json(

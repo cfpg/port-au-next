@@ -81,6 +81,7 @@ export function AppSettingsForm({ appId, initialSettings }: AppSettingsFormProps
           value={settings.cloudflare_zone_id || ''}
           onChange={(e) => handleChange('cloudflare_zone_id', e.target.value)}
           placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+          showToggle={true}
         />
         <div className="flex items-end">
           <Button
