@@ -250,9 +250,17 @@ export async function migrate() {
 
     // Add new unique constraint including is_preview
     await pool.query(`
-      ALTER TABLE app_env_vars
-      ADD CONSTRAINT app_env_vars_app_id_is_preview_branch_key_key 
-      UNIQUE(app_id, is_preview, branch, key)
+      DO $$ 
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint 
+          WHERE conname = 'app_env_vars_app_id_is_preview_branch_key_key'
+        ) THEN
+          ALTER TABLE app_env_vars
+          ADD CONSTRAINT app_env_vars_app_id_is_preview_branch_key_key 
+          UNIQUE(app_id, is_preview, branch, key);
+        END IF;
+      END $$;
     `);
 
     // Add comment to explain the env vars behavior
@@ -298,13 +306,22 @@ export async function migrate() {
       ADD COLUMN IF NOT EXISTS preview_branch_id INTEGER REFERENCES preview_branches(id);
     `);
 
+    // Add check constraint for preview deployments
     await pool.query(`
-      ALTER TABLE deployments
-      ADD CONSTRAINT check_preview_deployment 
-      CHECK (
-        (is_preview = TRUE AND preview_branch_id IS NOT NULL) OR
-        (is_preview = FALSE AND preview_branch_id IS NULL)
-      )
+      DO $$ 
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint 
+          WHERE conname = 'check_preview_deployment'
+        ) THEN
+          ALTER TABLE deployments
+          ADD CONSTRAINT check_preview_deployment 
+          CHECK (
+            (is_preview = TRUE AND preview_branch_id IS NOT NULL) OR
+            (is_preview = FALSE AND preview_branch_id IS NULL)
+          );
+        END IF;
+      END $$;
     `);
 
     // Add all indexes in a single query
@@ -313,6 +330,37 @@ export async function migrate() {
       CREATE INDEX IF NOT EXISTS idx_deployments_preview_branch_id ON deployments(preview_branch_id);
       CREATE INDEX IF NOT EXISTS idx_preview_branches_app_id ON preview_branches(app_id);
       CREATE INDEX IF NOT EXISTS idx_preview_branches_subdomain ON preview_branches(subdomain)
+    `);
+
+    // Add preview_domain column to apps table
+    await pool.query(`
+      ALTER TABLE apps
+      ADD COLUMN IF NOT EXISTS preview_domain TEXT
+    `);
+
+    // Create app_features table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS app_features (
+        id SERIAL PRIMARY KEY,
+        app_id INTEGER REFERENCES apps(id) ON DELETE CASCADE,
+        feature TEXT NOT NULL,
+        enabled BOOLEAN DEFAULT FALSE,
+        config JSONB DEFAULT '{}'::jsonb,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(app_id, feature)
+      )
+    `);
+
+    // Add comment to explain the app_features table
+    await pool.query(`
+      COMMENT ON TABLE app_features IS 'Feature flags and configurations for apps. Each feature can be enabled/disabled and have its own configuration.'
+    `);
+
+    // Create index for faster lookups
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_app_features_app_id ON app_features(app_id);
+      CREATE INDEX IF NOT EXISTS idx_app_features_feature ON app_features(feature);
     `);
 
     await pool.query('COMMIT');

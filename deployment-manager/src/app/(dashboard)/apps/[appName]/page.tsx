@@ -10,6 +10,7 @@ import AppDeleteButton from '~/components/buttons/AppDeleteButton';
 import AppDeployButton from '~/components/buttons/AppDeployButton';
 import { ServiceStatus } from '~/types';
 import EnvVarsSettings from '~/components/env-vars/EnvVarsSettings';
+import PreviewBranchesCard from '~/components/settings/PreviewBranchesCard';
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
@@ -73,14 +74,33 @@ export default async function SingleAppPage({ params }: PageProps) {
           </div>}
       />
 
-      {/* Deployment Section */}
       <Card
         className='bg-white text-black mb-8'
-        title="Deployment History"
-        padding="table"
+        title="App Settings"
+        padding="content"
         content={
-          <DeploymentHistoryTable
-            deployments={deployments}
+          <AppSettingsForm
+            appId={app.id}
+            initialSettings={{
+              name: app.name,
+              domain: app.domain,
+              repo_url: app.repo_url,
+              branch: app.branch,
+              cloudflare_zone_id: app.cloudflare_zone_id,
+            }}
+          />
+        }
+      />
+
+      <Card
+        className='bg-white text-black mb-8'
+        title="Preview Branches"
+        padding="content"
+        content={
+          <PreviewBranchesCard
+            appId={app.id}
+            appName={app.name}
+            initialPreviewDomain={app.preview_domain}
           />
         }
       />
@@ -96,20 +116,14 @@ export default async function SingleAppPage({ params }: PageProps) {
         }
       />
 
+      {/* Deployment Section */}
       <Card
         className='bg-white text-black mb-8'
-        title="App Settings"
-        padding="content"
+        title="Deployment History"
+        padding="table"
         content={
-          <AppSettingsForm
-            appId={app.id}
-            initialSettings={{
-              name: app.name,
-              domain: app.domain,
-              repo_url: app.repo_url,
-              branch: app.branch,
-              cloudflare_zone_id: app.cloudflare_zone_id,
-            }}
+          <DeploymentHistoryTable
+            deployments={deployments}
           />
         }
       />
