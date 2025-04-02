@@ -11,20 +11,21 @@ import { deleteAppContainers } from '~/services/docker';
 import { deleteAppConfig } from '~/services/nginx';
 import { deleteRepository } from '~/services/git';
 import { deleteAppDatabase, deleteAppRecord } from '~/services/database';
+import { withAuth } from '~/lib/auth-utils';
 
-export async function fetchApp(appName: string) {
+export const fetchApp = withAuth(async (appName: string) => {
   const app = await fetchSingleAppQuery(appName);
   if (!app) {
     notFound();
   }
   return app;
-}
+});
 
-export async function fetchAppDeployments(appId: number) {
+export const fetchAppDeployments = withAuth(async (appId: number) => {
   return fetchRecentDeploymentsQuery(appId);
-}
+});
 
-export async function updateAppSettings(
+export const updateAppSettings = withAuth(async (
   appId: number,
   settings: {
     name?: string;
@@ -33,7 +34,7 @@ export async function updateAppSettings(
     branch?: string;
     cloudflare_zone_id?: string;
   }
-) {
+) => {
   try {
     await pool.query(
       `UPDATE apps 
@@ -58,15 +59,14 @@ export async function updateAppSettings(
     await logger.error('Failed to update app settings', error as Error);
     return { success: false, error: 'Failed to update app settings' };
   }
-}
+});
 
-export async function updateAppEnvVars(appId: number, branch: string, vars: Record<string, string>) {
+export const updateAppEnvVars = withAuth(async (appId: number, branch: string, vars: Record<string, string>) => {
   const result = await updateAppEnvVarsQuery(appId, branch, vars);
-  
   return result;
-}
+});
 
-export async function fetchZoneId(appName: string) {
+export const fetchZoneId = withAuth(async (appName: string) => {
   // Verify appName is valid
   const app = await fetchSingleAppQuery(appName);
   if (!app || !app.domain) {
@@ -80,9 +80,9 @@ export async function fetchZoneId(appName: string) {
   }
 
   return zoneId;
-}
+});
 
-export async function createApp({name, repo_url, branch, domain}: {name: string, repo_url: string, branch: string, domain: string,}) {
+export const createApp = withAuth(async ({name, repo_url, branch, domain}: {name: string, repo_url: string, branch: string, domain: string,}) => {
   // Try catch inserting a new app into the table apps and return the app id
   try {
     const result = await pool.query(
@@ -94,7 +94,7 @@ export async function createApp({name, repo_url, branch, domain}: {name: string,
     await logger.error('Failed to create app', error as Error);
     return { success: false, error: 'Failed to create app' };
   }
-}
+});
 
 interface DeletionStatus {
   success: boolean;
@@ -105,7 +105,7 @@ interface DeletionStatus {
   appRecord: { success: boolean; error: string | null };
 }
 
-export async function deleteApp(appName: string): Promise<{ success: boolean; message: string; details?: DeletionStatus }> {
+export const deleteApp = withAuth(async (appName: string): Promise<{ success: boolean; message: string; details?: DeletionStatus }> => {
   const deletionStatus: DeletionStatus = {
     success: false,
     containers: { success: false, error: null },
@@ -208,4 +208,4 @@ export async function deleteApp(appName: string): Promise<{ success: boolean; me
       message: 'Failed to initiate app deletion'
     };
   }
-}
+});

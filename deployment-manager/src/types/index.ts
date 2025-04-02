@@ -39,6 +39,15 @@ export interface App {
   };
 }
 
+export interface AppDeployment  {
+  id: number;
+  name: string;
+  repo_url: string;
+  branch: string;
+  status: string;
+  deployed_at: Date;
+}
+
 export interface AppSettings {
   name: string;
   repo_url: string;
@@ -49,7 +58,7 @@ export interface AppSettings {
 
 
 export type Service = 'postgres' | 'nginx' | 'redis' | 'thumbor';
-export type ServiceStatus = 'running' | 'stopped' | 'unknown';
+export type ServiceStatus = 'running' | 'stopped' | 'unknown' | 'pending' | 'building' | 'error' | 'failed';
 
 export interface ServiceHealth {
   id: string;

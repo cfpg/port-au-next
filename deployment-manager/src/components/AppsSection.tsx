@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import AppsTable from '~/components/tables/AppsTable';
 import DeploymentHistoryTable from '~/components/tables/DeploymentHistoryTable';
 import { Deployment, App } from '~/types';
-import { fetchApps, fetchRecentDeployments } from '~/app/actions';
+import { fetchApps, fetchRecentDeployments } from '~/app/(dashboard)/actions';
 import Card from '~/components/general/Card';
 
 interface AppsSectionProps {
