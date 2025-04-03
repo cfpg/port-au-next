@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import useSWR from 'swr';
 import { App, ServiceStatus } from '~/types';
 import fetcher from '~/utils/fetcher';
@@ -10,6 +9,14 @@ import Button from '~/components/general/Button';
 import AppDeployButton from '~/components/buttons/AppDeployButton';
 import { showToast } from '~/components/general/Toaster';
 import getGithubRepoPath from '~/utils/getGithubRepoPath';
+import getRelativeTime from '~/utils/getRelativeTime';
+import Table, {
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '~/components/general/Table';
 
 interface PreviewBranch {
   id: number;
@@ -57,69 +64,75 @@ export default function ActivePreviewBranches({ app }: ActivePreviewBranchesProp
     );
   }
 
+  if (!app.preview_domain) {
+    return (
+      <div className="text-center py-4 text-gray-500">
+        Preview domain not configured. Please configure it in the settings.
+      </div>
+    );
+  }
+
   return (
     <div className="overflow-x-auto">
-      <table className="min-w-full divide-y divide-gray-200 rounded-b-lg">
-        <thead className="bg-gray-50">
-          <tr>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Branch
-            </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Subdomain
-            </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Status
-            </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Last Deployment
-            </th>
-            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Actions
-            </th>
-          </tr>
-        </thead>
-        <tbody className="bg-white divide-y divide-gray-200 rounded-b-lg">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-1/4">Branch</TableHead>
+            <TableHead className="w-1/4">Subdomain</TableHead>
+            <TableHead>Commit</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Last Deployment</TableHead>
+            <TableHead className="text-right">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
           {previewBranches.map((previewBranch) => (
-            <tr key={previewBranch.id}>
-              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                {previewBranch.branch}
-              </td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+            <TableRow key={previewBranch.id}>
+              <TableCell className="font-medium text-gray-900 max-w-0">
+                <div className="truncate break-words">
+                  {previewBranch.branch}
+                </div>
+              </TableCell>
+              <TableCell className="max-w-0">
                 <a 
                   href={`https://${previewBranch.subdomain}`} 
                   target="_blank" 
                   rel="noopener noreferrer" 
-                  className="text-blue-500 hover:text-blue-700 underline"
+                  className="text-blue-500 hover:text-blue-700 underline block truncate break-words"
                 >
                   {previewBranch.subdomain}
                 </a>
-              </td>
-              <td className="px-6 py-4 whitespace-nowrap">
+              </TableCell>
+              <TableCell>
+                {previewBranch.last_deployment_commit ? (
+                  <a 
+                    href={`https://github.com/${getGithubRepoPath(app.repo_url)}/commit/${previewBranch.last_deployment_commit}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-500 hover:text-blue-700 underline"
+                  >
+                    {previewBranch.last_deployment_commit.substring(0, 7)}
+                  </a>
+                ) : (
+                  'N/A'
+                )}
+              </TableCell>
+              <TableCell>
                 <Badge color={getServiceStatusColor(previewBranch.status as ServiceStatus)} withDot>
                   {previewBranch.status}
                 </Badge>
-              </td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+              </TableCell>
+              <TableCell>
                 {previewBranch.last_deployment_at ? (
                   <>
                     {new Date(previewBranch.last_deployment_at).toLocaleString()}
-                    {previewBranch.last_deployment_commit && (
-                      <a 
-                        href={`https://github.com/${getGithubRepoPath(app.repo_url)}/commit/${previewBranch.last_deployment_commit}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="ml-2 text-blue-500 hover:text-blue-700 underline"
-                      >
-                        {previewBranch.last_deployment_commit.substring(0, 7)}
-                      </a>
-                    )}
+                    <span className="text-gray-400"> ({getRelativeTime(previewBranch.last_deployment_at)})</span>
                   </>
                 ) : (
                   'Never'
                 )}
-              </td>
-              <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
+              </TableCell>
+              <TableCell className="text-right space-x-2">
                 <AppDeployButton app={app} branch={previewBranch.branch} />
                 <Button
                   color="red"
@@ -129,11 +142,11 @@ export default function ActivePreviewBranches({ app }: ActivePreviewBranchesProp
                   <i className="fas fa-trash mr-2"></i>
                   Delete
                 </Button>
-              </td>
-            </tr>
+              </TableCell>
+            </TableRow>
           ))}
-        </tbody>
-      </table>
+        </TableBody>
+      </Table>
     </div>
   );
 } 

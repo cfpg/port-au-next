@@ -74,7 +74,6 @@ export default function AppNavigation({ appName, size }: AppNavigationProps) {
                 href={item.href}
                 className={active ? styles.activeLink() : styles.link()}
                 variant="default"
-                underline={false}
               >
                 {item.label}
               </Link>

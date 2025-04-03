@@ -5,6 +5,8 @@ import getRelativeTime from "~/utils/getRelativeTime";
 import { ServiceStatus } from "~/types";
 import { fetchApp } from "./actions";
 import AppNavigation from "~/components/navigation/AppNavigation";
+import AppDeployButton from "~/components/buttons/AppDeployButton";
+import AppDeleteButton from "~/components/buttons/AppDeleteButton";
 
 export default async function SingleAppLayout({ params, children }: { params: Promise<{ appName: string }>, children: React.ReactNode }) {
   const { appName } = await params;
@@ -19,9 +21,13 @@ export default async function SingleAppLayout({ params, children }: { params: Pr
             <>
               <h3 className="text-2xl font-bold">{app.name}</h3>
               <div className="flex items-center gap-4">
-                <Badge color={getServiceStatusColor(app.status as ServiceStatus)} withDot>
-                  {app.status}
-                </Badge>
+                <div className="flex items-center gap-4">
+                  <Badge color={getServiceStatusColor(app.status as ServiceStatus)} withDot>
+                    {app.status}
+                  </Badge>
+                  <AppDeployButton app={app} showDropdown={true} />
+                  <AppDeleteButton appName={app.name} />
+                </div>
               </div>
             </>
           }

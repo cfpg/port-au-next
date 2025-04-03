@@ -4,6 +4,7 @@ import logger from './logger';
 import { updateNginxConfig, deletePreviewBranchConfig } from './nginx';
 import { buildAndStartContainer, stopContainer } from './docker';
 import { pullLatestChanges, getLatestCommit } from './git';
+import { getPreviewBranchSubdomain, sanitizeBranchForSubdomain } from '~/utils/previewBranches';
 
 interface PreviewBranchSetup {
   appId: number;
@@ -61,7 +62,7 @@ export async function setupPreviewBranch({ appId, appName, branch, previewDomain
     }
 
     // Create database for preview branch
-    const dbPrefix = `${appName}_${branch}`.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+    const dbPrefix = `${appName}_${sanitizeBranchForSubdomain(branch)}`;
     const { dbUser, dbName, dbPassword } = await setupAppDatabase(dbPrefix);
 
     // Create preview branch record
@@ -70,7 +71,7 @@ export async function setupPreviewBranch({ appId, appName, branch, previewDomain
        (app_id, branch, subdomain, db_name, db_user, db_password, status)
        VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING id`,
-      [appId, branch, `${branch}.${previewDomain}`, dbName, dbUser, dbPassword, 'created']
+      [appId, branch, getPreviewBranchSubdomain(branch, previewDomain), dbName, dbUser, dbPassword, 'created']
     );
 
     await pool.query('COMMIT');
