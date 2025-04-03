@@ -5,7 +5,7 @@ import Button from '~/components/general/Button';
 import Input from '~/components/general/Input';
 import Label from '~/components/general/Label';
 import { updateAppEnvVars } from '~/app/(dashboard)/apps/[appName]/actions';
-import { useToast } from '~/components/general/ToastContainer';
+import { showToast } from '~/components/general/Toaster';
 import { AppEnvVar } from '~/queries/fetchAppEnvVars';
 
 interface EnvVarsFormProps {
@@ -15,7 +15,6 @@ interface EnvVarsFormProps {
 }
 
 export function EnvVarsForm({ appId, branch, initialEnvVars }: EnvVarsFormProps) {
-  const { showToast } = useToast();
   const [envVars, setEnvVars] = useState<AppEnvVar[]>(initialEnvVars);
   const [unsavedChanges, setUnsavedChanges] = useState(false);
 
@@ -55,10 +54,10 @@ export function EnvVarsForm({ appId, branch, initialEnvVars }: EnvVarsFormProps)
     const result = await updateAppEnvVars(appId, branch, envVarsMap);
 
     if (result.success) {
-      showToast('Environment variables updated successfully');
+      showToast('Environment variables updated successfully', 'success');
       setUnsavedChanges(false);
     } else {
-      showToast(result.error || 'Failed to update environment variables');
+      showToast(result.error || 'Failed to update environment variables', 'error');
     }
   };
 

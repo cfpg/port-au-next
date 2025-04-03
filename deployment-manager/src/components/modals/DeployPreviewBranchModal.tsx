@@ -6,7 +6,7 @@ import Modal from '~/components/general/Modal';
 import Button from '~/components/general/Button';
 import Input from '~/components/general/Input';
 import { triggerDeployment } from '~/app/(dashboard)/actions';
-import { useToast } from "~/components/general/ToastContainer";
+import { showToast } from "~/components/general/Toaster";
 
 interface DeployPreviewBranchModalProps {
   isOpen: boolean;
@@ -32,7 +32,6 @@ export default function DeployPreviewBranchModal({
   const [branch, setBranch] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<FormError | null>(null);
-  const { showToast } = useToast();
 
   const handleDeploy = async () => {
     // Reset error state

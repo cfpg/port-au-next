@@ -5,7 +5,7 @@ import Button from '~/components/general/Button';
 import Input from '~/components/general/Input';
 import Label from '~/components/general/Label';
 import { fetchZoneId, updateAppSettings } from '~/app/(dashboard)/apps/[appName]/actions';
-import { useToast } from '~/components/general/ToastContainer';
+import { showToast } from '~/components/general/Toaster';
 
 interface AppSettingsFormProps {
   appId: number;
@@ -20,7 +20,6 @@ interface AppSettingsFormProps {
 
 export function AppSettingsForm({ appId, initialSettings }: AppSettingsFormProps) {
   const [settings, setSettings] = useState(initialSettings);
-  const { showToast } = useToast();
 
   const handleChange = (field: keyof typeof settings, value: string) => {
     setSettings((prev) => ({ ...prev, [field]: value }));
@@ -32,9 +31,9 @@ export function AppSettingsForm({ appId, initialSettings }: AppSettingsFormProps
     const result = await updateAppSettings(appId, settings);
 
     if (result.success) {
-      showToast("App settings updated successfully.");
+      showToast("App settings updated successfully.", "success");
     } else {
-      showToast(result.error || 'Failed to update app settings');
+      showToast(result.error || 'Failed to update app settings', "error");
     }
   };
 
