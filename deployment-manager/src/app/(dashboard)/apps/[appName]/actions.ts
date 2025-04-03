@@ -12,6 +12,8 @@ import { deleteAppConfig } from '~/services/nginx';
 import { deleteRepository } from '~/services/git';
 import { deleteAppDatabase, deleteAppRecord } from '~/services/database';
 import { withAuth } from '~/lib/auth-utils';
+import updateAppSettingsQuery from '~/queries/updateAppSettingsQuery';
+import { AppSettings } from '~/types';
 
 export const fetchApp = withAuth(async (appName: string) => {
   const app = await fetchSingleAppQuery(appName);
@@ -27,33 +29,10 @@ export const fetchAppDeployments = withAuth(async (appId: number) => {
 
 export const updateAppSettings = withAuth(async (
   appId: number,
-  settings: {
-    name?: string;
-    domain?: string;
-    repo_url?: string;
-    branch?: string;
-    cloudflare_zone_id?: string;
-  }
+  settings: AppSettings
 ) => {
   try {
-    await pool.query(
-      `UPDATE apps 
-       SET name = COALESCE($1, name),
-           domain = COALESCE($2, domain),
-           repo_url = COALESCE($3, repo_url),
-           branch = COALESCE($4, branch),
-           cloudflare_zone_id = COALESCE($5, cloudflare_zone_id)
-       WHERE id = $6`,
-      [
-        settings.name,
-        settings.domain,
-        settings.repo_url,
-        settings.branch,
-        settings.cloudflare_zone_id,
-        appId
-      ]
-    );
-
+    await updateAppSettingsQuery(appId, settings);
     return { success: true };
   } catch (error) {
     await logger.error('Failed to update app settings', error as Error);
