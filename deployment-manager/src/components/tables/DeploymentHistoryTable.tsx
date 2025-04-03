@@ -1,4 +1,4 @@
-import { Deployment, ServiceStatus } from '~/types';
+import { App, Deployment, ServiceStatus } from '~/types';
 import Table, {
   TableBody,
   TableCell,
@@ -56,7 +56,7 @@ export default function DeploymentHistoryTable({
                 {deployment.deployed_at && <span className="text-gray-400"> ({getRelativeTime(deployment.deployed_at)})</span>}
               </TableCell>
               <TableCell className="font-medium flex justify-end space-x-2">
-                <AppDeployButton appName={deployment.app_name} branch={deployment.branch} />
+                <AppDeployButton app={{ name: deployment.app_name, id: deployment.app_id } as App} branch={deployment.branch} />
                 <ViewLogsButton
                   deploymentId={deployment.id}
                   appName={deployment.app_name}

@@ -37,7 +37,7 @@ export default async function SingleAppPage({ params }: PageProps) {
               <Badge color={getServiceStatusColor(app.status as ServiceStatus)} withDot>
                 {app.status}
               </Badge>
-              <AppDeployButton appName={app.name} showDropdown={true} />
+              <AppDeployButton app={app} showDropdown={true} />
               <AppDeleteButton appName={app.name} />
             </div>
           </>
