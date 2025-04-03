@@ -1,5 +1,5 @@
 import pool from '~/services/database';
-import { App } from './fetchAppsQuery';
+import { App } from '~/types';
 
 export default async function fetchSingleAppQuery(appName: string): Promise<App | null> {
   try {
@@ -13,6 +13,7 @@ export default async function fetchSingleAppQuery(appName: string): Promise<App 
         a.db_name,
         a.db_user,
         a.db_password,
+        a.preview_domain,
         a.cloudflare_zone_id,
         COALESCE(
           jsonb_object_agg(
@@ -27,7 +28,8 @@ export default async function fetchSingleAppQuery(appName: string): Promise<App 
             'version', d.version,
             'commit_id', d.commit_id,
             'status', d.status,
-            'deployed_at', d.deployed_at
+            'deployed_at', d.deployed_at,
+            'branch', d.branch
           )
           ELSE NULL
         END as last_deployment
@@ -36,6 +38,8 @@ export default async function fetchSingleAppQuery(appName: string): Promise<App 
         SELECT *
         FROM deployments d
         WHERE d.app_id = a.id
+        AND (d.is_preview = false OR d.is_preview IS NULL)
+        AND (d.branch = a.branch OR d.branch IS NULL)
         ORDER BY d.deployed_at DESC
         LIMIT 1
       ) d ON true
@@ -57,7 +61,8 @@ export default async function fetchSingleAppQuery(appName: string): Promise<App 
         d.version,
         d.commit_id,
         d.status,
-        d.deployed_at;
+        d.deployed_at,
+        d.branch;
     `, [appName]);
 
     return result.rows[0] || null;

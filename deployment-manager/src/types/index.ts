@@ -4,10 +4,11 @@ export interface Deployment {
   app_name: string;
   app_repository: string;
   version: string;
-  commit_id: string;
+  commit_id?: string;
   status: string;
-  deployed_at: Date;
+  deployed_at: string;
   container_id?: string;
+  branch?: string;
 }
 
 export interface DeploymentLog {
@@ -30,6 +31,7 @@ export interface App {
   db_password?: string;
   cloudflare_zone_id?: string;
   env?: Record<string, string>;
+  preview_domain?: string;
   status: string;
   last_deployment?: {
     version: string;

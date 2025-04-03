@@ -1,7 +1,6 @@
 import Card from '~/components/general/Card';
 import Badge from '~/components/general/Badge';
 import DeploymentHistoryTable from '~/components/tables/DeploymentHistoryTable';
-import { EnvVarsForm } from '~/components/EnvVarsForm';
 import { AppSettingsForm } from '~/components/AppSettingsForm';
 import { fetchApp, fetchAppDeployments } from './actions';
 import { getServiceStatusColor } from '~/utils/serviceColors';
@@ -9,6 +8,8 @@ import getRelativeTime from '~/utils/getRelativeTime';
 import AppDeleteButton from '~/components/buttons/AppDeleteButton';
 import AppDeployButton from '~/components/buttons/AppDeployButton';
 import { ServiceStatus } from '~/types';
+import EnvVarsSettings from '~/components/env-vars/EnvVarsSettings';
+import PreviewBranchesCard from '~/components/settings/PreviewBranchesCard';
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
@@ -36,7 +37,7 @@ export default async function SingleAppPage({ params }: PageProps) {
               <Badge color={getServiceStatusColor(app.status as ServiceStatus)} withDot>
                 {app.status}
               </Badge>
-              <AppDeployButton appName={app.name} />
+              <AppDeployButton app={app} showDropdown={true} />
               <AppDeleteButton appName={app.name} />
             </div>
           </>
@@ -72,31 +73,6 @@ export default async function SingleAppPage({ params }: PageProps) {
           </div>}
       />
 
-      {/* Deployment Section */}
-      <Card
-        className='bg-white text-black mb-8'
-        title="Deployment History"
-        padding="table"
-        content={
-          <DeploymentHistoryTable
-            deployments={deployments}
-          />
-        }
-      />
-
-      <Card
-        className='bg-white text-black mb-8'
-        title="Environment Variables"
-        padding="content"
-        content={
-          <EnvVarsForm
-            appId={app.id}
-            branch={app.branch}
-            initialEnvVars={app.env}
-          />
-        }
-      />
-
       <Card
         className='bg-white text-black mb-8'
         title="App Settings"
@@ -111,6 +87,41 @@ export default async function SingleAppPage({ params }: PageProps) {
               branch: app.branch,
               cloudflare_zone_id: app.cloudflare_zone_id,
             }}
+          />
+        }
+      />
+
+      <Card
+        className='bg-white text-black mb-8'
+        title="Preview Branches"
+        padding="content"
+        content={
+          <PreviewBranchesCard
+            app={app}
+            initialPreviewDomain={app.preview_domain}
+          />
+        }
+      />
+
+      <Card
+        className='bg-white text-black mb-8'
+        title="Environment Variables"
+        padding="content"
+        content={
+          <EnvVarsSettings
+            appId={app.id}
+          />
+        }
+      />
+
+      {/* Deployment Section */}
+      <Card
+        className='bg-white text-black mb-8'
+        title="Deployment History"
+        padding="table"
+        content={
+          <DeploymentHistoryTable
+            deployments={deployments}
           />
         }
       />

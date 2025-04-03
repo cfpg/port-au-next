@@ -40,55 +40,50 @@ export function AppSettingsForm({ appId, initialSettings }: AppSettingsFormProps
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="space-y-2">
-        <Label htmlFor="name">App Name</Label>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Input
           id="name"
+          label="App Name"
           value={settings.name || ''}
           onChange={(e) => handleChange('name', e.target.value)}
           placeholder="myapp"
         />
-      </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="domain">Domain</Label>
         <Input
           id="domain"
+          label="Domain"
           value={settings.domain || ''}
           onChange={(e) => handleChange('domain', e.target.value)}
           placeholder="example.com"
         />
-      </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="repository">Repository</Label>
         <Input
           id="repository"
+          label="Repository"
           value={settings.repo_url || ''}
           onChange={(e) => handleChange('repo_url', e.target.value)}
           placeholder="https://github.com/myapp/myapp"
         />
-      </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="branch">Branch</Label>
         <Input
           id="branch"
+          label="Branch"
           value={settings.branch || ''}
           onChange={(e) => handleChange('branch', e.target.value)}
           placeholder="main"
         />
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="cloudflare_zone_id">Cloudflare Zone ID</Label>
-        <div className="flex items-center flex-row gap-4">
-          <Input
-            id="cloudflare_zone_id"
-            value={settings.cloudflare_zone_id || ''}
-            onChange={(e) => handleChange('cloudflare_zone_id', e.target.value)}
-            placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-          />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Input
+          id="cloudflare_zone_id"
+          label="Cloudflare Zone ID"
+          value={settings.cloudflare_zone_id || ''}
+          onChange={(e) => handleChange('cloudflare_zone_id', e.target.value)}
+          placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+          showToggle={true}
+        />
+        <div className="flex items-end">
           <Button
             onClick={() => {
               fetchZoneId(settings.name || '')

@@ -1,4 +1,4 @@
-export default function getRelativeTime(date: Date) {
+export default function getRelativeTime(date: string | Date) {
   // Fail early if no date is provided
   if (!date) {
     return '';

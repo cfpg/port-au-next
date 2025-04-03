@@ -1,4 +1,4 @@
-import { Deployment, ServiceStatus } from '~/types';
+import { App, Deployment, ServiceStatus } from '~/types';
 import Table, {
   TableBody,
   TableCell,
@@ -12,6 +12,7 @@ import Badge from '~/components/general/Badge';
 import { getServiceStatusColor } from '~/utils/serviceColors';
 import ViewLogsButton from '~/components/deployments/ViewLogsButton';
 import Link from '~/components/general/Link';
+import AppDeployButton from '~/components/buttons/AppDeployButton';
 
 interface DeploymentHistoryTableProps {
   deployments: Deployment[];
@@ -27,6 +28,7 @@ export default function DeploymentHistoryTable({
           <TableRow>
             <TableHead>App</TableHead>
             <TableHead>Version</TableHead>
+            <TableHead>Branch</TableHead>
             <TableHead>Commit</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Deployed At</TableHead>
@@ -42,6 +44,7 @@ export default function DeploymentHistoryTable({
                 </Link>
               </TableCell>
               <TableCell>{deployment.version}</TableCell>
+              <TableCell>{deployment.branch || 'main'}</TableCell>
               <TableCell>
                 {deployment.commit_id ? <a href={`https://github.com/${getGithubRepoPath(deployment.app_repository)}/commit/${deployment.commit_id}`} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700 underline">{deployment.commit_id.substring(0, 7)}</a> : 'N/A'}
               </TableCell>
@@ -52,7 +55,8 @@ export default function DeploymentHistoryTable({
                 {new Date(deployment.deployed_at).toLocaleString()}
                 {deployment.deployed_at && <span className="text-gray-400"> ({getRelativeTime(deployment.deployed_at)})</span>}
               </TableCell>
-              <TableCell className="font-medium flex justify-end">
+              <TableCell className="font-medium flex justify-end space-x-2">
+                <AppDeployButton app={{ name: deployment.app_name, id: deployment.app_id } as App} branch={deployment.branch} />
                 <ViewLogsButton
                   deploymentId={deployment.id}
                   appName={deployment.app_name}
