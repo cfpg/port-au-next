@@ -13,6 +13,7 @@ export default async function fetchSingleAppQuery(appName: string): Promise<App 
         a.db_name,
         a.db_user,
         a.db_password,
+        a.preview_domain,
         a.cloudflare_zone_id,
         COALESCE(
           jsonb_object_agg(
