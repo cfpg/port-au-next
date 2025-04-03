@@ -217,10 +217,15 @@ export async function deployPreviewBranch(appId: number, branch: string) {
     await logger.info('Preview branch deployed successfully', {
       appName: app.name,
       branch,
-      containerId
+      containerId,
+      commitId
     });
 
-    return { success: true };
+    return { 
+      success: true,
+      containerId,
+      commitId
+    };
   } catch (error) {
     await logger.error('Preview branch deployment failed', error as Error);
     throw error;

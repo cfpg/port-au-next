@@ -31,6 +31,7 @@ export interface App {
   db_password?: string;
   cloudflare_zone_id?: string;
   env?: Record<string, string>;
+  preview_domain?: string;
   status: string;
   last_deployment?: {
     version: string;

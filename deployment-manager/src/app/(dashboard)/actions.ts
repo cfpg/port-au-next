@@ -106,7 +106,16 @@ export const triggerDeployment = withAuth(async (appName: string, { pathname, br
 
         if (isPreviewBranch) {
           // Handle preview branch deployment
-          await deployPreviewBranch(app.id, targetBranch);
+          const result = await deployPreviewBranch(app.id, targetBranch);
+          
+          // Update deployment status with container ID and commit ID from preview branch deployment
+          await logger.info('Marking deployment as active');
+          await pool.query(
+            `UPDATE deployments 
+             SET status = $1, commit_id = $2, container_id = $3 
+             WHERE id = $4`,
+            ['active', result.commitId, result.containerId, deploymentId]
+          );
         } else {
           // Handle production branch deployment (existing logic)
           await logger.info(`Pulling latest changes from branch ${targetBranch}`);
