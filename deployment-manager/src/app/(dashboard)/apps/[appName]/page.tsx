@@ -24,7 +24,7 @@ export default async function SingleAppPage({ params }: PageProps) {
   const { appName } = await params;
   const app = await fetchApp(appName);
   const deployments = await fetchAppDeployments(app.id);
-console.log("got app",app)
+
   return (
     <div>
       {/* App Information Section */}
