@@ -46,6 +46,7 @@ export const triggerDeployment = withAuth(async (appName: string, { pathname, br
     const version = new Date().toISOString().replace(/[^0-9]/g, '');
     const targetBranch = branch || app.branch;
     const isPreviewBranch = branch && branch !== app.branch;
+    let previewBranch = null;
 
     // If this is a preview branch deployment, check if preview branches are enabled
     if (isPreviewBranch) {
@@ -58,8 +59,8 @@ export const triggerDeployment = withAuth(async (appName: string, { pathname, br
         throw new Error('Preview domain is not configured');
       }
 
-      // Check if preview branch exists, if not set it up
-      let previewBranch = await getPreviewBranch(app.id, targetBranch);
+      // Check if preview branch db entry exists, if not set it up
+      previewBranch = await getPreviewBranch(app.id, targetBranch);
       if (!previewBranch) {
         previewBranch = await setupPreviewBranch({
           appId: app.id,
@@ -72,15 +73,20 @@ export const triggerDeployment = withAuth(async (appName: string, { pathname, br
 
     // Start deployment record
     const deploymentResult = await pool.query(
-      `INSERT INTO deployments (app_id, version, status, branch, is_preview)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO deployments (app_id, version, status, branch, is_preview, preview_branch_id)
+       VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING id`,
-      [app.id, version, 'pending', targetBranch, isPreviewBranch]
+      [app.id, version, 'pending', targetBranch, isPreviewBranch, isPreviewBranch ? previewBranch.id : null]
     );
 
     deploymentId = deploymentResult.rows[0].id;
     logger.setDeploymentContext(deploymentId);
-    await logger.info('Deployment record created', { version, branch: targetBranch, isPreview: isPreviewBranch });
+    await logger.info('Deployment record created', { 
+      version, 
+      branch: targetBranch, 
+      isPreview: isPreviewBranch,
+      previewBranchId: isPreviewBranch ? previewBranch.id : null 
+    });
 
     // Revalidate path if available
     if (pathname) {

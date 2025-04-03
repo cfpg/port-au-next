@@ -2,8 +2,9 @@ import { NextResponse } from 'next/server';
 import { withAuth } from '~/lib/auth-utils';
 import pool from '~/services/database';
 
-export const PATCH = withAuth(async (request: Request, { params }: { params: { appId: string } }) => {
-  const appId = parseInt(params.appId);
+export const PATCH = withAuth(async (request: Request, { params }: { params: Promise<{ appId: string }> }) => {
+  const { appId: appIdParam } = await params;
+  const appId = parseInt(appIdParam);
 
   if (isNaN(appId)) {
     return NextResponse.json(

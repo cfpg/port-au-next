@@ -11,6 +11,7 @@
     "db:migrate": "ts-node src/scripts/migrate.ts"
   },
   "dependencies": {
+    "@types/next": "^8.0.7",
     "@types/pg": "^8.11.11",
     "better-auth": "^1.2.5",
     "cloudflare": "^4.2.0",

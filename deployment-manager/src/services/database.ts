@@ -70,7 +70,7 @@ export async function setupAppDatabase(appName: string) {
     const tempPool = new Pool({
       user: process.env.POSTGRES_USER,
       password: process.env.POSTGRES_PASSWORD,
-      host: 'postgres',
+      host: process.env.POSTGRES_HOST || 'postgres',
       database: 'postgres',
       port: 5432
     });
