@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Button from "~/components/general/Button";
 import { triggerDeployment } from "~/app/(dashboard)/actions";
-import { useToast } from "~/components/general/ToastContainer";
+import { showToast } from "~/components/general/Toaster";
 import { usePathname } from "next/navigation";
 import DeployPreviewBranchModal from "~/components/modals/DeployPreviewBranchModal";
 import { App } from "~/types";
@@ -17,7 +17,6 @@ interface AppDeployButtonProps {
 export default function AppDeployButton({ app, branch, showDropdown = false }: AppDeployButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const { showToast } = useToast();
   const pathname = usePathname();
 
   const handleDeploy = async (targetBranch?: string) => {

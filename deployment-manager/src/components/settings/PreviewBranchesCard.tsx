@@ -6,7 +6,7 @@ import { AppFeature } from '~/types/appFeatures';
 import fetcher from '~/utils/fetcher';
 import Button from '~/components/general/Button';
 import Input from '~/components/general/Input';
-import { useToast } from '~/components/general/ToastContainer';
+import { showToast } from '~/components/general/Toaster';
 import { App } from '~/types';
 
 interface PreviewBranchesCardProps {
@@ -15,7 +15,6 @@ interface PreviewBranchesCardProps {
 }
 
 export default function PreviewBranchesCard({ app, initialPreviewDomain }: PreviewBranchesCardProps) {
-  const { showToast } = useToast();
   const [previewDomain, setPreviewDomain] = useState(initialPreviewDomain || '');
   const [isUpdating, setIsUpdating] = useState(false);
 
@@ -45,9 +44,9 @@ export default function PreviewBranchesCard({ app, initialPreviewDomain }: Previ
       }
 
       await mutateFeatures();
-      showToast(`Preview Branches ${!isEnabled ? 'enabled' : 'disabled'} successfully`);
+      showToast(`Preview Branches ${!isEnabled ? 'enabled' : 'disabled'} successfully`, 'success');
     } catch (error) {
-      showToast('Failed to update Preview Branches feature');
+      showToast('Failed to update Preview Branches feature', 'error');
     } finally {
       setIsUpdating(false);
     }
@@ -55,7 +54,7 @@ export default function PreviewBranchesCard({ app, initialPreviewDomain }: Previ
 
   const handleUpdatePreviewDomain = async () => {
     if (!previewDomain) {
-      showToast('Please enter a preview domain');
+      showToast('Please enter a preview domain', 'warning');
       return;
     }
 
@@ -75,9 +74,9 @@ export default function PreviewBranchesCard({ app, initialPreviewDomain }: Previ
         throw new Error('Failed to update preview domain');
       }
 
-      showToast('Preview domain updated successfully');
+      showToast('Preview domain updated successfully', 'success');
     } catch (error) {
-      showToast('Failed to update preview domain');
+      showToast('Failed to update preview domain', 'error');
     } finally {
       setIsUpdating(false);
     }
