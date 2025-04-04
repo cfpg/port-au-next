@@ -24,8 +24,6 @@ COPY . .
 # Disable telemetry during build
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Compile migration script
-RUN npx tsc src/scripts/migrate.ts --outDir dist/scripts --esModuleInterop
 
 # Build Next.js app
 RUN npm run build -- -d
@@ -61,9 +59,6 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 
-# Copy compiled migration script
-COPY --from=builder /app/dist/scripts/migrate.js ./scripts/
-
 # Switch to node user
 USER node
 
@@ -73,4 +68,4 @@ ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
 # Run migration before starting the server
-CMD ["sh", "-c", "node scripts/migrate.js && node server.js"] 
+CMD ["sh", "-c", "node server.js"] 
