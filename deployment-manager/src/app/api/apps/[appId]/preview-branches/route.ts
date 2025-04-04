@@ -37,6 +37,7 @@ export const GET = withAuth(async (request: Request, { params }: { params: { app
       FROM preview_branches pb
       LEFT JOIN latest_deployments ld ON ld.preview_branch_id = pb.id
       WHERE pb.app_id = $1
+      AND pb.deleted_at IS NULL
       ORDER BY 
         ld.last_deployment_at DESC NULLS LAST,
         pb.created_at DESC

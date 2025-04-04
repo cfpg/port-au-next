@@ -7,15 +7,15 @@ import { usePathname } from 'next/navigation';
 const appNavigation = tv({
   slots: {
     base: 'mb-8',
-    list: 'flex gap-1 p-1 bg-gray-50 rounded-lg border border-gray-100',
+    list: 'flex gap-1 p-1 bg-gray-50 rounded-lg border border-gray-400 shadow-sm py-4 px-2',
     item: 'relative',
     link: [
-      'px-4 py-2 text-sm font-medium transition-colors rounded-md',
+      'px-2 py-2 text-sm font-medium transition-colors rounded-md',
       'text-gray-600 hover:text-gray-900',
       'focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500'
     ],
     activeLink: [
-      'px-4 py-2 text-sm font-medium transition-colors rounded-md',
+      'px-2 py-2 text-sm font-medium transition-colors rounded-md bg-blue-50 border border-blue-200',
       'text-blue-600 font-semibold',
       'focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500'
     ]
@@ -60,7 +60,6 @@ export default function AppNavigation({ appName, size }: AppNavigationProps) {
   const navItems = [
     { href: `/apps/${appName}`, label: 'Overview' },
     { href: `/apps/${appName}/settings`, label: 'Settings' },
-    // Add more navigation items here as needed
   ];
 
   return (

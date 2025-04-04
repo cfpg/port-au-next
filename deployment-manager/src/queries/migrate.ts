@@ -201,6 +201,12 @@ export async function migrate() {
       ADD COLUMN IF NOT EXISTS branch TEXT
     `);
 
+    // Add deleted_at column to preview_branches for soft deletion
+    await pool.query(`
+      ALTER TABLE preview_branches
+      ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP WITH TIME ZONE
+    `);
+
     await pool.query('COMMIT');
     console.log('Database migration completed successfully');
   } catch (error) {

@@ -5,9 +5,7 @@ import { App, ServiceStatus } from '~/types';
 import fetcher from '~/utils/fetcher';
 import { getServiceStatusColor } from '~/utils/serviceColors';
 import Badge from '~/components/general/Badge';
-import Button from '~/components/general/Button';
 import AppDeployButton from '~/components/buttons/AppDeployButton';
-import { showToast } from '~/components/general/Toaster';
 import getGithubRepoPath from '~/utils/getGithubRepoPath';
 import getRelativeTime from '~/utils/getRelativeTime';
 import Table, {
@@ -17,6 +15,7 @@ import Table, {
   TableHeader,
   TableRow,
 } from '~/components/general/Table';
+import PreviewBranchDeleteButton from '~/components/buttons/PreviewBranchDeleteButton';
 
 interface PreviewBranch {
   id: number;
@@ -39,23 +38,6 @@ export default function ActivePreviewBranches({ app }: ActivePreviewBranchesProp
     fetcher
   );
 
-  const handleDelete = async (branch: string) => {
-    try {
-      const response = await fetch(`/api/apps/${app.id}/preview-branches/${branch}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to delete preview branch');
-      }
-
-      await mutate();
-      showToast('Preview branch deleted successfully', 'success');
-    } catch (error) {
-      showToast('Failed to delete preview branch', 'error');
-    }
-  };
-
   if (!previewBranches?.length) {
     return (
       <div className="text-center py-4 text-gray-500">
@@ -77,8 +59,8 @@ export default function ActivePreviewBranches({ app }: ActivePreviewBranchesProp
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead className="w-1/4">Branch</TableHead>
-            <TableHead className="w-1/4">Subdomain</TableHead>
+            <TableHead>Branch</TableHead>
+            <TableHead>Subdomain</TableHead>
             <TableHead>Commit</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Last Deployment</TableHead>
@@ -89,7 +71,7 @@ export default function ActivePreviewBranches({ app }: ActivePreviewBranchesProp
           {previewBranches.map((previewBranch) => (
             <TableRow key={previewBranch.id}>
               <TableCell className="font-medium text-gray-900 max-w-0">
-                <div className="truncate break-words">
+                <div className="break-words whitespace-pre-wrap">
                   {previewBranch.branch}
                 </div>
               </TableCell>
@@ -98,7 +80,7 @@ export default function ActivePreviewBranches({ app }: ActivePreviewBranchesProp
                   href={`https://${previewBranch.subdomain}`} 
                   target="_blank" 
                   rel="noopener noreferrer" 
-                  className="text-blue-500 hover:text-blue-700 underline block truncate break-words"
+                  className="text-blue-500 hover:text-blue-700 underline block break-words whitespace-pre-wrap"
                 >
                   {previewBranch.subdomain}
                 </a>
@@ -134,14 +116,7 @@ export default function ActivePreviewBranches({ app }: ActivePreviewBranchesProp
               </TableCell>
               <TableCell className="text-right space-x-2">
                 <AppDeployButton app={app} branch={previewBranch.branch} />
-                <Button
-                  color="red"
-                  size="sm"
-                  onClick={() => handleDelete(previewBranch.branch)}
-                >
-                  <i className="fas fa-trash mr-2"></i>
-                  Delete
-                </Button>
+                <PreviewBranchDeleteButton appId={app.id} branch={previewBranch.branch} onDeleted={() => mutate()} />
               </TableCell>
             </TableRow>
           ))}
