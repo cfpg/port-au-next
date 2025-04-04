@@ -4,6 +4,20 @@ All notable changes to Port-Au-Next will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2024-03-21
+
+### Added
+* Feature/user management
+* Feature/preview branches
+* Feature/preview branches management
+
+### Fixed
+* Fixes toast notifications with sonner
+* HOTIFX: Removes building and calling scripts/migrate.ts from deployment-manager/Dockerfile
+
+### Changed
+* Adds new User Management related env vars to docker-compose
+
 ## [0.1.0] - 2025-03-17
 
 ### Added
