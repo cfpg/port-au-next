@@ -68,6 +68,16 @@ export const triggerDeployment = withAuth(async (appName: string, { pathname, br
           branch: targetBranch,
           previewDomain: app.preview_domain
         });
+      } else if (previewBranch.deleted_at) {
+        // If preview branch exists but is soft-deleted, restore it
+        await pool.query(
+          'UPDATE preview_branches SET deleted_at = NULL WHERE id = $1',
+          [previewBranch.id]
+        );
+        await logger.info('Restored soft-deleted preview branch', { 
+          branch: targetBranch,
+          previewBranchId: previewBranch.id 
+        });
       }
     }
 
