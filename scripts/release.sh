@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-# Function to increment version (same as before)
+# Function to increment version
 increment_version() {
     local version=$1
     local major minor patch
@@ -11,7 +11,7 @@ increment_version() {
         minor=${BASH_REMATCH[2]}
         patch=${BASH_REMATCH[3]}
     else
-        echo "Error: Current version not in semantic format"
+        echo "Error: Current version '$version' not in semantic format (X.Y.Z)"
         exit 1
     fi
 
@@ -27,6 +27,10 @@ increment_version() {
             ;;
         patch)
             patch=$((patch + 1))
+            ;;
+        *)
+            echo "Error: Invalid version type '$2'. Must be major, minor, or patch"
+            exit 1
             ;;
     esac
 
@@ -126,17 +130,23 @@ parse_commit_messages() {
     local pattern=""
     case $type in
         "feat")
-            pattern="^feat\|^feature\|^add"
+            pattern="^feat|^feature|^add"
             ;;
         "fix")
-            pattern="^fix\|^bug\|^hotfix"
+            pattern="^fix|^bug|^hotfix"
             ;;
         "security")
-            pattern="^security\|^deps\|^dependency"
+            pattern="^security|^deps|^dependency"
+            ;;
+        "chore")
+            pattern="^chore"
             ;;
     esac
     
-    git log $PREV_VERSION..HEAD --pretty=format:"* %s" --reverse | grep -iE "$pattern" | sed 's/^\([^:]*\): */\1: /' || true
+    git log $PREV_VERSION..HEAD --pretty=format:"* %s" --reverse | \
+        grep -iE "$pattern" | \
+        sed -E 's/^([^:]*): */\1: /' | \
+        sed -E 's/^([^\(]*)(\([^\)]*\))?:? */\1/' || true
 }
 
 # Improved changelog generation
@@ -155,6 +165,10 @@ generate_changelog() {
     
     echo "### Security" >> CHANGELOG.tmp
     parse_commit_messages "security" >> CHANGELOG.tmp
+    echo "" >> CHANGELOG.tmp
+
+    echo "### Changed" >> CHANGELOG.tmp
+    parse_commit_messages "chore" >> CHANGELOG.tmp
     echo "" >> CHANGELOG.tmp
 }
 
@@ -183,12 +197,20 @@ if [ $SKIP_CONFIRM -eq 0 ]; then
     fi
 fi
 
+# Main release process
 echo "Starting release process..."
 
 # Create temporary release branch
-git checkout -b temp-release-v$VERSION
+RELEASE_BRANCH="release-v$VERSION"
+if git show-ref --verify --quiet "refs/heads/$RELEASE_BRANCH"; then
+    echo "Error: Release branch $RELEASE_BRANCH already exists"
+    exit 1
+fi
+
+git checkout -b "$RELEASE_BRANCH"
 
 # Update version files
+echo "Updating version files..."
 echo $VERSION > VERSION
 if [[ "$OSTYPE" == "darwin"* ]]; then
     sed -i '' "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" deployment-manager/package.json
@@ -197,6 +219,7 @@ else
 fi
 
 # Update CHANGELOG.md
+echo "Updating changelog..."
 if [ -f CHANGELOG.tmp ]; then
     cat CHANGELOG.tmp CHANGELOG.md > CHANGELOG.new
     mv CHANGELOG.new CHANGELOG.md
@@ -204,6 +227,7 @@ if [ -f CHANGELOG.tmp ]; then
 fi
 
 # Commit changes
+echo "Committing version changes..."
 git add VERSION deployment-manager/package.json CHANGELOG.md
 git commit -m "chore: release version $VERSION"
 
@@ -216,14 +240,14 @@ handle_merge() {
     echo "Attempting to merge $source into $target..."
     
     if ! git checkout $target; then
-        echo "Failed to checkout $target branch"
+        echo "Error: Failed to checkout $target branch"
         return 1
-    }
+    fi
     
     if ! git pull origin $target; then
-        echo "Failed to update $target branch"
+        echo "Error: Failed to update $target branch"
         return 1
-    }
+    fi
     
     if ! git merge --no-ff $source -m "$message"; then
         echo "Merge conflict detected while merging $source into $target"
@@ -244,44 +268,44 @@ handle_merge() {
                 read -n 1
                 
                 # Check if conflicts were resolved
-                if git diff --check; then
-                    git add .
-                    git commit --no-edit
-                    return 0
-                else
-                    echo "Conflicts still exist"
+                if ! git diff --check; then
+                    echo "Error: Conflicts still exist"
                     git merge --abort
                     return 1
                 fi
+                
+                git add .
+                git commit --no-edit
+                return 0
                 ;;
             *)
                 git merge --abort
-                echo "Invalid option"
+                echo "Error: Invalid option"
                 return 1
                 ;;
         esac
     fi
+    
+    echo "Successfully merged $source into $target"
     return 0
 }
 
-# Try to merge to main
+# Merge to main
 echo "Merging to main..."
-git checkout main
-if ! handle_merge temp-release-v$VERSION main "chore: merge release $VERSION"; then
+if ! handle_merge "$RELEASE_BRANCH" main "chore: merge release $VERSION"; then
     cleanup
 fi
 
-# Create tag
+# Create and push tag
 echo "Creating release tag..."
 if ! git tag -a "v$VERSION" -m "Release v$VERSION"; then
-    echo "Failed to create tag"
+    echo "Error: Failed to create tag"
     cleanup
 fi
 
-# Push changes to main
 echo "Pushing to main..."
 if ! git push origin main --tags; then
-    echo "Failed to push to main"
+    echo "Error: Failed to push to main"
     git tag -d "v$VERSION"
     cleanup
 fi
@@ -289,13 +313,14 @@ fi
 # Update dev branch
 echo "Updating dev branch..."
 if ! handle_merge main dev "chore: sync dev with main after release $VERSION"; then
-    echo "Failed to merge main into dev"
+    echo "Error: Failed to merge main into dev"
     echo "Please resolve conflicts manually and push changes"
     exit 1
 fi
 
 # Cleanup
-git branch -D temp-release-v$VERSION
+echo "Cleaning up..."
+git branch -D "$RELEASE_BRANCH"
 
 echo "Release v$VERSION completed successfully!"
 echo "Don't forget to:"
