@@ -14,8 +14,11 @@ interface PageProps {
 export default async function SingleAppPage({ params }: PageProps) {
   const { appName } = await params;
   const app = await fetchApp(appName);
-  const activePreviewBranches = await fetchActivePreviewBranches(app.id);
-  const deployments = await fetchAppDeployments(app.id);
+  
+  const [activePreviewBranches, deployments] = await Promise.all([
+    fetchActivePreviewBranches(app.id),
+    fetchAppDeployments(app.id),
+  ]);
 
   return (
     <SWRConfig

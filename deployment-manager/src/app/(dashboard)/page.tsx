@@ -1,7 +1,7 @@
 import AppsSection from '~/components/AppsSection';
 import AppRegistrationForm from '~/components/AppRegistrationForm';
 import { fetchApps, fetchRecentDeployments } from '~/app/(dashboard)/actions';
-import { Deployment } from '~/types';
+import { SWRConfig } from 'swr';
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
@@ -14,21 +14,27 @@ export default async function Home() {
   ]);
 
   return (
-    <main className="">
-      <h1 className="text-3xl font-bold mb-8">Dashboard</h1>
+    <SWRConfig
+      value={{
+        fallback: {
+          '/api/apps': apps,
+          '/api/apps/deployments': deployments,
+        },
+      }}
+    >
+      <main className="">
+        <h1 className="text-3xl font-bold mb-8">Dashboard</h1>
 
-      <div className="grid grid-cols-12 gap-8">
-        <div className="col-span-12">
-          <AppsSection
-            initialApps={apps}
-            initialDeployments={deployments as Deployment[]}
-          />
-        </div>
+        <div className="grid grid-cols-12 gap-8">
+          <div className="col-span-12">
+            <AppsSection />
+          </div>
 
-        <div className="col-span-12" id="new">
-          <AppRegistrationForm />
+          <div className="col-span-12" id="new">
+            <AppRegistrationForm />
+          </div>
         </div>
-      </div>
-    </main>
+      </main>
+    </SWRConfig>
   );
 }

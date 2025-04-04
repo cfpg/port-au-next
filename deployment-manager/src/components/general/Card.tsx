@@ -24,6 +24,7 @@ interface CardProps extends VariantProps<typeof card> {
   content?: React.ReactNode;
   className?: string;
   actions?: React.ReactNode;
+  isLoading?: boolean;
 }
 
 export default function Card({ 
@@ -33,6 +34,7 @@ export default function Card({
   className,
   padding,
   actions,
+  isLoading = false,
   ...props 
 }: CardProps) {
   const styles = card({ padding });
@@ -47,7 +49,13 @@ export default function Card({
       )}
       {content && (
         <div className={styles.content()}>
-          {content}
+          {isLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="w-4 h-4 animate-spin rounded-full border-t-2 border-b-2 border-gray-900" />
+            </div>
+          ) : (
+            content
+          )}
         </div>
       )}
       {actions && (
