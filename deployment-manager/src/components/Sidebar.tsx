@@ -3,7 +3,9 @@
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Link from '~/components/general/Link';
+import UserAvatar from '~/components/general/UserAvatar';
 import getSingleAppPath from '~/utils/getSingleAppPath';
+import { useSession } from '~/lib/auth-client';
 
 interface SidebarProps {
   apps: any[];
@@ -11,7 +13,7 @@ interface SidebarProps {
 
 export default function Sidebar({ apps }: SidebarProps) {
   const pathname = usePathname();
-
+  const { data } = useSession();
   const [isNavOpen, setIsNavOpen] = useState(false);
 
   useEffect(() => {
@@ -32,7 +34,7 @@ export default function Sidebar({ apps }: SidebarProps) {
   };
 
   return (
-    <nav className="p-4 h-auto">
+    <nav className="p-4 h-auto flex flex-col">
       <div className="flex justify-between items-center">
         <h1 className="text-xl font-bold text-gray-800">Port-au-Next</h1>
         <button onClick={() => setIsNavOpen(!isNavOpen)} className="md:hidden">
@@ -40,11 +42,12 @@ export default function Sidebar({ apps }: SidebarProps) {
         </button>
       </div>
       
-      <ul className={`space-y-2 h-0 md:h-auto overflow-y-auto transition-all duration-300 ease-in-out ${isNavOpen ? 'h-auto' : 'h-0'}`}>
+      <ul className={`space-y-2 h-0 md:h-auto overflow-y-auto transition-all duration-300 ease-in-out mb-8  ${isNavOpen ? 'h-auto' : 'h-0'}`}>
         <li className="mt-8">
           <Link 
             href="/" 
             variant="nav"
+            color="primary"
             className={getNavClassName('/')}
           >
             <i className="fas fa-home mr-3" />
@@ -55,17 +58,19 @@ export default function Sidebar({ apps }: SidebarProps) {
           <Link 
             href="/apps" 
             variant="nav"
-            className={getNavClassName('/apps')}
+            color="primary"
+            className={`mb-2 ${getNavClassName('/apps')}`}
           >
             <i className="fas fa-rocket mr-3" />
             Applications
           </Link>
-          <ul className="ml-6 hidden md:block">
+          <ul className="ml-6 hidden md:block space-y-2">
             {apps.map((app) => (
               <li key={app.id}>
                 <Link 
                   href={getSingleAppPath(app.name)} 
                   variant="subNav"
+                  color="gray"
                   className={getNavClassName(getSingleAppPath(app.name))}
                 >
                   {app.domain}
@@ -76,6 +81,7 @@ export default function Sidebar({ apps }: SidebarProps) {
               <Link 
                 href="/#new" 
                 variant="nav"
+                color="gray"
               >
                 <i className="fas fa-plus mr-3" />
                 Add App
@@ -87,6 +93,7 @@ export default function Sidebar({ apps }: SidebarProps) {
           <Link 
             href="/settings" 
             variant="nav"
+            color="primary"
             className={getNavClassName('/settings')}
           >
             <i className="fas fa-gear mr-3" />
@@ -94,6 +101,18 @@ export default function Sidebar({ apps }: SidebarProps) {
           </Link>
         </li>
       </ul>
+
+      {data?.user && (
+        <div className="mt-auto pt-8 border-t border-gray-200">
+          <div className="flex items-center space-x-3">
+            <UserAvatar name={data.user.name} />
+            <div>
+              <div className="text-sm font-medium text-gray-900">{data.user.name}</div>
+              <div className="text-xs text-gray-500">{data.user.email}</div>
+            </div>
+          </div>
+        </div>
+      )}
     </nav>
   );
 } 

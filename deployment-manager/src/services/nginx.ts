@@ -8,27 +8,8 @@ import getAppsDir from '~/utils/getAppsDir';
 // Use absolute path from project root
 const NGINX_CONFIG_DIR = path.join(getAppsDir(), '../nginx/conf.d');
 
-export async function updateNginxConfig(appName: string, domain: string, containerId: string | null = null) {
-  try {
-    await logger.info(`Using nginx config directory: ${NGINX_CONFIG_DIR}`);
-    
-    // Ensure nginx config directory exists
-    if (!fs.existsSync(NGINX_CONFIG_DIR)) {
-      await logger.info(`Creating nginx config directory: ${NGINX_CONFIG_DIR}`);
-      fs.mkdirSync(NGINX_CONFIG_DIR, { recursive: true });
-    }
-    
-    const configPath = path.join(NGINX_CONFIG_DIR, `app-${domain}.conf`);
-    let upstreamServer = 'deployment-manager:3000';
-
-    if (containerId) {
-      await logger.debug('Getting container IP', { containerId });
-      const containerIp = await getContainerIp(containerId);
-      upstreamServer = `${containerIp}:3000`;
-      await logger.debug('Using container IP for upstream', { containerIp });
-    }
-
-    const config = `
+// Common nginx configuration blocks
+const getCommonNginxConfig = (domain: string, upstreamServer: string) => `
 server {
     listen 80;
     listen [::]:80;
@@ -70,11 +51,82 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
     }
-}
+}`;
+
+// Preview branch markers
+const getBranchMarkers = (branch: string) => ({
+  start: `# START PREVIEW BRANCH === ${branch} ===`,
+  end: `# END PREVIEW BRANCH === ${branch} ===`
+});
+
+// Get preview branch configuration with markers
+const getPreviewBranchConfig = (branch: string, domain: string, upstreamServer: string) => {
+  const markers = getBranchMarkers(branch);
+  return `
+${markers.start}
+${getCommonNginxConfig(`${branch}.${domain}`, upstreamServer)}
+${markers.end}
 `;
+};
+
+export async function updateNginxConfig(
+  appName: string, 
+  domain: string, 
+  containerId: string | null = null,
+  previewBranch?: string
+) {
+  try {
+    await logger.info(`Using nginx config directory: ${NGINX_CONFIG_DIR}`);
+    
+    // Ensure nginx config directory exists
+    if (!fs.existsSync(NGINX_CONFIG_DIR)) {
+      await logger.info(`Creating nginx config directory: ${NGINX_CONFIG_DIR}`);
+      fs.mkdirSync(NGINX_CONFIG_DIR, { recursive: true });
+    }
+
+    let configPath: string;
+    let upstreamServer = 'deployment-manager:3000';
+
+    if (containerId) {
+      await logger.debug('Getting container IP', { containerId });
+      const containerIp = await getContainerIp(containerId);
+      upstreamServer = `${containerIp}:3000`;
+      await logger.debug('Using container IP for upstream', { containerIp });
+    }
+
+    if (previewBranch) {
+      // For preview branches, use a separate config file
+      configPath = path.join(NGINX_CONFIG_DIR, `preview-${appName}.conf`);
+
+      // Create or update the preview branch configuration
+      let existingConfig = '';
+      if (fs.existsSync(configPath)) {
+        existingConfig = fs.readFileSync(configPath, 'utf8');
+      }
+
+      // Remove existing configuration for this branch if it exists
+      const markers = getBranchMarkers(previewBranch);
+      const startIndex = existingConfig.indexOf(markers.start);
+      const endIndex = existingConfig.indexOf(markers.end);
+
+      if (startIndex !== -1 && endIndex !== -1) {
+        existingConfig = existingConfig.substring(0, startIndex) + 
+                        existingConfig.substring(endIndex + markers.end.length);
+      }
+
+      // Create new configuration for this branch
+      const branchConfig = getPreviewBranchConfig(previewBranch, domain, upstreamServer);
+
+      // Append new configuration
+      fs.writeFileSync(configPath, (existingConfig + branchConfig).trim() + '\n');
+    } else {
+      // For main branch, use the standard config file
+      configPath = path.join(NGINX_CONFIG_DIR, `app-${domain}.conf`);
+      const config = getCommonNginxConfig(domain, upstreamServer);
+      fs.writeFileSync(configPath, config);
+    }
 
     await logger.info(`Writing nginx config to: ${configPath}`);
-    fs.writeFileSync(configPath, config);
     await reloadNginx();
     await logger.info('Nginx configuration updated successfully');
   } catch (error) {
@@ -140,6 +192,40 @@ export async function deleteAppConfig(domain: string) {
     return true; // Success either way for idempotency
   } catch (error) {
     await logger.error(`Error deleting nginx config`, error as Error);
+    throw error;
+  }
+}
+
+export async function deletePreviewBranchConfig(appName: string, branch: string) {
+  try {
+    const configPath = path.join(NGINX_CONFIG_DIR, `preview-${appName}.conf`);
+    
+    if (fs.existsSync(configPath)) {
+      let config = fs.readFileSync(configPath, 'utf8');
+      
+      const markers = getBranchMarkers(branch);
+      const startIndex = config.indexOf(markers.start);
+      const endIndex = config.indexOf(markers.end);
+
+      if (startIndex !== -1 && endIndex !== -1) {
+        // Remove the branch configuration
+        config = config.substring(0, startIndex) + 
+                config.substring(endIndex + markers.end.length);
+        
+        // Write back the config file
+        fs.writeFileSync(configPath, config.trim() + '\n');
+        
+        // If the file is empty (except for whitespace), delete it
+        if (!config.trim()) {
+          fs.unlinkSync(configPath);
+        }
+        
+        await reloadNginx();
+        await logger.info(`Removed nginx config for preview branch ${branch}`);
+      }
+    }
+  } catch (error) {
+    await logger.error(`Error deleting preview branch nginx config`, error as Error);
     throw error;
   }
 }

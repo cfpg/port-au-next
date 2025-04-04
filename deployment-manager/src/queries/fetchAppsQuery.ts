@@ -42,6 +42,8 @@ export default async function fetchAppsQuery({ where: { appId, appName } = {} }:
         SELECT *
         FROM deployments d
         WHERE d.app_id = a.id
+        AND (d.is_preview = false OR d.is_preview IS NULL)
+        AND (d.branch = a.branch OR d.branch IS NULL)
         ORDER BY d.deployed_at DESC
         LIMIT 1
       ) d ON true

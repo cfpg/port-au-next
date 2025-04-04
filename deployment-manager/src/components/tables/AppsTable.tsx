@@ -1,9 +1,9 @@
 "use client";
 
-import { getStatusColor } from '~/utils/status';
+import { getServiceStatusColor } from '~/utils/serviceColors';
 import Link from '~/components/general/Link';
 import getSingleAppPath from '~/utils/getSingleAppPath';
-import { App } from '~/types';
+import { App, ServiceStatus } from '~/types';
 import AppDeployButton from '~/components/buttons/AppDeployButton';
 import Badge from '../general/Badge';
 
@@ -48,7 +48,7 @@ export default function AppsTable({
               <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                 <Link href={getSingleAppPath(app.name)} variant="nav" className='underline text-blue-500 hover:text-blue-700'>{app.name}</Link>
               </td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+              <td className="px-6 py-4 text-sm text-gray-500 break-words whitespace-pre-wrap">
                 {app.repo_url}
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -58,13 +58,13 @@ export default function AppsTable({
                 <a href={`https://${app.domain}`} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700 underline">{app.domain}</a>
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
-                <Badge className={getStatusColor(app.status)}>{app.status}</Badge>
+                <Badge color={getServiceStatusColor(app.status as ServiceStatus)} withDot>{app.status}</Badge>
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                 {app.last_deployment ? new Date(app.last_deployment.deployed_at).toLocaleString() : 'Never'}
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
-                <AppDeployButton appName={app.name} />
+                <AppDeployButton app={app} showDropdown={true} />
                 <Link
                   href={getSingleAppPath(app.name)}
                   color="yellow"

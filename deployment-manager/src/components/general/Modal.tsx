@@ -1,12 +1,14 @@
-import Link from 'next/link';
-import { tv, type VariantProps } from 'tailwind-variants';
+'use client';
+
+import { tv, VariantProps } from 'tailwind-variants';
+import Button from './Button';
 
 const modal = tv({
   slots: {
     backdrop: "fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4",
     container: "bg-white rounded-lg shadow-xl w-full flex flex-col",
     header: "flex justify-between items-center px-6 py-4 rounded-t-lg border-b border-gray-200 bg-gray-100",
-    title: "text-xl font-bold",
+    title: "text-xl font-bold text-black",
     closeButton: "text-gray-500 hover:text-gray-700 text-2xl",
     content: "p-6 overflow-y-auto flex-1"
   },
@@ -30,13 +32,16 @@ const modal = tv({
 });
 
 interface ModalProps extends VariantProps<typeof modal> {
+  isOpen: boolean;
+  onClose: () => void;
   title: string;
   children: React.ReactNode;
-  closeHref?: string;
   className?: string;
-}
+};
 
-export default function Modal({ title, children, closeHref, size, className }: ModalProps) {
+export default function Modal({ isOpen, onClose, title, children, size, className }: ModalProps) {
+  if (!isOpen) return null;
+
   const { backdrop, container, header, title: titleStyles, closeButton, content } = modal({ size, className });
 
   return (
@@ -44,14 +49,14 @@ export default function Modal({ title, children, closeHref, size, className }: M
       <div className={container()}>
         <div className={header()}>
           <h2 className={titleStyles()}>{title}</h2>
-          {closeHref && (
-            <Link
-              href={closeHref}
-              className={closeButton()}
-            >
-              &times;
-            </Link>
-          )}
+          <Button
+            onClick={onClose}
+            className={closeButton()}
+            color="transparent"
+            size="sm"
+          >
+            &times;
+          </Button>
         </div>
         <div className={content()}>
           {children}

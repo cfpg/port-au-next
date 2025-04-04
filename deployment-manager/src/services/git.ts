@@ -73,14 +73,58 @@ export async function pullLatestChanges(appName: string, branch: string = 'main'
 
     await logger.info(`Pulling latest changes for branch ${branch}`);
     
-    // Pull latest changes
+    // First fetch all changes
+    await new Promise((resolve, reject) => {
+      exec(`cd ${appDir} && git fetch origin`, (error: Error | null, stdout: string) => {
+        if (error) {
+          logger.error(`Error fetching changes`, error);
+          reject(error);
+        } else {
+          resolve(stdout);
+        }
+      });
+    });
+
+    // Check if branch exists locally
+    const branchExists = await new Promise<boolean>((resolve) => {
+      exec(`cd ${appDir} && git branch --list ${branch}`, (error: Error | null, stdout: string) => {
+        resolve(!!stdout.trim());
+      });
+    });
+
+    // Check if branch exists remotely
+    const remoteBranchExists = await new Promise<boolean>((resolve) => {
+      exec(`cd ${appDir} && git ls-remote --heads origin ${branch}`, (error: Error | null, stdout: string) => {
+        resolve(!!stdout.trim());
+      });
+    });
+
+    if (!branchExists && !remoteBranchExists) {
+      throw new Error(`Branch ${branch} does not exist locally or remotely`);
+    }
+
+    // If branch doesn't exist locally but exists remotely, create it
+    if (!branchExists && remoteBranchExists) {
+      await new Promise((resolve, reject) => {
+        exec(`cd ${appDir} && git checkout -b ${branch} origin/${branch}`, (error: Error | null, stdout: string) => {
+          if (error) {
+            logger.error(`Error creating local branch`, error);
+            reject(error);
+          } else {
+            resolve(stdout);
+          }
+        });
+      });
+    }
+    
+    // Checkout and pull the branch
     return new Promise((resolve, reject) => {
-      exec(`cd ${appDir} && git fetch && git stash && git checkout ${branch} && git pull origin ${branch}`, (error: Error | null, stdout: string) => {
+      exec(`cd ${appDir} && git stash && git checkout ${branch} && git pull origin ${branch}`, (error: Error | null, stdout: string) => {
         if (error) {
           logger.error(`Error pulling latest changes`, error);
           reject(error);
         } else {
-          logger.info(`Successfully pulled latest changes`, { stdout: stdout.trim() });
+          logger.info(`Successfully pulled latest changes for branch ${branch}`, { stdout: stdout.trim() });
           resolve(stdout);
         }
       });
@@ -91,17 +135,17 @@ export async function pullLatestChanges(appName: string, branch: string = 'main'
   }
 }
 
-export async function getLatestCommit(appName: string) {
+export async function getLatestCommit(appName: string, branch: string = 'main') {
   const appDir = path.join(APPS_DIR, appName);
 
   return new Promise<string>((resolve, reject) => {
-    exec(`cd ${appDir} && git rev-parse HEAD`, (error: Error | null, stdout: string) => {
+    exec(`cd ${appDir} && git rev-parse ${branch}`, (error: Error | null, stdout: string) => {
       if (error) {
-        logger.error(`Error getting latest commit`, error);
+        logger.error(`Error getting latest commit for branch ${branch}`, error);
         reject(error);
       } else {
         const commitId = stdout.trim();
-        logger.debug(`Got latest commit`, { commitId });
+        logger.debug(`Got latest commit for branch ${branch}`, { commitId });
         resolve(commitId);
       }
     });

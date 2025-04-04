@@ -4,10 +4,11 @@ export interface Deployment {
   app_name: string;
   app_repository: string;
   version: string;
-  commit_id: string;
+  commit_id?: string;
   status: string;
-  deployed_at: Date;
+  deployed_at: string;
   container_id?: string;
+  branch?: string;
 }
 
 export interface DeploymentLog {
@@ -30,6 +31,7 @@ export interface App {
   db_password?: string;
   cloudflare_zone_id?: string;
   env?: Record<string, string>;
+  preview_domain?: string;
   status: string;
   last_deployment?: {
     version: string;
@@ -37,6 +39,15 @@ export interface App {
     status: string;
     deployed_at: Date;
   };
+}
+
+export interface AppDeployment  {
+  id: number;
+  name: string;
+  repo_url: string;
+  branch: string;
+  status: string;
+  deployed_at: Date;
 }
 
 export interface AppSettings {
@@ -49,7 +60,7 @@ export interface AppSettings {
 
 
 export type Service = 'postgres' | 'nginx' | 'redis' | 'thumbor';
-export type ServiceStatus = 'running' | 'stopped' | 'unknown';
+export type ServiceStatus = 'running' | 'stopped' | 'unknown' | 'pending' | 'building' | 'error' | 'failed';
 
 export interface ServiceHealth {
   id: string;

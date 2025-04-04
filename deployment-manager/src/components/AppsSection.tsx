@@ -1,66 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import useSWR from 'swr';
 import AppsTable from '~/components/tables/AppsTable';
 import DeploymentHistoryTable from '~/components/tables/DeploymentHistoryTable';
-import { Deployment, App } from '~/types';
-import { fetchApps, fetchRecentDeployments } from '~/app/actions';
 import Card from '~/components/general/Card';
+import fetcher from '~/utils/fetcher';
 
-interface AppsSectionProps {
-  initialApps: App[];
-  initialDeployments: Deployment[];
-}
-
-export default function AppsSection({ initialApps, initialDeployments }: AppsSectionProps) {
-  const [apps, setApps] = useState<App[]>(initialApps);
-  const [deployments, setDeployments] = useState<Deployment[]>(initialDeployments);
-
-  useEffect(() => {
-    setApps(initialApps);
-  }, [initialApps]);
-
-  useEffect(() => {
-    setDeployments(initialDeployments);
-  }, [initialDeployments]);
-
-  useEffect(() => {
-    // Continuously poll for apps data
-    const poolApps = async () => {
-      const response = await fetchApps();
-      setApps(response);
-    };
-
-    let appsTimeoutId: NodeJS.Timeout;
-    const scheduleNextPool = () => {
-      appsTimeoutId = setTimeout(async () => {
-        await poolApps();
-        scheduleNextPool();
-      }, 10000);
-    };
-    scheduleNextPool();
-
-    // Continuously poll for deployments data
-    const poolDeployments = async () => {
-      const response = await fetchRecentDeployments();
-      setDeployments(response as Deployment[]);
-    };
-
-    let deploymentsTimeoutId: NodeJS.Timeout;
-    const scheduleNextPoolDeployments = () => {
-      deploymentsTimeoutId = setTimeout(async () => {
-        await poolDeployments();
-        scheduleNextPoolDeployments();
-      }, 10000);
-    };
-    scheduleNextPoolDeployments();
-
-    // Clean up timeouts when component unmounts
-    return () => {
-      clearTimeout(appsTimeoutId);
-      clearTimeout(deploymentsTimeoutId);
-    };
-  }, []);
+export default function AppsSection() {
+  const { data: apps } = useSWR('/api/apps', fetcher, { refreshInterval: 10000 });
+  const { data: deployments } = useSWR('/api/apps/deployments', fetcher, { refreshInterval: 10000 });
 
   return (
     <>

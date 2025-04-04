@@ -111,7 +111,23 @@ async function buildImage(appName: string, version: string): Promise<string> {
     
     await logger.info('Building Docker image', { imageTag });
     await logger.info('You can find the build log in the file', { logFile });
-    await execCommand(`docker build -t ${imageTag} ${appDir} &> ${logFile}`);
+    
+    // Build the image and capture both stdout and stderr
+    const buildOutput = await execCommand(`docker build -t ${imageTag} ${appDir} 2>&1`) as string;
+    
+    // Write the build output to the log file
+    fs.writeFileSync(logFile, buildOutput);
+    
+    // Check if the build output contains any error messages
+    if (buildOutput.includes('ERROR: failed to solve:') || buildOutput.includes('error: failed to solve:')) {
+      throw new Error(`Docker build failed: ${buildOutput}`);
+    }
+    
+    // Verify the image was built successfully
+    const imageExists = await execCommand(`docker image inspect ${imageTag}`).catch(() => null);
+    if (!imageExists) {
+      throw new Error('Docker build failed - image not found after build');
+    }
     
     await logger.info('Docker image built successfully', { imageTag });
 
