@@ -21,6 +21,7 @@ export default async function fetchActivePreviewBranchesQuery(appId: number) {
       CASE
         WHEN pb.container_id IS NULL AND ld.last_deployment_status = 'failed' THEN 'failed'
         WHEN pb.container_id IS NULL AND ld.last_deployment_status = 'pending' THEN 'deploying'
+        WHEN pb.container_id IS NULL AND ld.last_deployment_status = 'building' THEN 'building'
         WHEN pb.container_id IS NOT NULL THEN 'active'
         ELSE 'stopped'
       END as status,
