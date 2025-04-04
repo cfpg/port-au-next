@@ -35,7 +35,8 @@ interface ActivePreviewBranchesProps {
 export default function ActivePreviewBranches({ app }: ActivePreviewBranchesProps) {
   const { data: previewBranches, mutate } = useSWR<PreviewBranch[]>(
     `/api/apps/${app.id}/preview-branches`,
-    fetcher
+    fetcher,
+    { refreshInterval: 10000 }
   );
 
   if (!previewBranches?.length) {
