@@ -1,5 +1,6 @@
 import pool from '~/services/database';
 import { Deployment } from '~/types';
+
 export default async function fetchRecentDeploymentsQuery(appId?: number, {limit = 10, page = 1}: {limit?: number, page?: number} = {}): Promise<Deployment[]> {
   try {
     const query = `
@@ -10,7 +11,13 @@ export default async function fetchRecentDeploymentsQuery(appId?: number, {limit
         d.branch as branch
       FROM deployments d
       JOIN apps a ON a.id = d.app_id
-      ${appId ? 'WHERE d.app_id = $1' : ''}
+      LEFT JOIN preview_branches pb ON pb.id = d.preview_branch_id
+      WHERE (
+        d.is_preview = false 
+        OR 
+        (d.is_preview = true AND pb.deleted_at IS NULL)
+      )
+      ${appId ? 'AND d.app_id = $1' : ''}
       ORDER BY d.deployed_at DESC
       LIMIT ${appId ? '$2' : '$1'} OFFSET ${appId ? '$3' : '$2'};
     `;

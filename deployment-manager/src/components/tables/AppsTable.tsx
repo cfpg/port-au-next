@@ -48,7 +48,7 @@ export default function AppsTable({
               <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                 <Link href={getSingleAppPath(app.name)} variant="nav" className='underline text-blue-500 hover:text-blue-700'>{app.name}</Link>
               </td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+              <td className="px-6 py-4 text-sm text-gray-500 break-words whitespace-pre-wrap">
                 {app.repo_url}
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
