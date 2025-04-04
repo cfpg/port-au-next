@@ -14,6 +14,7 @@ import { deleteAppDatabase, deleteAppRecord } from '~/services/database';
 import { withAuth } from '~/lib/auth-utils';
 import updateAppSettingsQuery from '~/queries/updateAppSettingsQuery';
 import { AppSettings } from '~/types';
+import fetchActivePreviewBranchesQuery from '~/queries/fetchActivePreviewBranches';
 
 export const fetchApp = withAuth(async (appName: string) => {
   const app = await fetchSingleAppQuery(appName);
@@ -25,6 +26,10 @@ export const fetchApp = withAuth(async (appName: string) => {
 
 export const fetchAppDeployments = withAuth(async (appId: number) => {
   return fetchRecentDeploymentsQuery(appId);
+});
+
+export const fetchActivePreviewBranches = withAuth(async (appId: number) => {
+  return fetchActivePreviewBranchesQuery(appId);
 });
 
 export const updateAppSettings = withAuth(async (
