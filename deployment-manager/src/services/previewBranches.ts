@@ -195,7 +195,7 @@ export async function deployPreviewBranch(appId: number, branch: string) {
 
     // Build and start container
     const version = new Date().toISOString().replace(/[^0-9]/g, '');
-    const { containerId } = await buildAndStartContainer(app.name, version, {
+    const { containerId } = await buildAndStartContainer(app, version, {
       POSTGRES_USER: previewBranch.db_user,
       POSTGRES_PASSWORD: previewBranch.db_password,
       POSTGRES_DB: previewBranch.db_name,

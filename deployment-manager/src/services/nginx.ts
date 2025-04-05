@@ -69,7 +69,7 @@ ${markers.end}
 `;
 };
 
-export async function updateNginxConfig(
+async function updateNginxConfig(
   appName: string, 
   domain: string, 
   containerId: string | null = null,
@@ -135,7 +135,7 @@ export async function updateNginxConfig(
   }
 }
 
-export async function reloadNginx() {
+async function reloadNginx() {
   const projectRoot = path.join(process.cwd(), './');
   
   return new Promise<void>((resolve, reject) => {
@@ -155,7 +155,7 @@ export async function reloadNginx() {
   });
 }
 
-export async function deleteAppConfig(domain: string) {
+async function deleteAppConfig(domain: string) {
   try {
     // Validate domain doesn't contain path traversal attempts
     if (!domain || domain.includes('/') || domain.includes('..')) {
@@ -196,7 +196,7 @@ export async function deleteAppConfig(domain: string) {
   }
 }
 
-export async function deletePreviewBranchConfig(appName: string, branch: string) {
+async function deletePreviewBranchConfig(appName: string, branch: string) {
   try {
     const configPath = path.join(NGINX_CONFIG_DIR, `preview-${appName}.conf`);
     
@@ -229,3 +229,71 @@ export async function deletePreviewBranchConfig(appName: string, branch: string)
     throw error;
   }
 }
+
+interface LocationConfig {
+  path: string;
+  proxyPass: string;
+  allowCors?: boolean;
+}
+
+async function createServiceVhostConfig(
+  serviceName: string,
+  serverName: string,
+  locations: LocationConfig[]
+): Promise<void> {
+  try {
+    const configPath = path.join(NGINX_CONFIG_DIR, `service-${serviceName}.conf`);
+    
+    // Generate location blocks from the locations array
+    const locationBlocks = locations.map(loc => {
+      const baseConfig = `
+    # ${serviceName} ${loc.path === '/' ? 'API' : loc.path}
+    location ${loc.path} {
+        proxy_pass ${loc.proxyPass};
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_connect_timeout 300;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        chunked_transfer_encoding off;`;
+
+      // Add CORS headers if enabled
+      if (loc.allowCors) {
+        return `${baseConfig}
+        # CORS headers
+        add_header 'Access-Control-Allow-Origin' '*' always;
+        add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS' always;
+        add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization' always;
+        add_header 'Access-Control-Expose-Headers' 'Content-Length,Content-Range' always;
+    }`;
+      }
+
+      return `${baseConfig}
+    }`;
+    }).join('\n');
+
+    const config = `
+server {
+    listen 80;
+    server_name ${serverName};
+${locationBlocks}
+}`;
+
+    fs.writeFileSync(configPath, config);
+    await reloadNginx();
+    await logger.info(`Created nginx config for service ${serviceName}`);
+  } catch (error) {
+    await logger.error(`Error creating nginx config for service ${serviceName}`, error as Error);
+    throw error;
+  }
+}
+
+export {
+  updateNginxConfig,
+  reloadNginx,
+  deleteAppConfig,
+  deletePreviewBranchConfig,
+  createServiceVhostConfig,
+};

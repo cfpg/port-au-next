@@ -114,7 +114,7 @@ export async function setupAppDatabase(appName: string) {
 
 export async function getActiveDeployments() {
   const result = await pool.query(`
-    SELECT a.name, a.domain, d.container_id, d.version
+    SELECT a.name, a.domain, a.branch, d.container_id, d.version
     FROM deployments d
     JOIN apps a ON a.id = d.app_id
     WHERE d.status = 'active'

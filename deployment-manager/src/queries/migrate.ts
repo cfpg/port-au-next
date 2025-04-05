@@ -207,6 +207,23 @@ export async function migrate() {
       ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP WITH TIME ZONE
     `);
 
+    // Create app_services table for storing service credentials
+    await pool.query(`
+    CREATE TABLE IF NOT EXISTS app_services (
+        id SERIAL PRIMARY KEY,
+        app_id INTEGER NOT NULL REFERENCES apps(id) ON DELETE CASCADE,
+        service_type VARCHAR(50) NOT NULL,
+        username VARCHAR(255),
+        password VARCHAR(255),
+        secret_key VARCHAR(255),
+        public_key VARCHAR(255),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(app_id, service_type)
+    );
+    `);
+    console.log('Created app_services table');
+
     await pool.query('COMMIT');
     console.log('Database migration completed successfully');
   } catch (error) {
