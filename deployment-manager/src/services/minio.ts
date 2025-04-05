@@ -2,14 +2,24 @@ import { Client } from 'minio';
 import crypto from 'crypto';
 import pool from '~/services/database';
 import logger from '~/services/logger';
+import { App } from '~/types';
 
 const rootUser = process.env.MINIO_ROOT_USER || 'minioadmin';
 const rootPassword = process.env.MINIO_ROOT_PASSWORD || 'minioadmin';
-const host = process.env.MINIO_HOST || 'localhost:9000';
+const host = process.env.MINIO_HOST || 'localhost';
+const port = process.env.MINIO_PORT ? parseInt(process.env.MINIO_PORT) : 80;
+
+// Log the connection details for debugging
+console.log('Connecting to Minio:', {
+  host,
+  port,
+  rootUser,
+  useSSL: false
+});
 
 const client = new Client({
-  endPoint: 'minio',
-  port: 80,
+  endPoint: host,
+  port,
   useSSL: false,
   accessKey: rootUser,
   secretKey: rootPassword,
@@ -55,17 +65,29 @@ async function setBucketPolicy(bucketName: string, accessKey: string): Promise<v
   await client.setBucketPolicy(bucketName, JSON.stringify(policy));
 }
 
-export async function setupAppStorage(appId: number, appName: string): Promise<MinioCredentials> {
+async function checkBucketExists(bucketName: string): Promise<boolean> {
+  try {
+    await client.bucketExists(bucketName);
+    return true;
+  } catch (error) {
+    if ((error as Error).name === 'NoSuchBucket') {
+      return false;
+    }
+    throw error;
+  }
+}
+
+export async function setupAppStorage(app: App): Promise<MinioCredentials> {
   try {
     // Generate unique identifiers
     const accessKey = await generateRandomString(20);
     const secretKey = await generateRandomString(40);
-    const bucket = `${appName}-bucket`.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+    const bucket = `${app.name}-bucket`.toLowerCase().replace(/[^a-z0-9-]/g, '-');
 
-    // Check if service credentials already exist
+    // Check if service credentials already exist in database
     const existingService = await pool.query(
       'SELECT * FROM app_services WHERE app_id = $1 AND service_type = $2',
-      [appId, 'minio']
+      [app.id, 'minio']
     );
 
     if (existingService.rows.length > 0) {
@@ -78,7 +100,30 @@ export async function setupAppStorage(appId: number, appName: string): Promise<M
       };
     }
 
-    // Create Minio resources
+    // Check if bucket exists but we don't have credentials
+    const exists = await checkBucketExists(bucket);
+    if (exists) {
+      // Bucket exists but no credentials in DB, store new credentials
+      await pool.query(
+        `INSERT INTO app_services 
+         (app_id, service_type, public_key, secret_key) 
+         VALUES ($1, $2, $3, $4)`,
+        [app.id, 'minio', accessKey, secretKey]
+      );
+      
+      // Set policy for existing bucket
+      await setBucketPolicy(bucket, accessKey);
+      
+      await logger.info(`Reconnected to existing Minio bucket for app ${app.name}`);
+      
+      return {
+        accessKey,
+        secretKey,
+        bucket
+      };
+    }
+
+    // Create new bucket and store credentials
     await createBucket(bucket);
     await setBucketPolicy(bucket, accessKey);
 
@@ -87,10 +132,10 @@ export async function setupAppStorage(appId: number, appName: string): Promise<M
       `INSERT INTO app_services 
        (app_id, service_type, public_key, secret_key) 
        VALUES ($1, $2, $3, $4)`,
-      [appId, 'minio', accessKey, secretKey]
+      [app.id, 'minio', accessKey, secretKey]
     );
 
-    await logger.info(`Created Minio storage for app ${appName}`);
+    await logger.info(`Created Minio storage for app ${app.name}`);
 
     return {
       accessKey,
@@ -98,7 +143,7 @@ export async function setupAppStorage(appId: number, appName: string): Promise<M
       bucket
     };
   } catch (error) {
-    await logger.error(`Failed to setup Minio storage for app ${appName}:`, error as Error);
+    await logger.error(`Failed to setup Minio storage for app ${app.name}:`, error as Error);
     throw error;
   }
 }

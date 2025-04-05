@@ -59,7 +59,7 @@ export interface AppSettings {
 } 
 
 
-export type Service = 'postgres' | 'nginx' | 'redis' | 'thumbor';
+export type Service = 'nginx' | 'postgres' | 'redis' | 'thumbor' | 'minio';
 export type ServiceStatus = 'running' | 'stopped' | 'unknown' | 'pending' | 'building' | 'error' | 'failed';
 
 export interface ServiceHealth {

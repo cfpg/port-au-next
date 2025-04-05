@@ -8,6 +8,7 @@ import Button from '~/components/general/Button';
 import Input from '~/components/general/Input';
 import { showToast } from '~/components/general/Toaster';
 import { App } from '~/types';
+import SettingsInstructionsToggleable from '~/components/general/SettingsInstructionsToggleable';
 
 interface PreviewBranchesCardProps {
   app: App;
@@ -130,7 +131,7 @@ export default function PreviewBranchesCard({ app, initialPreviewDomain }: Previ
             </p>
           </div>
 
-          <div className="bg-blue-50 p-4 rounded-md">
+          <SettingsInstructionsToggleable title="DNS Configuration Required">
             <h4 className="text-sm font-medium text-blue-800 mb-2">DNS Configuration Required</h4>
             <p className="text-sm text-blue-700">
               To enable preview branches, you need to add a wildcard DNS record:
@@ -143,7 +144,7 @@ export default function PreviewBranchesCard({ app, initialPreviewDomain }: Previ
             <p className="mt-2 text-sm text-blue-700">
               This will allow preview branches to be accessed via their own subdomains.
             </p>
-          </div>
+          </SettingsInstructionsToggleable>
         </div>
       )}
     </div>

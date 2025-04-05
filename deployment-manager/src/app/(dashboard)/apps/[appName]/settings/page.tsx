@@ -2,6 +2,7 @@ import { fetchApp } from "../actions";
 import Card from "~/components/general/Card";
 import EnvVarsSettings from '~/components/env-vars/EnvVarsSettings';
 import PreviewBranchesCard from '~/components/settings/PreviewBranchesCard';
+import ObjectStorageCard from '~/components/settings/ObjectStorageCard';
 import { AppSettingsForm } from '~/components/AppSettingsForm';
 
 export default async function AppSettingsPage({ params }: { params: Promise<{ appName: string }> }) {
@@ -35,6 +36,16 @@ export default async function AppSettingsPage({ params }: { params: Promise<{ ap
         padding="content"
         content={
           <EnvVarsSettings appId={app.id} />
+        }
+      />
+
+      {/* Object Storage Section */}
+      <Card
+        className='bg-white text-black mb-8'
+        title="Object Storage"
+        padding="content"
+        content={
+          <ObjectStorageCard app={app} />
         }
       />
 

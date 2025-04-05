@@ -45,7 +45,7 @@ async function getAppEnvVars(app: App, branch: string = 'main', filterPrefix: st
 
   // Get Minio credentials for the app
   const isProduction = branch === app.branch;
-  const minioCredentials = await setupAppStorage(app.id.toString(), isProduction);
+  const minioCredentials = await setupAppStorage(app);
   const minioEnvVars = getMinioEnvVars(minioCredentials);
 
   // Convert Minio env vars to the same format as database env vars
@@ -488,7 +488,7 @@ async function getServicesHealth(): Promise<ServiceHealth[]> {
     };
   }).filter(status => 
     // Only include our core services
-    ['postgres', 'nginx', 'redis', 'thumbor'].includes(status.service)
+    ['postgres', 'nginx', 'redis', 'thumbor', 'minio'].includes(status.service)
   );
 
   return healthStatus;

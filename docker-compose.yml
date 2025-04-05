@@ -27,6 +27,7 @@ services:
       MINIO_SERVER_URL: http://${MINIO_HOST}
     command: server /data --console-address ":9001" --address ":80"
     ports:
+      - "9000:9000"
       - "9001:9001"  # Expose console port locally
     networks:
       - port_au_next_network
