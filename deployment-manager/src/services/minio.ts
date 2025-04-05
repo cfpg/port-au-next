@@ -3,19 +3,12 @@ import crypto from 'crypto';
 import pool from '~/services/database';
 import logger from '~/services/logger';
 import { App } from '~/types';
+import { generateBucketName } from '~/utils/bucket';
 
 const rootUser = process.env.MINIO_ROOT_USER || 'minioadmin';
 const rootPassword = process.env.MINIO_ROOT_PASSWORD || 'minioadmin';
 const host = process.env.MINIO_HOST || 'localhost';
 const port = process.env.MINIO_PORT ? parseInt(process.env.MINIO_PORT) : 80;
-
-// Log the connection details for debugging
-console.log('Connecting to Minio:', {
-  host,
-  port,
-  rootUser,
-  useSSL: false
-});
 
 const client = new Client({
   endPoint: host,
@@ -82,7 +75,7 @@ export async function setupAppStorage(app: App): Promise<MinioCredentials> {
     // Generate unique identifiers
     const accessKey = await generateRandomString(20);
     const secretKey = await generateRandomString(40);
-    const bucket = `${app.name}-bucket`.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+    const bucket = generateBucketName(app.name);
 
     // Check if service credentials already exist in database
     const existingService = await pool.query(
