@@ -6,6 +6,8 @@ import { generateBucketName } from '~/utils/bucket';
 import fetchAppServiceCredentialsQuery from '~/queries/fetchAppServiceCredentialsQuery';
 import insertAppServiceCredentialsQuery from '~/queries/insertAppServiceCredentialsQuery';
 import { execCommand } from '~/utils/docker';
+import * as fs from 'fs';
+import * as path from 'path';
 
 if (!process.env.MINIO_ROOT_USER || !process.env.MINIO_ROOT_PASSWORD || !process.env.MINIO_HOST) {
   throw new Error('Missing required Minio environment variables');
@@ -82,6 +84,64 @@ async function createMinioUser(accessKey: string, secretKey: string): Promise<bo
   }
 }
 
+async function createAndAttachUserPolicy(appName: string, accessKey: string, bucketName: string): Promise<boolean> {
+  try {
+    await logger.info(`Creating and attaching policy for user ${accessKey} with bucket ${bucketName}`);
+    
+    // Create a policy name based on the app name
+    const policyName = `${appName.toLowerCase().replace(/[^a-z0-9]/g, '-')}-policy`;
+    
+    // Create the policy content
+    const policyContent = {
+      Version: '2012-10-17',
+      Statement: [
+        {
+          Effect: 'Allow',
+          Action: [
+            's3:ListAllMyBuckets',
+            's3:ListBucket',
+            's3:GetObject',
+            's3:PutObject',
+            's3:DeleteObject'
+          ],
+          Resource: [
+            `arn:aws:s3:::${bucketName}`,
+            `arn:aws:s3:::${bucketName}/*`
+          ]
+        }
+      ]
+    };
+    
+    // Create the policy file locally in the minio/policies directory
+    const localPolicyDir = path.join(process.cwd(), 'minio', 'policies');
+    const localPolicyPath = path.join(localPolicyDir, `${policyName}.json`);
+    
+    // Ensure the directory exists
+    if (!fs.existsSync(localPolicyDir)) {
+      fs.mkdirSync(localPolicyDir, { recursive: true });
+    }
+    
+    // Write the policy file locally
+    fs.writeFileSync(localPolicyPath, JSON.stringify(policyContent, null, 2));
+    await logger.info(`Created policy file at ${localPolicyPath}`);
+    
+    // The file will be available in the container at /policies due to the volume mount
+    const containerPolicyPath = `/policies/${policyName}.json`;
+    
+    // Create the policy using the file
+    await execCommand(`docker compose exec minio mc admin policy create myminio ${policyName} ${containerPolicyPath}`);
+    
+    // Attach the policy to the user
+    await execCommand(`docker compose exec minio mc admin policy attach myminio ${policyName} --user ${accessKey}`);
+    
+    await logger.info(`Successfully created and attached policy ${policyName} to user ${accessKey}`);
+    return true;
+  } catch (error) {
+    await logger.error(`Failed to create and attach policy for user ${accessKey}:`, error as Error);
+    return false;
+  }
+}
+
 async function setBucketPolicy(bucketName: string, accessKey: string): Promise<boolean> {
   try {
     const policy = {
@@ -110,7 +170,7 @@ async function setBucketPolicy(bucketName: string, accessKey: string): Promise<b
             's3:GetObject',
             's3:PutObject',
             's3:DeleteObject',
-            's3:ListBucket'
+            's3:ListBucket',
           ],
           Resource: [
             `arn:aws:s3:::${bucketName}/*`,
@@ -171,6 +231,12 @@ export async function setupAppStorage(app: App): Promise<MinioCredentials> {
     if (!userCreated) {
       throw new Error(`Failed to create Minio user for app ${app.name}`);
     }
+    
+    // Create and attach a policy for the user
+    const policyAttached = await createAndAttachUserPolicy(app.name, accessKey, bucket);
+    if (!policyAttached) {
+      throw new Error(`Failed to create and attach policy for app ${app.name}`);
+    }
 
     // Set policy for the bucket using the generated access key
     const policySet = await setBucketPolicy(bucket, accessKey);
@@ -201,4 +267,4 @@ export function getMinioEnvVars(credentials: MinioCredentials): Record<string, s
     MINIO_SECRET_KEY: credentials.secretKey,
     MINIO_BUCKET: credentials.bucket
   };
-} 
+}

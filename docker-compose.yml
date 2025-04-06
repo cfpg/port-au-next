@@ -21,6 +21,7 @@ services:
     restart: always
     volumes:
       - minio_data:/data
+      - ./minio/policies:/policies
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
@@ -80,6 +81,7 @@ services:
       - ~/.ssh/id_rsa.pub:/home/node/.ssh/id_rsa.pub:ro
       - ./nginx:/app/nginx:rw
       - ./docker-compose.yml:/app/docker-compose.yml:ro
+      - ./minio/policies:/app/minio/policies
     environment:
       - NODE_ENV=production
       - PORT=3000
