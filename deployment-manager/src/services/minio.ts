@@ -87,6 +87,20 @@ async function setBucketPolicy(bucketName: string, accessKey: string): Promise<b
     const policy = {
       Version: '2012-10-17',
       Statement: [
+        // Allow public read access to all objects
+        {
+          Effect: 'Allow',
+          Principal: {
+            AWS: ['*']
+          },
+          Action: [
+            's3:GetObject'
+          ],
+          Resource: [
+            `arn:aws:s3:::${bucketName}/*`
+          ]
+        },
+        // Allow the app's user full access to their bucket
         {
           Effect: 'Allow',
           Principal: {
@@ -106,7 +120,7 @@ async function setBucketPolicy(bucketName: string, accessKey: string): Promise<b
       ]
     };
 
-    await logger.info(`Setting bucket-specific policy for ${bucketName} to allow only access key ${accessKey}...`);
+    await logger.info(`Setting bucket policy for ${bucketName} - public read access with full access for ${accessKey}...`);
     await client.setBucketPolicy(bucketName, JSON.stringify(policy));
     await logger.info(`Successfully set bucket policy for ${bucketName}`);
     return true;
