@@ -4,6 +4,7 @@ import pool from '~/services/database';
 import { withAuth } from '~/lib/auth-utils';
 import { generateBucketName } from '~/utils/bucket';
 import fetchSingleAppQuery from '~/queries/fetchSingleAppQuery';
+import logger from '~/services/logger';
 
 export const GET = withAuth(async (request: Request, { params }: { params: Promise<{ appId: string }> }) => {
   try {
@@ -76,6 +77,7 @@ export const POST = withAuth(async (request: Request, { params }: { params: { ap
     const app = appResult.rows[0];
 
     // Set up object storage for the app
+    logger.info('Setting up object storage for app', { appId });
     const credentials = await setupAppStorage(app);
 
     return NextResponse.json({
