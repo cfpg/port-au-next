@@ -26,6 +26,9 @@ deployment-manager/node_modules/
 deployment-manager/dist/
 deployment-manager/.env
 
+# Minio
+minio/policies/
+
 # Ignore apps
 apps/*
 log-build*.log

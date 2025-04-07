@@ -61,7 +61,10 @@ export async function setupMinio(): Promise<void> {
           path: '/',
           proxyPass: `http://${containerIp}:80`
         }
-      ]
+      ],
+      {
+        clientMaxBodySize: '50M'
+      }
     );
 
     await logger.info('Minio setup completed successfully');

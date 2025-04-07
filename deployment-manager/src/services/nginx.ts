@@ -236,13 +236,21 @@ interface LocationConfig {
   allowCors?: boolean;
 }
 
+interface ServiceVhostOptions {
+  clientMaxBodySize?: string;
+}
+
 async function createServiceVhostConfig(
   serviceName: string,
   serverName: string,
-  locations: LocationConfig[]
+  locations: LocationConfig[],
+  options: ServiceVhostOptions = {}
 ): Promise<void> {
   try {
     const configPath = path.join(NGINX_CONFIG_DIR, `service-${serviceName}.conf`);
+    
+    // Set default client_max_body_size if not provided
+    const clientMaxBodySize = options.clientMaxBodySize || '5M';
     
     // Generate location blocks from the locations array
     const locationBlocks = locations.map(loc => {
@@ -257,7 +265,8 @@ async function createServiceVhostConfig(
         proxy_connect_timeout 300;
         proxy_http_version 1.1;
         proxy_set_header Connection "";
-        chunked_transfer_encoding off;`;
+        chunked_transfer_encoding off;
+        client_max_body_size ${clientMaxBodySize};`;
 
       // Add CORS headers if enabled
       if (loc.allowCors) {
@@ -278,6 +287,7 @@ async function createServiceVhostConfig(
 server {
     listen 80;
     server_name ${serverName};
+    client_max_body_size ${clientMaxBodySize};
 ${locationBlocks}
 }`;
 
