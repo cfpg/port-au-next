@@ -1,3 +1,13 @@
+## [0.4.0] - 2025-04-07
+
+### Added
+
+### Fixed
+
+### Security
+
+### Changed
+
 # Changelog
 All notable changes to Port-Au-Next will be documented in this file.
 
