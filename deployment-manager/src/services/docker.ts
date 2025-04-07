@@ -12,6 +12,8 @@ import getAppsDir from '~/utils/getAppsDir';
 import { ServiceStatus } from '~/types';
 import { Service } from '~/types';
 import { ServiceHealth } from '~/types';
+import { setupAppStorage, getMinioEnvVars } from './minio';
+import { App } from '~/types';
 
 // Types
 interface EnvVar {
@@ -29,17 +31,30 @@ const APPS_DIR: string = getAppsDir();
 const networkName: string = 'port-au-next_port_au_next_network';
 
 
-async function getAppEnvVars(appName: string, branch: string = 'main', filterPrefix: string | null = null): Promise<EnvVar[]> {
+async function getAppEnvVars(app: App, branch: string = 'main', filterPrefix: string | null = null): Promise<EnvVar[]> {
   const query = `
     SELECT key, value 
     FROM app_env_vars av
     JOIN apps a ON a.id = av.app_id
-    WHERE a.name = $1 AND av.branch = $2
+    WHERE a.id = $1 AND av.branch = $2
     ${filterPrefix ? `AND key LIKE '${filterPrefix}%'` : ''}
   `;
 
-  const envResult = await pool.query(query, [appName, branch]);
-  return envResult.rows;
+  const envResult = await pool.query(query, [app.id, branch]);
+  const envVars = envResult.rows;
+
+  // Get Minio credentials for the app
+  const isProduction = branch === app.branch;
+  const minioCredentials = await setupAppStorage(app);
+  const minioEnvVars = getMinioEnvVars(minioCredentials);
+
+  // Convert Minio env vars to the same format as database env vars
+  const minioEnvVarsArray = Object.entries(minioEnvVars).map(([key, value]) => ({
+    key,
+    value
+  }));
+
+  return [...envVars, ...minioEnvVarsArray];
 }
 
 async function ensureDockerfile(appDir: string, appName: string): Promise<void> {
@@ -103,22 +118,20 @@ CMD ["node", "server.js"]
 }
 
 async function buildImage(appName: string, version: string): Promise<string> {
-  const logFile = path.join(APPS_DIR, `log-build-${appName}.log`);
+  const logFile = path.join(getAppsDir(), `log-build-${appName}-${version}.log`);
 
   try {
     const imageTag = `${appName}:${version}`;
-    const appDir = path.join(APPS_DIR, appName);
+    const appDir = path.join(getAppsDir(), appName);
     
     await logger.info('Building Docker image', { imageTag });
     await logger.info('You can find the build log in the file', { logFile });
     
-    // Build the image and capture both stdout and stderr
-    const buildOutput = await execCommand(`docker build -t ${imageTag} ${appDir} 2>&1`) as string;
-    
-    // Write the build output to the log file
-    fs.writeFileSync(logFile, buildOutput);
+    // Use shell redirection to write directly to the log file
+    await execCommand(`docker build -t ${imageTag} ${appDir} &> ${logFile}`);
     
     // Check if the build output contains any error messages
+    const buildOutput = fs.readFileSync(logFile, 'utf8');
     if (buildOutput.includes('ERROR: failed to solve:') || buildOutput.includes('error: failed to solve:')) {
       throw new Error(`Docker build failed: ${buildOutput}`);
     }
@@ -170,18 +183,18 @@ async function startContainer(
 }
 
 async function buildAndStartContainer(
-  appName: string, 
+  app: App, 
   version: string, 
   env: Record<string, string> = {}
 ): Promise<ContainerInfo> {
   try {
-    const appDir = path.join(APPS_DIR, appName);
-    await ensureDockerfile(appDir, appName);
+    const appDir = path.join(APPS_DIR, app.name);
+    await ensureDockerfile(appDir, app.name);
 
     await modifyNextConfig(appDir);
 
     await logger.debug('Fetching environment variables');
-    const envVars = await getAppEnvVars(appName, env.BRANCH || 'main');
+    const envVars = await getAppEnvVars(app, env.BRANCH || 'main');
 
     const appEnv = {
       ...env,
@@ -196,9 +209,9 @@ async function buildAndStartContainer(
     fs.writeFileSync(envFilePath, envFileContent, { encoding: 'utf-8' });
     await logger.info('Created .env file', { path: envFilePath });
 
-    const imageTag = await buildImage(appName, version);
+    const imageTag = await buildImage(app.name, version);
     const timestamp = new Date().getTime();
-    const containerName = `${appName}_${version}_${timestamp}`;
+    const containerName = `${app.name}_${version}_${timestamp}`;
 
     const envString = Object.entries(appEnv)
       .map(([key, value]) => `"-e ${key}=${value}"`)
@@ -313,7 +326,7 @@ async function recoverContainers(): Promise<void> {
             });
 
             // Get environment variables from database
-            const envVars = await getAppEnvVars(deployment.name, 'main');
+            const envVars = await getAppEnvVars(deployment, 'main');
             const envString = envVars
               .map(({ key, value }) => `"-e ${key}=${value}"`)
               .join(' ');
@@ -347,7 +360,7 @@ async function recoverContainers(): Promise<void> {
             });
             
             const { containerId } = await buildAndStartContainer(
-              deployment.name,
+              deployment,
               deployment.version
             );
 
@@ -473,10 +486,29 @@ async function getServicesHealth(): Promise<ServiceHealth[]> {
     };
   }).filter(status => 
     // Only include our core services
-    ['postgres', 'nginx', 'redis', 'thumbor'].includes(status.service)
+    ['postgres', 'nginx', 'redis', 'thumbor', 'minio'].includes(status.service)
   );
 
   return healthStatus;
+}
+
+async function getServiceContainerIp(serviceName: string): Promise<string> {
+  try {
+    const containerId = await execCommand(`docker compose ps -q ${serviceName}`) as string;
+    if (!containerId.trim()) {
+      throw new Error(`Service ${serviceName} not found`);
+    }
+
+    const ip = await execCommand(`docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' ${containerId.trim()}`) as string;
+    if (!ip.trim()) {
+      throw new Error(`Could not get IP for service ${serviceName}`);
+    }
+
+    return ip.trim();
+  } catch (error) {
+    await logger.error(`Error getting container IP for service ${serviceName}`, error as Error);
+    throw error;
+  }
 }
 
 export {
@@ -487,5 +519,6 @@ export {
   recoverContainers,
   containerExists,
   deleteAppContainers,
-  getServicesHealth
+  getServicesHealth,
+  getServiceContainerIp
 }; 

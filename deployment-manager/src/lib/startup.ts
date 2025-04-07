@@ -1,5 +1,14 @@
 import { auth } from './auth';
 import { APIError } from "better-auth/api";
+import { exec } from 'child_process';
+import { promisify } from 'util';
+import fs from 'fs';
+import path from 'path';
+import { getServiceContainerIp } from '~/services/docker';
+import { createServiceVhostConfig } from '~/services/nginx';
+import logger from '~/services/logger';
+
+const execAsync = promisify(exec);
 
 export async function ensureAdminUser() {
   const email = process.env.DEPLOYMENT_MANAGER_AUTH_EMAIL;
@@ -30,5 +39,37 @@ export async function ensureAdminUser() {
     } else {
       console.error('Unexpected error:', error);
     }
+  }
+}
+
+export async function setupMinio(): Promise<void> {
+  const minioHost = process.env.MINIO_HOST;
+  if (!minioHost) {
+    throw new Error('MINIO_HOST environment variable is not set');
+  }
+
+  try {
+    // Get Minio container IP
+    const containerIp = await getServiceContainerIp('minio');
+    
+    // Create nginx config for Minio API only
+    await createServiceVhostConfig(
+      'minio',
+      minioHost,
+      [
+        {
+          path: '/',
+          proxyPass: `http://${containerIp}:80`
+        }
+      ],
+      {
+        clientMaxBodySize: '50M'
+      }
+    );
+
+    await logger.info('Minio setup completed successfully');
+  } catch (error) {
+    await logger.error('Error setting up Minio', error as Error);
+    throw error;
   }
 } 

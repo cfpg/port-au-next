@@ -150,7 +150,7 @@ export const triggerDeployment = withAuth(async (appName: string, { pathname, br
           );
 
           await logger.info('Starting new container');
-          const { containerId } = await buildAndStartContainer(appName, version, {
+          const { containerId } = await buildAndStartContainer(app, version, {
             POSTGRES_USER: app.db_user,
             POSTGRES_PASSWORD: app.db_password,
             POSTGRES_DB: app.db_name,

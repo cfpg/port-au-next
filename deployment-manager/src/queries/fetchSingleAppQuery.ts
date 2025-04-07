@@ -1,7 +1,7 @@
 import pool from '~/services/database';
 import { App } from '~/types';
 
-export default async function fetchSingleAppQuery(appName: string): Promise<App | null> {
+export default async function fetchSingleAppQuery({ appName, appId }: { appName?: string, appId?: number }): Promise<App | null> {
   try {
     const result = await pool.query<App>(`
       SELECT 
@@ -46,7 +46,7 @@ export default async function fetchSingleAppQuery(appName: string): Promise<App 
       LEFT JOIN app_env_vars env 
         ON env.app_id = a.id 
         AND env.branch = a.branch
-      WHERE a.name = $1
+      ${appName ? `WHERE a.name = $1` : 'WHERE a.id = $1'}
       GROUP BY 
         a.id,
         a.name, 
@@ -63,7 +63,7 @@ export default async function fetchSingleAppQuery(appName: string): Promise<App 
         d.status,
         d.deployed_at,
         d.branch;
-    `, [appName]);
+    `, [appName ? appName : appId]);
 
     return result.rows[0] || null;
   } catch (error) {

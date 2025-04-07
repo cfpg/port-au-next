@@ -5,6 +5,8 @@ import { updateNginxConfig, deletePreviewBranchConfig } from './nginx';
 import { buildAndStartContainer, stopContainer } from './docker';
 import { pullLatestChanges, getLatestCommit } from './git';
 import { getPreviewBranchSubdomain, sanitizeBranchForSubdomain } from '~/utils/previewBranches';
+import { generateBucketName } from '~/utils/bucket';
+import fetchAppServiceCredentialsQuery from '~/queries/fetchAppServiceCredentialsQuery';
 
 interface PreviewBranchSetup {
   appId: number;
@@ -193,9 +195,20 @@ export async function deployPreviewBranch(appId: number, branch: string) {
       envVarsResult.rows.map(row => [row.key, row.value])
     );
 
+    // Get Minio credentials
+    const minioResult = await fetchAppServiceCredentialsQuery(appId, 'minio', true);
+
+    const minio = minioResult?.[0];
+    
+    if (minio) {
+      envVars.MINIO_ACCESS_KEY = minio.public_key;
+      envVars.MINIO_SECRET_KEY = minio.secret_key;
+      envVars.MINIO_BUCKET = generateBucketName(app.name, true);
+    }
+
     // Build and start container
     const version = new Date().toISOString().replace(/[^0-9]/g, '');
-    const { containerId } = await buildAndStartContainer(app.name, version, {
+    const { containerId } = await buildAndStartContainer(app, version, {
       POSTGRES_USER: previewBranch.db_user,
       POSTGRES_PASSWORD: previewBranch.db_password,
       POSTGRES_DB: previewBranch.db_name,

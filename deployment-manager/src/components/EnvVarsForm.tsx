@@ -1,68 +1,37 @@
 'use client';
 
-import { useState } from 'react';
 import Button from '~/components/general/Button';
 import Input from '~/components/general/Input';
 import Label from '~/components/general/Label';
-import { updateAppEnvVars } from '~/app/(dashboard)/apps/[appName]/actions';
-import { showToast } from '~/components/general/Toaster';
 import { AppEnvVar } from '~/queries/fetchAppEnvVars';
 
 interface EnvVarsFormProps {
-  appId: number;
-  branch: string;
-  initialEnvVars: AppEnvVar[];
+  envVars: AppEnvVar[];
+  isPreview: boolean;
+  unsavedChanges: boolean;
+  onAdd: () => void;
+  onRemove: (index: number) => void;
+  onChange: (index: number, field: 'key' | 'value', value: string) => void;
+  onSubmit: (e: React.FormEvent) => void;
 }
 
-export function EnvVarsForm({ appId, branch, initialEnvVars }: EnvVarsFormProps) {
-  const [envVars, setEnvVars] = useState<AppEnvVar[]>(initialEnvVars);
-  const [unsavedChanges, setUnsavedChanges] = useState(false);
-
-  const calculateUnsavedChanges = () => {
-    const unsaved = envVars.some((envVar, index) => {
-      const initialVar = initialEnvVars[index];
-      return !initialVar || envVar.key !== initialVar.key || envVar.value !== initialVar.value;
-    });
-    setUnsavedChanges(unsaved);
-  };
-
-  const handleAdd = () => {
-    setEnvVars([...envVars, { key: '', value: '', branch: null, is_preview: branch === 'preview' }]);
-    calculateUnsavedChanges();
-  };
-
-  const handleRemove = (index: number) => {
-    setEnvVars(envVars.filter((_, i) => i !== index));
-    calculateUnsavedChanges();
-  };
-
-  const handleChange = (index: number, field: 'key' | 'value', value: string) => {
-    const newEnvVars = [...envVars];
-    newEnvVars[index] = { ...newEnvVars[index], [field]: value };
-    setEnvVars(newEnvVars);
-    calculateUnsavedChanges();
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    const envVarsMap = envVars.reduce((acc, { key, value }) => {
-      if (key) acc[key] = value;
-      return acc;
-    }, {} as Record<string, string>);
-
-    const result = await updateAppEnvVars(appId, branch, envVarsMap);
-
-    if (result.success) {
-      showToast('Environment variables updated successfully', 'success');
-      setUnsavedChanges(false);
-    } else {
-      showToast(result.error || 'Failed to update environment variables', 'error');
-    }
-  };
-
+export function EnvVarsForm({ 
+  envVars, 
+  isPreview, 
+  unsavedChanges,
+  onAdd, 
+  onRemove, 
+  onChange, 
+  onSubmit 
+}: EnvVarsFormProps) {
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={onSubmit} className="space-y-4">
+      <div className="mb-4">
+        <p className="text-sm text-gray-500">
+          Managing environment variables for {isPreview ? 'preview' : 'production'} environment.
+        </p>
+      </div>
+
       {envVars.map((envVar, index) => (
         <div key={index} className="flex gap-4 items-end">
           <div className="flex-1">
@@ -70,7 +39,7 @@ export function EnvVarsForm({ appId, branch, initialEnvVars }: EnvVarsFormProps)
             <Input
               id={`key-${index}`}
               value={envVar.key}
-              onChange={(e) => handleChange(index, 'key', e.target.value)}
+              onChange={(e) => onChange(index, 'key', e.target.value)}
               placeholder="KEY"
             />
           </div>
@@ -79,14 +48,15 @@ export function EnvVarsForm({ appId, branch, initialEnvVars }: EnvVarsFormProps)
             <Input
               id={`value-${index}`}
               value={envVar.value}
-              onChange={(e) => handleChange(index, 'value', e.target.value)}
+              onChange={(e) => onChange(index, 'value', e.target.value)}
               placeholder="value"
+              showToggle
             />
           </div>
           <Button
             type="button"
             color="red"
-            onClick={() => handleRemove(index)}
+            onClick={() => onRemove(index)}
             className="mb-2"
           >
             <i className="fas fa-trash mr-2"></i>
@@ -96,11 +66,11 @@ export function EnvVarsForm({ appId, branch, initialEnvVars }: EnvVarsFormProps)
       ))}
 
       <div className="flex items-center gap-4">
-        <Button type="button" color="blue" onClick={handleAdd}>
+        <Button type="button" color="blue" onClick={onAdd}>
           <i className="fas fa-plus mr-2"></i>
           Add Variable
         </Button>
-        <Button type="submit" color="green">
+        <Button type="submit" color="green" disabled={!unsavedChanges}>
           <i className="fas fa-save mr-2"></i>
           Save Changes
         </Button>

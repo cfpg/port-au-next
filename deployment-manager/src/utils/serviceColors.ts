@@ -5,6 +5,7 @@ const serviceColors: Record<Service, string> = {
   postgres: 'bg-blue-500',    // Blue for database
   redis: 'bg-red-500',        // Red for cache
   thumbor: 'bg-purple-500',   // Purple for image processing
+  minio: 'bg-orange-500',     // Orange for object storage
 } as const;
 
 export function getServiceColor(serviceName: Service): string {

@@ -106,7 +106,7 @@ export async function pullLatestChanges(appName: string, branch: string = 'main'
     // If branch doesn't exist locally but exists remotely, create it
     if (!branchExists && remoteBranchExists) {
       await new Promise((resolve, reject) => {
-        exec(`cd ${appDir} && git checkout -b ${branch} origin/${branch}`, (error: Error | null, stdout: string) => {
+        exec(`cd ${appDir} && git stash && git checkout -b ${branch} origin/${branch}`, (error: Error | null, stdout: string) => {
           if (error) {
             logger.error(`Error creating local branch`, error);
             reject(error);

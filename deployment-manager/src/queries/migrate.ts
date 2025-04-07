@@ -207,6 +207,56 @@ export async function migrate() {
       ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP WITH TIME ZONE
     `);
 
+    // Create app_services table for storing service credentials
+    await pool.query(`
+    CREATE TABLE IF NOT EXISTS app_services (
+        id SERIAL PRIMARY KEY,
+        app_id INTEGER NOT NULL REFERENCES apps(id) ON DELETE CASCADE,
+        service_type VARCHAR(50) NOT NULL,
+        username VARCHAR(255),
+        password VARCHAR(255),
+        secret_key VARCHAR(255),
+        public_key VARCHAR(255),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(app_id, service_type)
+    );
+    `);
+    console.log('Created app_services table');
+
+    // Add is_preview column to app_services if it doesn't exist
+    await pool.query(`
+    ALTER TABLE app_services
+    ADD COLUMN IF NOT EXISTS is_preview BOOLEAN DEFAULT FALSE;
+    `);
+    console.log('Added is_preview column to app_services table');
+
+    // Update the unique constraint to include is_preview
+    await pool.query(`
+    DO $$
+    BEGIN
+      -- Drop the existing constraint if it exists
+      IF EXISTS (
+        SELECT 1 FROM pg_constraint 
+        WHERE conname = 'app_services_app_id_service_type_key'
+      ) THEN
+        ALTER TABLE app_services 
+        DROP CONSTRAINT app_services_app_id_service_type_key;
+      END IF;
+      
+      -- Add the new constraint if it doesn't exist
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint 
+        WHERE conname = 'app_services_app_id_service_type_is_preview_key'
+      ) THEN
+        ALTER TABLE app_services
+        ADD CONSTRAINT app_services_app_id_service_type_is_preview_key 
+        UNIQUE(app_id, service_type, is_preview);
+      END IF;
+    END $$;
+    `);
+    console.log('Updated unique constraint on app_services table');
+
     await pool.query('COMMIT');
     console.log('Database migration completed successfully');
   } catch (error) {

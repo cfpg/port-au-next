@@ -25,10 +25,17 @@ const input = tv({
       },
       false: {},
     },
+    disabled: {
+      true: {
+        input: 'bg-gray-50 cursor-not-allowed',
+      },
+      false: {},
+    },
   },
   defaultVariants: {
     hasToggle: false,
     hasError: false,
+    disabled: false,
   },
 });
 
@@ -44,6 +51,7 @@ export default function Input({
   label: labelText,
   showToggle = false,
   error,
+  disabled,
   ...props
 }: InputProps) {
   const [isContentHidden, setIsContentHidden] = useState(showToggle);
@@ -51,10 +59,10 @@ export default function Input({
   const hasToggle = showToggle;
   const hasError = !!error;
 
-  const styles = input({ hasToggle, hasError, className });
+  const styles = input({ hasToggle, hasError, disabled });
 
   return (
-    <div className={styles.base()}>
+    <div className={styles.base({ className })}>
       {labelText && (
         <label htmlFor={props.id} className={styles.label()}>
           {labelText}
@@ -64,6 +72,7 @@ export default function Input({
         <input
           type={inputType}
           className={styles.input()}
+          disabled={disabled}
           {...props}
           autoComplete={showToggle ? 'off' : props.autoComplete}
         />

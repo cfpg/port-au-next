@@ -17,7 +17,7 @@ import { AppSettings } from '~/types';
 import fetchActivePreviewBranchesQuery from '~/queries/fetchActivePreviewBranches';
 
 export const fetchApp = withAuth(async (appName: string) => {
-  const app = await fetchSingleAppQuery(appName);
+  const app = await fetchSingleAppQuery({appName});
   if (!app) {
     notFound();
   }
@@ -52,7 +52,7 @@ export const updateAppEnvVars = withAuth(async (appId: number, branch: string, v
 
 export const fetchZoneId = withAuth(async (appName: string) => {
   // Verify appName is valid
-  const app = await fetchSingleAppQuery(appName);
+  const app = await fetchSingleAppQuery({appName});
   if (!app || !app.domain) {
     return { success: false, error: 'Invalid app to fetch Cloudflare Zone ID.' };
   }
