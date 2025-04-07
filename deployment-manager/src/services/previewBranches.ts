@@ -6,6 +6,7 @@ import { buildAndStartContainer, stopContainer } from './docker';
 import { pullLatestChanges, getLatestCommit } from './git';
 import { getPreviewBranchSubdomain, sanitizeBranchForSubdomain } from '~/utils/previewBranches';
 import { generateBucketName } from '~/utils/bucket';
+import fetchAppServiceCredentialsQuery from '~/queries/fetchAppServiceCredentialsQuery';
 
 interface PreviewBranchSetup {
   appId: number;
@@ -195,17 +196,14 @@ export async function deployPreviewBranch(appId: number, branch: string) {
     );
 
     // Get Minio credentials
-    const minioResult = await pool.query(
-      'SELECT public_key, secret_key FROM app_services WHERE app_id = $1 AND service_type = $2',
-      [appId, 'minio']
-    );
+    const minioResult = await fetchAppServiceCredentialsQuery(appId, 'minio', true);
 
-    const minio = minioResult.rows[0];
+    const minio = minioResult?.[0];
     
     if (minio) {
       envVars.MINIO_ACCESS_KEY = minio.public_key;
       envVars.MINIO_SECRET_KEY = minio.secret_key;
-      envVars.MINIO_BUCKET = generateBucketName(app.name, branch !== app.branch ? branch : '');
+      envVars.MINIO_BUCKET = generateBucketName(app.name, true);
     }
 
     // Build and start container
