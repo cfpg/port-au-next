@@ -152,8 +152,9 @@ parse_commit_messages() {
             ;;
     esac
     
-    git log $PREV_VERSION..HEAD --pretty=format:"* %s" --reverse | \
+    git log $PREV_VERSION..HEAD --pretty=format:"%s" --reverse | \
         grep -iE "$pattern" | \
+        sed -E 's/^/* /' | \
         sed -E 's/^([^:]*): */\1: /' | \
         sed -E 's/^([^\(]*)(\([^\)]*\))?:? */\1/' || true
 }
