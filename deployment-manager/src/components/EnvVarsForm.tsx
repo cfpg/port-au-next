@@ -7,16 +7,19 @@ import Label from '~/components/general/Label';
 import { updateAppEnvVars } from '~/app/(dashboard)/apps/[appName]/actions';
 import { showToast } from '~/components/general/Toaster';
 import { AppEnvVar } from '~/queries/fetchAppEnvVars';
+import { App } from '~/types';
 
 interface EnvVarsFormProps {
-  appId: number;
-  branch: string;
+  app: App;
+  isPreview: boolean;
   initialEnvVars: AppEnvVar[];
 }
 
-export function EnvVarsForm({ appId, branch, initialEnvVars }: EnvVarsFormProps) {
+export function EnvVarsForm({ app, isPreview, initialEnvVars }: EnvVarsFormProps) {
   const [envVars, setEnvVars] = useState<AppEnvVar[]>(initialEnvVars);
   const [unsavedChanges, setUnsavedChanges] = useState(false);
+  
+  const branch = isPreview ? null : app.branch;
 
   const calculateUnsavedChanges = () => {
     const unsaved = envVars.some((envVar, index) => {
@@ -27,7 +30,12 @@ export function EnvVarsForm({ appId, branch, initialEnvVars }: EnvVarsFormProps)
   };
 
   const handleAdd = () => {
-    setEnvVars([...envVars, { key: '', value: '', branch: null, is_preview: branch === 'preview' }]);
+    setEnvVars([...envVars, { 
+      key: '', 
+      value: '', 
+      branch, 
+      is_preview: isPreview 
+    }]);
     calculateUnsavedChanges();
   };
 
@@ -38,7 +46,11 @@ export function EnvVarsForm({ appId, branch, initialEnvVars }: EnvVarsFormProps)
 
   const handleChange = (index: number, field: 'key' | 'value', value: string) => {
     const newEnvVars = [...envVars];
-    newEnvVars[index] = { ...newEnvVars[index], [field]: value };
+    newEnvVars[index] = { 
+      ...newEnvVars[index], 
+      [field]: value,
+      is_preview: isPreview // Ensure is_preview is always set correctly
+    };
     setEnvVars(newEnvVars);
     calculateUnsavedChanges();
   };
@@ -46,23 +58,42 @@ export function EnvVarsForm({ appId, branch, initialEnvVars }: EnvVarsFormProps)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const envVarsMap = envVars.reduce((acc, { key, value }) => {
+    // Filter out empty keys and ensure is_preview is set correctly
+    const validEnvVars = envVars.filter(envVar => envVar.key.trim() !== '').map(envVar => ({
+      ...envVar,
+      is_preview: isPreview
+    }));
+
+    const envVarsMap = validEnvVars.reduce((acc, { key, value }) => {
       if (key) acc[key] = value;
       return acc;
     }, {} as Record<string, string>);
 
-    const result = await updateAppEnvVars(appId, branch, envVarsMap);
+    try {
+      const result = await updateAppEnvVars(app.id, branch, envVarsMap);
 
-    if (result.success) {
-      showToast('Environment variables updated successfully', 'success');
-      setUnsavedChanges(false);
-    } else {
-      showToast(result.error || 'Failed to update environment variables', 'error');
+      if (result.success) {
+        showToast(`Environment variables updated successfully for ${isPreview ? 'preview' : 'production'} environment`, 'success');
+        setUnsavedChanges(false);
+        // Update the local state with the new env vars to ensure consistency
+        setEnvVars(validEnvVars);
+      } else {
+        showToast(result.error || 'Failed to update environment variables', 'error');
+      }
+    } catch (error) {
+      showToast('An error occurred while updating environment variables', 'error');
     }
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="mb-4">
+        <p className="text-sm text-gray-500">
+          Managing environment variables for {isPreview ? 'preview' : 'production'} environment
+          {isPreview && <span className="ml-2">(Branch: {branch})</span>}
+        </p>
+      </div>
+
       {envVars.map((envVar, index) => (
         <div key={index} className="flex gap-4 items-end">
           <div className="flex-1">
@@ -81,6 +112,8 @@ export function EnvVarsForm({ appId, branch, initialEnvVars }: EnvVarsFormProps)
               value={envVar.value}
               onChange={(e) => handleChange(index, 'value', e.target.value)}
               placeholder="value"
+              type="password"
+              showToggle
             />
           </div>
           <Button
@@ -100,7 +133,7 @@ export function EnvVarsForm({ appId, branch, initialEnvVars }: EnvVarsFormProps)
           <i className="fas fa-plus mr-2"></i>
           Add Variable
         </Button>
-        <Button type="submit" color="green">
+        <Button type="submit" color="green" disabled={!unsavedChanges}>
           <i className="fas fa-save mr-2"></i>
           Save Changes
         </Button>

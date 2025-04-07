@@ -4,12 +4,26 @@ import EnvVarsSettings from '~/components/env-vars/EnvVarsSettings';
 import PreviewBranchesCard from '~/components/settings/PreviewBranchesCard';
 import ObjectStorageCard from '~/components/settings/ObjectStorageCard';
 import { AppSettingsForm } from '~/components/AppSettingsForm';
+import { SWRConfig } from "swr";
+import fetchAppEnvVars from "~/queries/fetchAppEnvVars";
 
 export default async function AppSettingsPage({ params }: { params: Promise<{ appName: string }> }) {
   const { appName } = await params;
   const app = await fetchApp(appName);
+  const appEnvVars = await fetchAppEnvVars(app.id, false);
+  const appPreviewEnvVars = await fetchAppEnvVars(app.id, true);
+  
   return (
-    <div>
+    <SWRConfig
+      value={
+        {
+          fallback: {
+            [`/api/apps/${app.id}/env-vars?isPreview=false`]: appEnvVars,
+            [`/api/apps/${app.id}/env-vars?isPreview=true`]: appPreviewEnvVars,
+          },
+        }
+      }
+    >
       {/* App Settings Section */}
       <Card
         className='bg-white text-black mb-8'
@@ -35,7 +49,7 @@ export default async function AppSettingsPage({ params }: { params: Promise<{ ap
         title="Environment Variables"
         padding="content"
         content={
-          <EnvVarsSettings appId={app.id} />
+          <EnvVarsSettings app={app} />
         }
       />
 
@@ -61,6 +75,6 @@ export default async function AppSettingsPage({ params }: { params: Promise<{ ap
           />
         }
       />
-    </div>
+    </SWRConfig>
   )
 }

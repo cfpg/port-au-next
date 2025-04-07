@@ -3,16 +3,18 @@
 import { useState } from 'react';
 import useSWR from 'swr';
 import { EnvVarsForm } from '~/components/EnvVarsForm';
+import Select from '~/components/general/Select';
 import fetcher from '~/utils/fetcher';
+import { App } from '~/types';
 
 interface EnvVarsSettingsProps {
-  appId: number;
+  app: App;
 }
 
-export default function EnvVarsSettings({ appId }: EnvVarsSettingsProps) {
+export default function EnvVarsSettings({ app }: EnvVarsSettingsProps) {
   const [isPreview, setIsPreview] = useState(false);
   const { data: envVars, error } = useSWR(
-    `/api/apps/${appId}/env-vars?isPreview=${isPreview}`,
+    `/api/apps/${app.id}/env-vars?isPreview=${isPreview}`,
     fetcher
   );
 
@@ -23,23 +25,22 @@ export default function EnvVarsSettings({ appId }: EnvVarsSettingsProps) {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-4">
-        <label htmlFor="env-type" className="text-sm font-medium text-gray-700">
-          Environment Type:
-        </label>
-        <select
+        <Select
           id="env-type"
-          value={isPreview ? 'preview' : 'production'}
-          onChange={(e) => setIsPreview(e.target.value === 'preview')}
-          className="block w-48 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-        >
-          <option value="production">Production</option>
-          <option value="preview">Preview</option>
-        </select>
+          label="Environment Type"
+          value={isPreview ? 'Preview' : 'Production'}
+          onChange={(e) => setIsPreview(e.target.value === 'Preview')}
+          options={[
+            { value: 'Production', label: 'Production' },
+            { value: 'Preview', label: 'Preview' },
+          ]}
+          className="w-48"
+        />
       </div>
 
       <EnvVarsForm
-        appId={appId}
-        branch={isPreview ? 'preview' : 'main'}
+        app={app}
+        isPreview={isPreview}
         initialEnvVars={envVars || []}
       />
     </div>
