@@ -1,3 +1,20 @@
+## [0.4.1] - 2025-04-07
+
+### Added
+* Feature/minio object storage service 
+
+### Fixed
+* HOTFIX: Upates README;
+* HOTFIX: Updates release script to use --ff-only when merging dev into main to avoid extra merge commits
+* HOTFIX: Fixes syntax error in release script
+* HOTFIX: Fixes release script by removing duplicate merge blocks and fixing syntax
+* HOTFIX: Fixes changelog generation in release script
+
+### Security
+
+### Changed
+* chore: sync dev with main after release 0.4.0
+
 ## [0.4.0] - 2025-04-07
 
 ### Added
