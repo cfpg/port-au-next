@@ -112,15 +112,6 @@ git fetch origin dev || {
 if ! git show-ref --verify refs/remotes/origin/dev >/dev/null; then
     echo "Error: dev branch does not exist"
     exit 1
-}
-
-# Fast-forward main to dev to ensure all features are included
-echo "Fast-forwarding main to dev..."
-if ! git merge origin/dev --ff-only; then
-    echo "Error: Cannot fast-forward main to dev. This usually means main has diverged from dev."
-    echo "Please ensure main does not have commits that aren't in dev before releasing."
-    git merge --abort
-    exit 1
 fi
 
 # Fast-forward main to dev to ensure all features are included
