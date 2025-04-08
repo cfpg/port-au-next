@@ -15,6 +15,8 @@ import { withAuth } from '~/lib/auth-utils';
 import updateAppSettingsQuery from '~/queries/updateAppSettingsQuery';
 import { AppSettings } from '~/types';
 import fetchActivePreviewBranchesQuery from '~/queries/fetchActivePreviewBranches';
+import { cloneRepository } from '~/services/git';
+import { setupAppDatabase } from '~/services/database';
 
 export const fetchApp = withAuth(async (appName: string) => {
   const app = await fetchSingleAppQuery({appName});
@@ -69,11 +71,39 @@ export const fetchZoneId = withAuth(async (appName: string) => {
 export const createApp = withAuth(async ({name, repo_url, branch, domain}: {name: string, repo_url: string, branch: string, domain: string,}) => {
   // Try catch inserting a new app into the table apps and return the app id
   try {
+    // First insert the app record
     const result = await pool.query(
       `INSERT INTO apps (name, repo_url, branch, domain) VALUES ($1, $2, $3, $4) RETURNING id`,
       [name, repo_url, branch, domain]
     );
-    return result.rows[0].id;
+    const appId = result.rows[0].id;
+    
+    // Clone the repository (idempotent)
+    try {
+      await cloneRepository(name, repo_url, branch);
+      await logger.info(`Repository cloned for app ${name}`);
+    } catch (error) {
+      await logger.error(`Failed to clone repository for app ${name}`, error as Error);
+      // Continue with the process even if cloning fails
+    }
+    
+    // Set up the database (idempotent)
+    try {
+      const dbSetup = await setupAppDatabase(name);
+      
+      // Update the app record with database credentials
+      await pool.query(
+        `UPDATE apps SET db_name = $1, db_user = $2, db_password = $3 WHERE id = $4`,
+        [dbSetup.dbName, dbSetup.dbUser, dbSetup.dbPassword, appId]
+      );
+      
+      await logger.info(`Database setup completed for app ${name}`);
+    } catch (error) {
+      await logger.error(`Failed to set up database for app ${name}`, error as Error);
+      // Continue with the process even if database setup fails
+    }
+    
+    return appId;
   } catch (error) {
     await logger.error('Failed to create app', error as Error);
     return { success: false, error: 'Failed to create app' };

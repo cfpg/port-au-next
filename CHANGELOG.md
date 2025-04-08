@@ -1,3 +1,15 @@
+## [0.4.2] - 2025-04-07
+
+### Added
+* Feature/imgproxy 
+
+### Fixed
+* Fix/docker build env vars 
+
+### Security
+
+### Changed
+
 ## [0.4.1] - 2025-04-07
 
 ### Added
