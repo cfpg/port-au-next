@@ -1,3 +1,14 @@
+## [0.4.3] - 2025-04-08
+
+### Added
+
+### Fixed
+* Fix/setup db clone repo on create app 
+
+### Security
+
+### Changed
+
 ## [0.4.2] - 2025-04-07
 
 ### Added
