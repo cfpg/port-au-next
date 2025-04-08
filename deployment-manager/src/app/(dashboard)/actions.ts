@@ -45,7 +45,7 @@ export const triggerDeployment = withAuth(async (appName: string, { pathname, br
     const app = appResult.rows[0];
     const version = new Date().toISOString().replace(/[^0-9]/g, '');
     const targetBranch = branch || app.branch;
-    const isPreviewBranch = branch && branch !== app.branch;
+    const isPreviewBranch = !!(branch && branch !== app.branch);
     let previewBranch = null;
 
     // If this is a preview branch deployment, check if preview branches are enabled
@@ -156,6 +156,7 @@ export const triggerDeployment = withAuth(async (appName: string, { pathname, br
             POSTGRES_DB: app.db_name,
             POSTGRES_HOST: 'postgres',
             BRANCH: targetBranch,
+            DATABASE_URL: `postgres://${app.db_user}:${app.db_password}@postgres:5432/${app.db_name}`,
             ...envVars
           });
           await logger.info('Container started successfully', { containerId });
