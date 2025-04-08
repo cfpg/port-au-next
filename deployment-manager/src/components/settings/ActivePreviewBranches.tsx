@@ -78,7 +78,7 @@ export default function ActivePreviewBranches({ app }: ActivePreviewBranchesProp
               </TableCell>
               <TableCell className="max-w-0">
                 <a 
-                  href={`https://${previewBranch.subdomain}`} 
+                  href={previewBranch.branch === app.branch ? `https://${app.domain}` : `https://${previewBranch.subdomain}`} 
                   target="_blank" 
                   rel="noopener noreferrer" 
                   className="text-blue-500 hover:text-blue-700 underline block break-words whitespace-pre-wrap"

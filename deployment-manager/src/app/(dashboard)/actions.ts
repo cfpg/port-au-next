@@ -45,7 +45,7 @@ export const triggerDeployment = withAuth(async (appName: string, { pathname, br
     const app = appResult.rows[0];
     const version = new Date().toISOString().replace(/[^0-9]/g, '');
     const targetBranch = branch || app.branch;
-    const isPreviewBranch = branch !== app.branch;
+    const isPreviewBranch = !!(branch && branch !== app.branch);
     let previewBranch = null;
 
     // If this is a preview branch deployment, check if preview branches are enabled

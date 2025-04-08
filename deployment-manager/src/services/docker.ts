@@ -46,8 +46,8 @@ async function getAppEnvVars(app: App, branch: string = 'main', filterPrefix: st
 
   // Get Minio credentials for the app
   const isProduction = branch === app.branch;
-  const minioCredentials = await fetchAppServiceCredentialsQuery(app.id, 'minio', isProduction);
-  console.log("minioCredentials", minioCredentials);
+  const minioCredentials = await fetchAppServiceCredentialsQuery(app.id, 'minio', !isProduction);
+
   let minioEnvVars = {};
   if (minioCredentials.length) {
     minioEnvVars = getMinioEnvVars(minioCredentials[0]);
