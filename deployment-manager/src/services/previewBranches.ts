@@ -214,6 +214,7 @@ export async function deployPreviewBranch(appId: number, branch: string) {
       POSTGRES_DB: previewBranch.db_name,
       POSTGRES_HOST: 'postgres',
       BRANCH: branch,
+      DATABASE_URL: `postgres://${previewBranch.db_user}:${previewBranch.db_password}@postgres:5432/${previewBranch.db_name}`,
       ...envVars
     });
 

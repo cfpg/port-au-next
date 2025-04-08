@@ -14,6 +14,7 @@ import { Service } from '~/types';
 import { ServiceHealth } from '~/types';
 import { setupAppStorage, getMinioEnvVars } from './minio';
 import { App } from '~/types';
+import fetchAppServiceCredentialsQuery from '~/queries/fetchAppServiceCredentialsQuery';
 
 // Types
 interface EnvVar {
@@ -45,8 +46,12 @@ async function getAppEnvVars(app: App, branch: string = 'main', filterPrefix: st
 
   // Get Minio credentials for the app
   const isProduction = branch === app.branch;
-  const minioCredentials = await setupAppStorage(app);
-  const minioEnvVars = getMinioEnvVars(minioCredentials);
+  const minioCredentials = await fetchAppServiceCredentialsQuery(app.id, 'minio', isProduction);
+  console.log("minioCredentials", minioCredentials);
+  let minioEnvVars = {};
+  if (minioCredentials.length) {
+    minioEnvVars = getMinioEnvVars(minioCredentials[0]);
+  }
 
   // Convert Minio env vars to the same format as database env vars
   const minioEnvVarsArray = Object.entries(minioEnvVars).map(([key, value]) => ({
@@ -54,7 +59,12 @@ async function getAppEnvVars(app: App, branch: string = 'main', filterPrefix: st
     value
   }));
 
-  return [...envVars, ...minioEnvVarsArray];
+  return [
+    { key: 'IMGPROXY_HOST', value: process.env.IMGPROXY_HOST || '' },
+    { key: 'NEXT_PUBLIC_IMGPROXY_HOST', value: process.env.IMGPROXY_HOST || '' },
+    ...envVars,
+    ...minioEnvVarsArray
+  ];
 }
 
 async function ensureDockerfile(appDir: string, appName: string): Promise<void> {

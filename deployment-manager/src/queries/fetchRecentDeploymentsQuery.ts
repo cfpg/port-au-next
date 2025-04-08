@@ -13,7 +13,7 @@ export default async function fetchRecentDeploymentsQuery(appId?: number, {limit
       JOIN apps a ON a.id = d.app_id
       LEFT JOIN preview_branches pb ON pb.id = d.preview_branch_id
       WHERE (
-        d.is_preview = false 
+        (d.is_preview = false OR d.is_preview IS NULL)
         OR 
         (d.is_preview = true AND pb.deleted_at IS NULL)
       )
