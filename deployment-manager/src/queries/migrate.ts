@@ -222,14 +222,12 @@ export async function migrate() {
         UNIQUE(app_id, service_type)
     );
     `);
-    console.log('Created app_services table');
 
     // Add is_preview column to app_services if it doesn't exist
     await pool.query(`
     ALTER TABLE app_services
     ADD COLUMN IF NOT EXISTS is_preview BOOLEAN DEFAULT FALSE;
     `);
-    console.log('Added is_preview column to app_services table');
 
     // Update the unique constraint to include is_preview
     await pool.query(`
@@ -255,7 +253,6 @@ export async function migrate() {
       END IF;
     END $$;
     `);
-    console.log('Updated unique constraint on app_services table');
 
     await pool.query('COMMIT');
     console.log('Database migration completed successfully');

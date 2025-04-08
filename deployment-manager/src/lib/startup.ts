@@ -42,6 +42,38 @@ export async function ensureAdminUser() {
   }
 }
 
+export async function setupImgproxy(): Promise<void> {
+  const imgproxyHost = process.env.IMGPROXY_HOST;
+  if (!imgproxyHost) {
+    throw new Error('IMGPROXY_HOST environment variable is not set');
+  }
+
+  try {
+    // Get Imgproxy container IP
+    const containerIp = await getServiceContainerIp('imgproxy');
+    
+    // Create nginx config for Imgproxy
+    await createServiceVhostConfig(
+      'imgproxy',
+      imgproxyHost,
+      [
+        {
+          path: '/',
+          proxyPass: `http://${containerIp}:80`
+        }
+      ],
+      {
+        clientMaxBodySize: '50M'
+      }
+    );
+
+    await logger.info('Imgproxy setup completed successfully');
+  } catch (error) {
+    await logger.error('Error setting up Imgproxy', error as Error);
+    throw error;
+  }
+}
+
 export async function setupMinio(): Promise<void> {
   const minioHost = process.env.MINIO_HOST;
   if (!minioHost) {

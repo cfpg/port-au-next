@@ -3,6 +3,7 @@ export async function register() {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
     const { ensureAdminUser } = await import('./lib/startup');
     const { setupMinio } = await import('./lib/startup');
+    const { setupImgproxy } = await import('./lib/startup');
     const { migrate } = await import('./queries/migrate');
     
     try {
@@ -17,6 +18,10 @@ export async function register() {
       // Setup Minio configuration
       await setupMinio();
       console.log('Minio setup completed');
+
+      // Setup Imgproxy configuration
+      await setupImgproxy();
+      console.log('Imgproxy setup completed');
     } catch (error) {
       console.error('Error during startup:', error);
       process.exit(1);
