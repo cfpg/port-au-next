@@ -57,17 +57,29 @@ services:
     networks:
       - port_au_next_network
 
-  thumbor:
-    image: minimalcompact/thumbor:6.7.5
+  # Image optimization service
+  imgproxy:
+    image: darthsim/imgproxy:latest
     restart: always
     environment:
-      SECURITY_KEY: ${THUMBOR_SECURITY_KEY}
-    volumes:
-      - thumbor_data:/data
+      IMGPROXY_BIND: ":80"
+      IMGPROXY_TIMEOUT: "20"
+      IMGPROXY_READ_REQUEST_TIMEOUT: "10"
+      IMGPROXY_DOWNLOAD_TIMEOUT: "20"
+      IMGPROXY_CONCURRENCY: "100"
+      IMGPROXY_MAX_CLIENTS: "100"
+      IMGPROXY_TTL: "2592000"
+      IMGPROXY_USE_REDIS: "1"
+      IMGPROXY_REDIS_URL: "redis://redis:6379/0"
+      IMGPROXY_QUALITY: "80"
+      IMGPROXY_MAX_SRC_RESOLUTION: "50"
+      IMGPROXY_MAX_SRC_FILE_SIZE: "20971520"
+      IMGPROXY_DOWNLOAD_BUFFER_SIZE: "10485760"
+      IMGPROXY_KEEP_ALIVE_TIMEOUT: "30"
     networks:
       - port_au_next_network
 
-  # Deployment managerr
+  # Deployment manager
   deployment-manager:
     build:
       context: ./deployment-manager
@@ -89,7 +101,6 @@ services:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=${POSTGRES_DB}
-      - THUMBOR_SECURITY_KEY=${THUMBOR_SECURITY_KEY}
       - HOST_APPS_DIR=/app/apps
       - CLOUDFLARE_API_EMAIL=${CLOUDFLARE_API_EMAIL}
       - CLOUDFLARE_API_KEY=${CLOUDFLARE_API_KEY}
@@ -100,6 +111,7 @@ services:
       - MINIO_HOST=${MINIO_HOST}
       - MINIO_ROOT_USER=${MINIO_ROOT_USER}
       - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
+      - IMGPROXY_HOST=${IMGPROXY_HOST}
     ports:
       - "3000:3000"
     depends_on:
@@ -114,6 +126,5 @@ networks:
 volumes:
   postgres_data:
   redis_data:
-  thumbor_data:
   nginx_cache:
   minio_data:

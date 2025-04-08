@@ -21,7 +21,7 @@ Whether you're deploying to a VPS, cloud server, or hardware in your own environ
 - **Health Checks**: Intelligent service switching only when new deployments are verified healthy
 - **Environment Isolation**: Each app, branch, or preview deployment can have its own environment variables
 - **Customizable Build Process**: Use the default optimized Dockerfile or create your own
-- **Shared Infrastructure**: PostgreSQL, Redis, and Thumbor services available to all applications
+- **Shared Infrastructure**: PostgreSQL, Redis, and imgproxy services available to all applications
 - **Web-Based Management UI**: Monitor and control your deployments through an intuitive interface
 
 ## Architecture
@@ -32,7 +32,7 @@ Port-Au-Next uses a Docker-based microservices architecture with the following c
 2. **Deployment Manager**: Web UI and API for managing applications and deployments, with secure authentication
 3. **Authentication Layer**: Handles user authentication and session management
 4. **Preview Branch Manager**: Manages isolated preview environments for feature branches
-5. **Shared Services**: PostgreSQL, Redis, and Thumbor available to all applications
+5. **Shared Services**: PostgreSQL, Redis, and imgproxy available to all applications
 6. **Application Containers**: Isolated containers for each application version and preview branch
 
 ## Quick Start
@@ -55,22 +55,28 @@ cd port-au-next
 2. Create a `.env` file with required variables, you can copy `.env.example` as a starter:
 
 ```bash
-# Database Configuration
+# Deployment Manager
+DEPLOYMENT_MANAGER_HOST=domain.to.access.manager.com
+DEPLOYMENT_MANAGER_AUTH_EMAIL=changeto@yourdomain.com
+DEPLOYMENT_MANAGER_AUTH_PASSWORD=changeme098
+BETTER_AUTH_SECRET=changeme567
+
+# Shared Postgres DB superuser credentials
 POSTGRES_USER=portaunext
-POSTGRES_PASSWORD=your_secure_password
+POSTGRES_PASSWORD=changeme123
 POSTGRES_DB=portaunext
 
-# Services Configuration
-THUMBOR_SECURITY_KEY=your_secure_key
+# Image Optimization
+IMGPROXY_HOST=cdn.yourdomain.com
 
-# Authentication Configuration
-DEPLOYMENT_MANAGER_AUTH_EMAIL=admin@example.com
-DEPLOYMENT_MANAGER_AUTH_PASSWORD=your_secure_admin_password
-DEPLOYMENT_MANAGER_HOST=mgmt.example.com # Should be pointed to your server, used to access the deployment-manager web UI
+# Minio Configuration
+MINIO_HOST=storage.yourdomain.com
+MINIO_ROOT_USER=minioadmin
+MINIO_ROOT_PASSWORD=minioadmin
 
-# Cloudflare Integration (optional)
-CLOUDFLARE_API_KEY=your_cloudflare_api_key
-CLOUDFLARE_API_EMAIL=your_cloudflare_email
+# Optinal: Used for cache busting
+CLOUDFLARE_API_KEY=your_cloudflare_api_token
+CLOUDFLARE_API_EMAIL=your_cloudflare_api_email
 ```
 
 3. Launch the system:

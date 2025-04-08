@@ -457,7 +457,7 @@ async function deleteAppContainers(appName: string): Promise<void> {
 }
 
 async function getServicesHealth(): Promise<ServiceHealth[]> {
-  // Use docker compose ps to get status of services containers: postgres, nginx, redis, thumbor
+  // Use docker compose ps to get status of services containers: postgres, nginx, redis, imgproxy
   const containers = await execCommand(`docker compose ps --format "{{.ID}} {{.Name}} {{.Status}}"`) as string;
   
   // Split output into lines and parse each line
@@ -486,7 +486,7 @@ async function getServicesHealth(): Promise<ServiceHealth[]> {
     };
   }).filter(status => 
     // Only include our core services
-    ['postgres', 'nginx', 'redis', 'thumbor', 'minio'].includes(status.service)
+    ['postgres', 'nginx', 'redis', 'minio', 'imgproxy'].includes(status.service)
   );
 
   return healthStatus;
