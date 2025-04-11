@@ -123,7 +123,7 @@ export async function modifyNextConfig(appDir: string) {
     }
 
     // If we have new configurations to add and haven't modified the content yet
-    if (configInsertions.length > 0 && modifiedContent === configContent) {
+    if (configInsertions.length > 0) {
       modifiedContent = modifiedContent.replace(
         configStartRegex,
         `${configStartReplacement}

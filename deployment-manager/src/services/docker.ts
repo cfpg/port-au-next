@@ -61,6 +61,7 @@ async function getAppEnvVars(app: App, branch: string = 'main', filterPrefix: st
   return [
     { key: 'IMGPROXY_HOST', value: process.env.IMGPROXY_HOST || '' },
     { key: 'NEXT_PUBLIC_IMGPROXY_HOST', value: process.env.IMGPROXY_HOST || '' },
+    { key: 'NEXT_PUBLIC_SITE_URL', value: `https://${app.domain}` },
     ...envVars,
     ...minioEnvVarsArray
   ];
