@@ -13,6 +13,10 @@ export default async function SingleAppPage({ params }: PageProps) {
   const { appName } = await params;
   const app = await fetchApp(appName);
 
+  if (!app) {
+    return <div>App not found</div>;
+  }
+
   const [activePreviewBranches, deployments] = await Promise.all([
     fetchActivePreviewBranches(app.id),
     fetchAppDeployments(app.id),
@@ -29,7 +33,7 @@ export default async function SingleAppPage({ params }: PageProps) {
         }
       }
     >
-      <SingleAppDashboard app={app} />
+      <SingleAppDashboard appId={app.id} />
     </SWRConfig>
   );
 }

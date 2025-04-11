@@ -30,10 +30,10 @@ export function AppSettingsForm({ appId, initialSettings }: AppSettingsFormProps
 
     const result = await updateAppSettings(appId, settings);
 
-    if (result.success) {
+    if (result?.success) {
       showToast("App settings updated successfully.", "success");
     } else {
-      showToast(result.error || 'Failed to update app settings', "error");
+      showToast(result?.error || 'Failed to update app settings', "error");
     }
   };
 

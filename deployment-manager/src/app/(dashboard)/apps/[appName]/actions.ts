@@ -20,9 +20,6 @@ import { setupAppDatabase } from '~/services/database';
 
 export const fetchApp = withAuth(async (appName: string) => {
   const app = await fetchSingleAppQuery({appName});
-  if (!app) {
-    notFound();
-  }
   return app;
 });
 
