@@ -24,7 +24,7 @@ export default function AppDeployButton({ app, branch, showDropdown = false }: A
   const handleDeploy = async (targetBranch?: string) => {
     try {
       setIsLoading(true);
-      const result = await triggerDeployment(app.name, { pathname, branch: targetBranch });
+      const result = await triggerDeployment(app.name, { pathname, branch: targetBranch || app.branch });
       if (result?.error) throw new Error(result.error);
       showToast(`Deployment started successfully for ${app.name}`, 'success');
     } catch (error) {
@@ -37,7 +37,7 @@ export default function AppDeployButton({ app, branch, showDropdown = false }: A
       mutate(`/api/apps/${app.id}/preview-branches`);
     };
   }
-  
+
   const dropdownItems = showDropdown ? [
     {
       label: "Deploy Branch",

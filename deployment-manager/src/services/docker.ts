@@ -50,7 +50,7 @@ async function getAppEnvVars(app: App, branch: string = 'main', filterPrefix: st
 
   let minioEnvVars = {};
   if (minioCredentials.length) {
-    minioEnvVars = getMinioEnvVars(minioCredentials[0]);
+    minioEnvVars = getMinioEnvVars(minioCredentials[0], app.name);
   }
 
   // Convert Minio env vars to the same format as database env vars

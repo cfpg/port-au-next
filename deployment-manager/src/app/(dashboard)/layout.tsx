@@ -17,7 +17,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         transition-all duration-300 ease-in-out
         mb-4 md:mb-0
       ">
-        <Sidebar apps={apps} />
+        <Sidebar apps={apps || []} />
       </aside>
 
       {/* Main content */}

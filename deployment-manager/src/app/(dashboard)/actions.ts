@@ -32,7 +32,7 @@ export const fetchRecentDeployments = withAuth(async () => {
 
 export const triggerDeployment = withAuth(async (appName: string, { pathname, branch }: { pathname?: string; branch?: string } = {}) => {
   let deploymentId: number;
-
+console.log("TRIGGERING DEPLOYMENT FOR BRANCH ",branch)
   try {
     // Get app details
     const appResult = await pool.query(
@@ -150,17 +150,6 @@ export const triggerDeployment = withAuth(async (appName: string, { pathname, br
           const envVars = Object.fromEntries(
             envVarsResult.rows.map(row => [row.key, row.value])
           );
-
-          // Get Minio credentials
-          const minioResult = await fetchAppServiceCredentialsQuery(app.id, 'minio');
-
-          const minio = minioResult?.[0];
-
-          if (minio) {
-            envVars.MINIO_ACCESS_KEY = minio.public_key;
-            envVars.MINIO_SECRET_KEY = minio.secret_key;
-            envVars.MINIO_BUCKET = generateBucketName(app.name, true);
-          }
 
           await logger.info('Starting new container');
           const { containerId } = await buildAndStartContainer(app, version, {
