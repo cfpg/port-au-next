@@ -12,7 +12,7 @@ import getAppsDir from '~/utils/getAppsDir';
 import { ServiceStatus } from '~/types';
 import { Service } from '~/types';
 import { ServiceHealth } from '~/types';
-import { setupAppStorage, getMinioEnvVars } from './minio';
+import { getMinioEnvVars } from './minio';
 import { App } from '~/types';
 import fetchAppServiceCredentialsQuery from '~/queries/fetchAppServiceCredentialsQuery';
 
@@ -30,7 +30,6 @@ interface ContainerInfo {
 // Constants
 const APPS_DIR: string = getAppsDir();
 const networkName: string = 'port-au-next_port_au_next_network';
-
 
 async function getAppEnvVars(app: App, branch: string = 'main', filterPrefix: string | null = null): Promise<EnvVar[]> {
   const query = `
