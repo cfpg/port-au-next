@@ -24,8 +24,8 @@ const client = new Minio.Client({
 });
 
 interface MinioCredentials {
-  accessKey: string;
-  secretKey: string;
+  public_key: string;
+  secret_key: string;
   bucket: string;
 }
 
@@ -207,8 +207,8 @@ export async function setupAppStorage(app: App): Promise<MinioCredentials> {
       // Return existing credentials
       const service = existingService[0];
       return {
-        accessKey: service.public_key,
-        secretKey: service.secret_key,
+        public_key: service.public_key,
+        secret_key: service.secret_key,
         bucket: bucket
       };
     }
@@ -250,8 +250,8 @@ export async function setupAppStorage(app: App): Promise<MinioCredentials> {
     await logger.info(`${exists ? 'Reconnected to' : 'Created'} Minio storage for app ${app.name}`);
 
     return {
-      accessKey,
-      secretKey,
+      public_key: accessKey,
+      secret_key: secretKey,
       bucket
     };
   } catch (error) {
@@ -260,11 +260,11 @@ export async function setupAppStorage(app: App): Promise<MinioCredentials> {
   }
 }
 
-export function getMinioEnvVars(credentials: MinioCredentials): Record<string, string> {
+export function getMinioEnvVars(credentials: MinioCredentials, appName: string): Record<string, string> {
   return {
     MINIO_HOST: host,
-    MINIO_ACCESS_KEY: credentials.accessKey,
-    MINIO_SECRET_KEY: credentials.secretKey,
-    MINIO_BUCKET: credentials.bucket
+    MINIO_ACCESS_KEY: credentials.public_key,
+    MINIO_SECRET_KEY: credentials.secret_key,
+    MINIO_BUCKET: credentials.bucket || generateBucketName(appName)
   };
 }

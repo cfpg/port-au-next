@@ -11,12 +11,14 @@ import fetchAppsQuery from '~/queries/fetchAppsQuery';
 import fetchRecentDeploymentsQuery from '~/queries/fetchRecentDeploymentsQuery';
 import { revalidatePath } from 'next/cache';
 import { withAuth } from '~/lib/auth-utils';
-import { 
-  isPreviewBranchesEnabled, 
-  setupPreviewBranch, 
+import {
+  isPreviewBranchesEnabled,
+  setupPreviewBranch,
   getPreviewBranch,
-  deployPreviewBranch 
+  deployPreviewBranch
 } from '~/services/previewBranches';
+import fetchAppServiceCredentialsQuery from '~/queries/fetchAppServiceCredentialsQuery';
+import { generateBucketName } from '~/utils/bucket';
 
 export const fetchApps = withAuth(async () => {
   const apps = await fetchAppsQuery();
@@ -30,7 +32,7 @@ export const fetchRecentDeployments = withAuth(async () => {
 
 export const triggerDeployment = withAuth(async (appName: string, { pathname, branch }: { pathname?: string; branch?: string } = {}) => {
   let deploymentId: number;
-
+console.log("TRIGGERING DEPLOYMENT FOR BRANCH ",branch)
   try {
     // Get app details
     const appResult = await pool.query(
@@ -74,9 +76,9 @@ export const triggerDeployment = withAuth(async (appName: string, { pathname, br
           'UPDATE preview_branches SET deleted_at = NULL WHERE id = $1',
           [previewBranch.id]
         );
-        await logger.info('Restored soft-deleted preview branch', { 
+        await logger.info('Restored soft-deleted preview branch', {
           branch: targetBranch,
-          previewBranchId: previewBranch.id 
+          previewBranchId: previewBranch.id
         });
       }
     }
@@ -91,11 +93,11 @@ export const triggerDeployment = withAuth(async (appName: string, { pathname, br
 
     deploymentId = deploymentResult.rows[0].id;
     logger.setDeploymentContext(deploymentId);
-    await logger.info('Deployment record created', { 
-      version, 
-      branch: targetBranch, 
+    await logger.info('Deployment record created', {
+      version,
+      branch: targetBranch,
       isPreview: isPreviewBranch,
-      previewBranchId: isPreviewBranch ? previewBranch.id : null 
+      previewBranchId: isPreviewBranch ? previewBranch.id : null
     });
 
     // Revalidate path if available
@@ -117,7 +119,7 @@ export const triggerDeployment = withAuth(async (appName: string, { pathname, br
         if (isPreviewBranch) {
           // Handle preview branch deployment
           const result = await deployPreviewBranch(app.id, targetBranch);
-          
+
           // Update deployment status with container ID and commit ID from preview branch deployment
           await logger.info('Marking deployment as active');
           await pool.query(
@@ -238,7 +240,7 @@ export const triggerDeployment = withAuth(async (appName: string, { pathname, br
           'UPDATE deployments SET status = $1 WHERE id = $2',
           ['failed', deploymentId]
         );
-      } finally {       
+      } finally {
         // Clear the deployment context when done
         logger.clearDeploymentContext();
       }

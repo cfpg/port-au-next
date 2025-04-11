@@ -10,6 +10,11 @@ import fetchAppEnvVars from "~/queries/fetchAppEnvVars";
 export default async function AppSettingsPage({ params }: { params: Promise<{ appName: string }> }) {
   const { appName } = await params;
   const app = await fetchApp(appName);
+
+  if (!app) {
+    return <div>App not found</div>;
+  }
+
   const appEnvVars = await fetchAppEnvVars(app.id, false);
   const appPreviewEnvVars = await fetchAppEnvVars(app.id, true);
   

@@ -12,7 +12,7 @@ import getAppsDir from '~/utils/getAppsDir';
 import { ServiceStatus } from '~/types';
 import { Service } from '~/types';
 import { ServiceHealth } from '~/types';
-import { setupAppStorage, getMinioEnvVars } from './minio';
+import { getMinioEnvVars } from './minio';
 import { App } from '~/types';
 import fetchAppServiceCredentialsQuery from '~/queries/fetchAppServiceCredentialsQuery';
 
@@ -30,7 +30,6 @@ interface ContainerInfo {
 // Constants
 const APPS_DIR: string = getAppsDir();
 const networkName: string = 'port-au-next_port_au_next_network';
-
 
 async function getAppEnvVars(app: App, branch: string = 'main', filterPrefix: string | null = null): Promise<EnvVar[]> {
   const query = `
@@ -50,7 +49,7 @@ async function getAppEnvVars(app: App, branch: string = 'main', filterPrefix: st
 
   let minioEnvVars = {};
   if (minioCredentials.length) {
-    minioEnvVars = getMinioEnvVars(minioCredentials[0]);
+    minioEnvVars = getMinioEnvVars(minioCredentials[0], app.name);
   }
 
   // Convert Minio env vars to the same format as database env vars
@@ -62,6 +61,7 @@ async function getAppEnvVars(app: App, branch: string = 'main', filterPrefix: st
   return [
     { key: 'IMGPROXY_HOST', value: process.env.IMGPROXY_HOST || '' },
     { key: 'NEXT_PUBLIC_IMGPROXY_HOST', value: process.env.IMGPROXY_HOST || '' },
+    { key: 'NEXT_PUBLIC_SITE_URL', value: `https://${app.domain}` },
     ...envVars,
     ...minioEnvVarsArray
   ];
@@ -224,7 +224,7 @@ async function buildAndStartContainer(
     const containerName = `${app.name}_${version}_${timestamp}`;
 
     const envString = Object.entries(appEnv)
-      .map(([key, value]) => `"-e ${key}=${value}"`)
+      .map(([key, value]) => `"-e${key}=${value}"`)
       .join(' ');
 
     return await startContainer(containerName, imageTag, networkName, envString);
