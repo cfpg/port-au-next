@@ -224,7 +224,7 @@ async function buildAndStartContainer(
     const containerName = `${app.name}_${version}_${timestamp}`;
 
     const envString = Object.entries(appEnv)
-      .map(([key, value]) => `"-e ${key}=${value}"`)
+      .map(([key, value]) => `"-e${key}=${value}"`)
       .join(' ');
 
     return await startContainer(containerName, imageTag, networkName, envString);

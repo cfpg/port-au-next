@@ -7,13 +7,24 @@ import { fetchApp } from "./actions";
 import AppNavigation from "~/components/navigation/AppNavigation";
 import AppDeployButton from "~/components/buttons/AppDeployButton";
 import AppDeleteButton from "~/components/buttons/AppDeleteButton";
+import { SWRConfig } from "swr";
 
 export default async function SingleAppLayout({ params, children }: { params: Promise<{ appName: string }>, children: React.ReactNode }) {
   const { appName } = await params;
   const app = await fetchApp(appName);
 
+  if (!app) {
+    return <div>App not found</div>;
+  }
+
   return (
-    <>
+    <SWRConfig
+      value={{
+        fallback: {
+          [`/api/apps/${app.id}`]: app
+        }
+      }}
+    >
       <div className="mb-8">
         <Card
           className="bg-white text-black"
@@ -72,6 +83,6 @@ export default async function SingleAppLayout({ params, children }: { params: Pr
       <div>
         {children}
       </div>
-    </>
+    </SWRConfig>
   )
 }
