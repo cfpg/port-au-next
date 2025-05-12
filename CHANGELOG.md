@@ -4,6 +4,17 @@ All notable changes to Port-Au-Next will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.5] - 2025-05-11
+
+### Added
+
+### Fixed
+* Fix/recover containers on next startup and updates nginx config with correct internal ip for running containers
+
+### Security
+
+### Changed
+
 ## [0.4.4] - 2025-04-11
 
 ### Added
