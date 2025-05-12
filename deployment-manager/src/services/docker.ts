@@ -435,6 +435,17 @@ async function recoverContainers(): Promise<void> {
             name: deployment.name,
             status: containerStatus ? containerStatus.trim() : 'unknown'
           });
+
+          // Update nginx config with container's new internal IP address
+          await updateNginxConfig(
+            deployment.name,
+            deployment.domain,
+            deployment.container_id
+          );
+          await logger.info(`Nginx config updated with container's new internal IP address`, {
+            name: deployment.name,
+            containerId: deployment.container_id
+          });
         }
       } catch (error) {
         await logger.error(`Failed to recover container`, { 
