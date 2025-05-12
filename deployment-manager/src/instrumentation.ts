@@ -5,6 +5,7 @@ export async function register() {
     const { setupMinio } = await import('./lib/startup');
     const { setupImgproxy } = await import('./lib/startup');
     const { migrate } = await import('./queries/migrate');
+    const { recoverContainers } = await import('./services/docker');
     
     try {
       // Run database migrations
@@ -22,6 +23,10 @@ export async function register() {
       // Setup Imgproxy configuration
       await setupImgproxy();
       console.log('Imgproxy setup completed');
+
+      // Recover any containers that are not running
+      await recoverContainers();
+      console.log('Container recovery completed');
     } catch (error) {
       console.error('Error during startup:', error);
       process.exit(1);
