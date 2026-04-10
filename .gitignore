@@ -37,3 +37,5 @@ log-build*.log
 nginx/conf.d/app-*.conf
 nginx/conf.d/service-*.conf
 nginx/conf.d/preview-*.conf
+
+.claude/

@@ -15,4 +15,5 @@ export const auth = betterAuth({
   plugins: [
     nextCookies()
   ],
+  trustedOrigins: [process.env.NEXT_PUBLIC_BETTER_AUTH_TRUSTED_ORIGINS || 'http://localhost:3000'],
 });

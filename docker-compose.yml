@@ -2,7 +2,7 @@ name: port-au-next
 services:
   # Shared PostgreSQL database
   postgres:
-    image: postgres:17-alpine
+    image: postgres:17.9-alpine
     restart: always
     ports:
       - "5432:5432"
@@ -17,7 +17,7 @@ services:
 
   # Minio Object Storage
   minio:
-    image: minio/minio:latest
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
     restart: always
     volumes:
       - minio_data:/data
@@ -35,7 +35,7 @@ services:
 
   # Nginx reverse proxy
   nginx:
-    image: nginx:alpine
+    image: nginx:1.29-alpine
     restart: always
     ports:
       - "80:80"
@@ -50,7 +50,7 @@ services:
       - port_au_next_network
   
   redis:
-    image: redis:7-alpine
+    image: redis:7.4-alpine
     restart: always
     volumes:
       - redis_data:/data
@@ -59,7 +59,7 @@ services:
 
   # Image optimization service
   imgproxy:
-    image: darthsim/imgproxy:latest
+    image: darthsim/imgproxy@sha256:2431fbc04ba06d2d598af7a4565286dd7e1a48a5eeb6365878119d75d7db75c0
     restart: always
     environment:
       IMGPROXY_BIND: ":80"
