@@ -74,7 +74,8 @@ async function ensureDockerfile(appDir: string, appName: string): Promise<void> 
     await logger.info('No Dockerfile found, creating one...');
 
     const dockerfile = `
-FROM node:20-alpine3.20 AS base
+# Prisma requires Node 20.19+, 22.12+, or 24+; use 22 LTS so npm ci meets the minimum.
+FROM node:22-alpine AS base
 
 # 1. Install dependencies only when needed
 FROM base as deps
