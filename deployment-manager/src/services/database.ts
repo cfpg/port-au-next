@@ -112,9 +112,49 @@ export async function setupAppDatabase(appName: string) {
   }
 }
 
+export async function cleanupStaleBuildingDeployments() {
+  const result = await pool.query(`
+    UPDATE deployments
+    SET status = 'failed'
+    WHERE status IN ('building', 'pending')
+    RETURNING id, app_id, branch
+  `);
+  return result.rows;
+}
+
+export async function deduplicateActiveDeployments() {
+  const result = await pool.query(`
+    UPDATE deployments
+    SET status = 'inactive'
+    WHERE status = 'active'
+      AND id NOT IN (
+        SELECT DISTINCT ON (app_id, COALESCE(branch, '')) id
+        FROM deployments
+        WHERE status = 'active'
+        ORDER BY app_id, COALESCE(branch, ''), id DESC
+      )
+    RETURNING id, app_id, branch
+  `);
+  return result.rows;
+}
+
+export async function cleanupOrphanedPreviewDeployments() {
+  const result = await pool.query(`
+    UPDATE deployments d
+    SET status = 'inactive'
+    FROM preview_branches pb
+    WHERE d.preview_branch_id = pb.id
+      AND pb.deleted_at IS NOT NULL
+      AND d.status = 'active'
+    RETURNING d.id, d.app_id, d.branch
+  `);
+  return result.rows;
+}
+
 export async function getActiveDeployments() {
   const result = await pool.query(`
-    SELECT a.name, a.domain, a.branch, d.container_id, d.version
+    SELECT a.id, a.name, a.domain, a.branch, a.db_user, a.db_password, a.db_name,
+           d.container_id, d.version, d.branch AS deployment_branch
     FROM deployments d
     JOIN apps a ON a.id = d.app_id
     WHERE d.status = 'active'

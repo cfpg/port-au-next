@@ -183,19 +183,25 @@ console.log("TRIGGERING DEPLOYMENT FOR BRANCH ",branch)
             ['active', commitId, containerId, deploymentId]
           );
 
-          // If there was a previous deployment for this branch, stop its container
+          // If there was a previous deployment for this branch, stop its container.
+          // This is best-effort cleanup - a missing old container must not fail the new deployment.
           if (oldDeployment.rows.length > 0) {
             const oldContainerId = oldDeployment.rows[0].container_id;
-            await logger.info('Stopping old container', { oldContainerId });
-            await stopContainer(oldContainerId);
-
-            await pool.query(
-              `UPDATE deployments 
-               SET status = 'inactive' 
-               WHERE container_id = $1`,
-              [oldContainerId]
-            );
-            await logger.info('Old container stopped and marked as inactive');
+            try {
+              await logger.info('Stopping old container', { oldContainerId });
+              await stopContainer(oldContainerId);
+              await logger.info('Old container stopped and marked as inactive');
+            } catch (error) {
+              await logger.warning('Failed to stop old container - new deployment is still active', {
+                oldContainerId,
+                error: (error as Error).message
+              });
+            } finally {
+              await pool.query(
+                `UPDATE deployments SET status = 'inactive' WHERE container_id = $1`,
+                [oldContainerId]
+              );
+            }
           }
 
           // Handle Cloudflare cache purging for production deployments

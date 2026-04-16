@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-import { getActiveDeployments, updateDeploymentContainer } from '~/services/database';
+import { getActiveDeployments, updateDeploymentContainer, deduplicateActiveDeployments, cleanupStaleBuildingDeployments, cleanupOrphanedPreviewDeployments } from '~/services/database';
 import { updateNginxConfig } from '~/services/nginx';
 import logger from '~/services/logger';
 import pool from '~/services/database';
@@ -67,7 +67,7 @@ async function getAppEnvVars(app: App, branch: string = 'main', filterPrefix: st
   ];
 }
 
-async function ensureDockerfile(appDir: string, appName: string): Promise<void> {
+async function ensureDockerfile(appDir: string): Promise<void> {
   const dockerfilePath = path.join(appDir, 'Dockerfile');
   
   if (!fs.existsSync(dockerfilePath)) {
@@ -200,7 +200,7 @@ async function buildAndStartContainer(
 ): Promise<ContainerInfo> {
   try {
     const appDir = path.join(APPS_DIR, app.name);
-    await ensureDockerfile(appDir, app.name);
+    await ensureDockerfile(appDir);
 
     await modifyNextConfig(appDir);
 
@@ -244,13 +244,21 @@ async function stopContainer(containerId: string): Promise<void> {
       await logger.warning('Container might already be disconnected from network', { error: (e as Error).message });
     }
 
-    await logger.info('Stopping container', { containerId });
-    await execCommand(`docker stop ${containerId}`);
-    
-    await logger.info('Removing container', { containerId });
-    await execCommand(`docker rm ${containerId}`);
-    
-    await logger.info('Container stopped and removed successfully', { containerId });
+    try {
+      await logger.info('Stopping container', { containerId });
+      await execCommand(`docker stop ${containerId}`);
+
+      await logger.info('Removing container', { containerId });
+      await execCommand(`docker rm ${containerId}`);
+
+      await logger.info('Container stopped and removed successfully', { containerId });
+    } catch (e) {
+      // Container may have already been removed externally - not a fatal error
+      await logger.warning('Container could not be stopped (may not exist)', {
+        containerId,
+        error: (e as Error).message
+      });
+    }
   } catch (error) {
     await logger.error(`Error stopping container`, error as Error);
     throw error;
@@ -309,7 +317,7 @@ async function startExistingContainer(containerId: string): Promise<ContainerInf
 
 async function imageExists(imageTag: string): Promise<boolean> {
   try {
-    const result = await execCommand(`docker image inspect ${imageTag}`);
+    await execCommand(`docker image inspect ${imageTag}`);
     return true;
   } catch (error) {
     logger.debug('Image not found', { imageTag });
@@ -319,6 +327,21 @@ async function imageExists(imageTag: string): Promise<boolean> {
 
 async function recoverContainers(): Promise<void> {
   try {
+    const interrupted = await cleanupStaleBuildingDeployments();
+    if (interrupted.length > 0) {
+      await logger.info('Marked interrupted deployments as failed', { count: interrupted.length });
+    }
+
+    const stale = await deduplicateActiveDeployments();
+    if (stale.length > 0) {
+      await logger.info('Cleaned up stale active deployments', { count: stale.length });
+    }
+
+    const orphaned = await cleanupOrphanedPreviewDeployments();
+    if (orphaned.length > 0) {
+      await logger.info('Cleaned up deployments for deleted preview branches', { count: orphaned.length });
+    }
+
     const deployments = await getActiveDeployments();
     await logger.info('Recovering active containers...', { count: deployments.length });
 
@@ -329,6 +352,17 @@ async function recoverContainers(): Promise<void> {
         if (!exists) {
           const imageTag = `${deployment.name}:${deployment.version}`;
           const hasImage = await imageExists(imageTag);
+          // Use the deployment's branch; fall back to the app's default branch
+          const targetBranch = deployment.deployment_branch || deployment.branch || 'main';
+          // DB credentials to pass as env vars during recovery
+          const dbEnv: Record<string, string> = deployment.db_user ? {
+            POSTGRES_USER: deployment.db_user,
+            POSTGRES_PASSWORD: deployment.db_password,
+            POSTGRES_DB: deployment.db_name,
+            POSTGRES_HOST: 'postgres',
+            BRANCH: targetBranch,
+            DATABASE_URL: `postgres://${deployment.db_user}:${deployment.db_password}@postgres:5432/${deployment.db_name}`
+          } : { BRANCH: targetBranch };
 
           if (hasImage) {
             await logger.info(`Container gone but image exists, starting new container`, {
@@ -337,9 +371,10 @@ async function recoverContainers(): Promise<void> {
             });
 
             // Get environment variables from database
-            const envVars = await getAppEnvVars(deployment, 'main');
-            const envString = envVars
-              .map(({ key, value }) => `"-e ${key}=${value}"`)
+            const envVars = await getAppEnvVars(deployment, targetBranch);
+            const allEnv = { ...dbEnv, ...Object.fromEntries(envVars.map(r => [r.key, r.value])) };
+            const envString = Object.entries(allEnv)
+              .map(([key, value]) => `"-e${key}=${value}"`)
               .join(' ');
 
             const timestamp = new Date().getTime();
@@ -359,7 +394,7 @@ async function recoverContainers(): Promise<void> {
             );
 
             await updateDeploymentContainer(deployment.container_id, containerId);
-            
+
             await logger.info(`Successfully started new container from existing image`, {
               name: deployment.name,
               containerId
@@ -369,10 +404,11 @@ async function recoverContainers(): Promise<void> {
               name: deployment.name,
               containerId: deployment.container_id
             });
-            
+
             const { containerId } = await buildAndStartContainer(
               deployment,
-              deployment.version
+              deployment.version,
+              dbEnv
             );
 
             await updateNginxConfig(
