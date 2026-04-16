@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { withAuth } from '~/lib/auth-utils';
 import pool from '~/services/database';
+import { grantCreateDb, revokeCreateDb } from '~/services/database';
 import { AppFeature } from '~/types/appFeatures';
 
 export const GET = withAuth(async (request: Request, { params }: { params: { appId: string } }) => {
@@ -72,11 +73,27 @@ export const PATCH = withAuth(async (request: Request, { params }: { params: { a
       INSERT INTO app_features (app_id, feature, enabled, config)
       VALUES ($1, $2, $3, $4)
       ON CONFLICT (app_id, feature)
-      DO UPDATE SET 
+      DO UPDATE SET
         enabled = EXCLUDED.enabled,
         config = EXCLUDED.config,
         updated_at = CURRENT_TIMESTAMP
     `, [appId, feature, enabled, config || {}]);
+
+    // Grant or revoke CREATEDB when the uses_prisma feature is toggled
+    if (feature === AppFeature.USES_PRISMA) {
+      const appResult = await pool.query(
+        'SELECT db_user FROM apps WHERE id = $1',
+        [appId]
+      );
+      const dbUser = appResult.rows[0]?.db_user;
+      if (dbUser) {
+        if (enabled) {
+          await grantCreateDb(dbUser);
+        } else {
+          await revokeCreateDb(dbUser);
+        }
+      }
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

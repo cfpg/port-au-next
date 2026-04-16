@@ -199,6 +199,36 @@ export async function deleteAppDatabase(dbName: string, dbUser: string) {
   }
 }
 
+export async function grantCreateDb(dbUser: string): Promise<void> {
+  const tempPool = new Pool({
+    user: process.env.POSTGRES_USER,
+    password: process.env.POSTGRES_PASSWORD,
+    host: process.env.POSTGRES_HOST || 'postgres',
+    database: 'postgres',
+    port: 5432
+  });
+  try {
+    await tempPool.query(`ALTER USER ${dbUser} CREATEDB`);
+  } finally {
+    await tempPool.end();
+  }
+}
+
+export async function revokeCreateDb(dbUser: string): Promise<void> {
+  const tempPool = new Pool({
+    user: process.env.POSTGRES_USER,
+    password: process.env.POSTGRES_PASSWORD,
+    host: process.env.POSTGRES_HOST || 'postgres',
+    database: 'postgres',
+    port: 5432
+  });
+  try {
+    await tempPool.query(`ALTER USER ${dbUser} NOCREATEDB`);
+  } finally {
+    await tempPool.end();
+  }
+}
+
 export async function deleteAppRecord(appId: number) {
   // Delete all related records first
   await pool.query('DELETE FROM deployment_logs WHERE deployment_id IN (SELECT id FROM deployments WHERE app_id = $1)', [appId]);

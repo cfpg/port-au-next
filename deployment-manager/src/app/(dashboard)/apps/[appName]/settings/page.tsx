@@ -2,6 +2,7 @@ import { fetchApp } from "../actions";
 import Card from "~/components/general/Card";
 import EnvVarsSettings from '~/components/env-vars/EnvVarsSettings';
 import PreviewBranchesCard from '~/components/settings/PreviewBranchesCard';
+import PrismaCard from '~/components/settings/PrismaCard';
 import ObjectStorageCard from '~/components/settings/ObjectStorageCard';
 import { AppSettingsForm } from '~/components/AppSettingsForm';
 import { SWRConfig } from "swr";
@@ -65,6 +66,16 @@ export default async function AppSettingsPage({ params }: { params: Promise<{ ap
         padding="content"
         content={
           <ObjectStorageCard app={app} />
+        }
+      />
+
+      {/* Database Section */}
+      <Card
+        className='bg-white text-black mb-8'
+        title="Database"
+        padding="content"
+        content={
+          <PrismaCard app={app} />
         }
       />
 
