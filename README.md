@@ -129,6 +129,39 @@ Preview branches allow you to deploy and test feature branches in isolated envir
 3. Configure domain settings and environment variables
 4. Initiate the first deployment
 
+## How deployed apps use shared services
+
+Port-Au-Next **passes environment variables into your deployed app containers** on every deployment.
+
+### Environment variables (how they get into app containers)
+
+- **Source of truth**: env vars are stored in the deployment manager database per app / branch / preview.
+- **Injection mechanism**: during a deployment, Port-Au-Next writes a per-app `.env` file inside the app’s folder and also passes the same values into `docker run` as `-e KEY=value` pairs.
+- **Preview branches**: preview deployments can use a different set of env vars (e.g. pointing at dev services), separate from production.
+
+### Shared services that can be injected
+
+Some shared services are managed by Port-Au-Next and injected automatically when enabled/available:
+
+- **MinIO object storage**
+  - Injected env vars: `MINIO_HOST`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`, `MINIO_BUCKET`
+  - Per-app credentials are provisioned and stored by the deployment manager.
+
+- **Cronicle (shared cron service)**
+  - Injected env vars (when configured for the app): `CRONICLE_BASE_URL`, `CRONICLE_API_KEY`
+  - Default internal base URL: `http://cronicle:3012` (apps can reach it over the shared compose network)
+
+### Cronicle: how an app should use it
+
+1. **Create an API Key in Cronicle UI** (Cronicle API keys are created via the UI).
+2. **Store the key for a specific app** using the deployment manager API:
+   - `POST /api/apps/<appId>/cronicle` with JSON body `{ "apiKey": "<cronicle_api_key>", "id": "<optional_label>" }`
+3. On the next deployment, Port-Au-Next will inject:
+   - `CRONICLE_BASE_URL`
+   - `CRONICLE_API_KEY`
+
+From the app side, you can then call Cronicle’s REST API (e.g. `create_event`, `update_event`, etc.) using `CRONICLE_BASE_URL` + `CRONICLE_API_KEY`.
+
 ### Enabling Preview Branches
 
 1. Navigate to your application's settings

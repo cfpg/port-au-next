@@ -105,3 +105,33 @@ export async function setupMinio(): Promise<void> {
     throw error;
   }
 } 
+
+export async function setupCronicle(): Promise<void> {
+  const cronicleHost = process.env.CRONICLE_HOST;
+  if (!cronicleHost) {
+    throw new Error('CRONICLE_HOST environment variable is not set');
+  }
+
+  try {
+    const containerIp = await getServiceContainerIp('cronicle');
+
+    await createServiceVhostConfig(
+      'cronicle',
+      cronicleHost,
+      [
+        {
+          path: '/',
+          proxyPass: `http://${containerIp}:3012`
+        }
+      ],
+      {
+        clientMaxBodySize: '10M'
+      }
+    );
+
+    await logger.info('Cronicle setup completed successfully');
+  } catch (error) {
+    await logger.error('Error setting up Cronicle', error as Error);
+    throw error;
+  }
+}

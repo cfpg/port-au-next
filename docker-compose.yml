@@ -33,6 +33,21 @@ services:
     networks:
       - port_au_next_network
 
+  # Shared Cron service (Cronicle)
+  cronicle:
+    image: soulteary/cronicle:latest
+    restart: always
+    volumes:
+      - cronicle_data:/opt/cronicle/data
+    environment:
+      # Used by Cronicle to generate absolute links in UI/emails
+      CRONICLE_base_app_url: http://${CRONICLE_HOST}
+      CRONICLE_foreground: "1"
+    ports:
+      - "3012:3012"
+    networks:
+      - port_au_next_network
+
   # Nginx reverse proxy
   nginx:
     image: nginx:1.29-alpine
@@ -112,6 +127,7 @@ services:
       - MINIO_ROOT_USER=${MINIO_ROOT_USER}
       - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
       - IMGPROXY_HOST=${IMGPROXY_HOST}
+      - CRONICLE_HOST=${CRONICLE_HOST}
     ports:
       - "3000:3000"
     depends_on:
@@ -128,3 +144,4 @@ volumes:
   redis_data:
   nginx_cache:
   minio_data:
+  cronicle_data:

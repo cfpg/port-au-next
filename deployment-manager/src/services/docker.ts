@@ -58,12 +58,22 @@ async function getAppEnvVars(app: App, branch: string = 'main', filterPrefix: st
     value
   }));
 
+  // Get Cronicle credentials for the app
+  const cronicleCredentials = await fetchAppServiceCredentialsQuery(app.id, 'cronicle', !isProduction);
+  const cronicleEnvVarsArray: EnvVar[] = cronicleCredentials.length
+    ? [
+        { key: 'CRONICLE_BASE_URL', value: 'http://cronicle:3012' },
+        { key: 'CRONICLE_API_KEY', value: cronicleCredentials[0].secret_key || '' }
+      ]
+    : [];
+
   return [
     { key: 'IMGPROXY_HOST', value: process.env.IMGPROXY_HOST || '' },
     { key: 'NEXT_PUBLIC_IMGPROXY_HOST', value: process.env.IMGPROXY_HOST || '' },
     { key: 'NEXT_PUBLIC_SITE_URL', value: `https://${app.domain}` },
     ...envVars,
-    ...minioEnvVarsArray
+    ...minioEnvVarsArray,
+    ...cronicleEnvVarsArray
   ];
 }
 
