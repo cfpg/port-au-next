@@ -39,3 +39,6 @@ nginx/conf.d/service-*.conf
 nginx/conf.d/preview-*.conf
 
 .claude/
+
+# Local planning / design docs (not committed)
+.plans/
