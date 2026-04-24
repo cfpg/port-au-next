@@ -4,6 +4,7 @@ export async function register() {
     const { ensureAdminUser } = await import('./lib/startup');
     const { setupMinio } = await import('./lib/startup');
     const { setupImgproxy } = await import('./lib/startup');
+    const { setupPortSchedule } = await import('./lib/startup');
     const { migrate } = await import('./queries/migrate');
     const { recoverContainers } = await import('./services/docker');
     
@@ -23,6 +24,10 @@ export async function register() {
       // Setup Imgproxy configuration
       await setupImgproxy();
       console.log('Imgproxy setup completed');
+
+      // Optional: nginx vhost for public port-schedule hostname
+      await setupPortSchedule();
+      console.log('port-schedule vhost step finished (no vhost if PORT_SCHEDULE_HOST unset)');
 
       // Recover any containers that are not running
       await recoverContainers();

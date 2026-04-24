@@ -21,7 +21,7 @@ Whether you're deploying to a VPS, cloud server, or hardware in your own environ
 - **Health Checks**: Intelligent service switching only when new deployments are verified healthy
 - **Environment Isolation**: Each app, branch, or preview deployment can have its own environment variables
 - **Customizable Build Process**: Use the default optimized Dockerfile or create your own
-- **Shared Infrastructure**: PostgreSQL, Redis, and imgproxy services available to all applications
+- **Shared Infrastructure**: PostgreSQL, Redis, imgproxy, and **port-schedule** (HTTP cron / webhook scheduler) available to all applications
 - **Web-Based Management UI**: Monitor and control your deployments through an intuitive interface
 
 ## Architecture
@@ -32,7 +32,7 @@ Port-Au-Next uses a Docker-based microservices architecture with the following c
 2. **Deployment Manager**: Web UI and API for managing applications and deployments, with secure authentication
 3. **Authentication Layer**: Handles user authentication and session management
 4. **Preview Branch Manager**: Manages isolated preview environments for feature branches
-5. **Shared Services**: PostgreSQL, Redis, and imgproxy available to all applications
+5. **Shared Services**: PostgreSQL, Redis, imgproxy, and **port-schedule** (per-app API keys; schedules outbound HTTP to your apps’ public URLs)
 6. **Application Containers**: Isolated containers for each application version and preview branch
 
 ## Quick Start
@@ -74,7 +74,14 @@ MINIO_HOST=storage.yourdomain.com
 MINIO_ROOT_USER=minioadmin
 MINIO_ROOT_PASSWORD=minioadmin
 
-# Optinal: Used for cache busting
+# port-schedule (shared HTTP scheduler; see “HTTP scheduling” below)
+PORT_SCHEDULE_MASTER_API_KEY=generate_a_long_random_secret
+PORT_SCHEDULE_MIGRATE_ON_START=false
+PORT_SCHEDULE_HOST_PORT=8085
+# Optional: public hostname for nginx → port-schedule (see .env.example)
+# PORT_SCHEDULE_HOST=schedule.yourdomain.com
+
+# Optional: Used for cache busting
 CLOUDFLARE_API_KEY=your_cloudflare_api_token
 CLOUDFLARE_API_EMAIL=your_cloudflare_api_email
 ```
@@ -161,6 +168,144 @@ Environment variables can be configured:
 - Per preview deployment (preview-specific settings)
 
 This flexibility enables managing multiple environments (development, staging, production) within the same Port-Au-Next instance.
+
+## HTTP scheduling (port-schedule)
+
+**port-schedule** is a first-party service that stores **per-app** cron-like jobs and, on a fixed interval, performs **outbound HTTP** requests to URLs you control (your Next.js app’s **public** routes). It uses the same PostgreSQL database as Port-Au-Next (`port_schedule` schema). There is no OS `crontab` inside app containers; scheduling is entirely API-driven.
+
+### How apps get access
+
+On each **production** deployment, the deployment manager:
+
+1. Ensures a **tenant** row exists in `port_schedule.tenants` for your app (`apps.id`).
+2. Stores the **plaintext client API key** in `app_services` (`service_type = port_schedule`), same idea as MinIO credentials.
+3. Injects into the running app container:
+
+| Variable | Purpose |
+|----------|---------|
+| `PORT_SCHEDULE_URL` | Base URL of the scheduler from inside Docker (fixed: `http://port-schedule:8080`). |
+| `PORT_SCHEDULE_API_KEY` | **Secret** used as `Authorization: Bearer …` when **your app** calls the scheduler API. |
+
+**Preview branch** deployments do not receive these variables in the current version; only the main production app deployment does.
+
+**Never** expose `PORT_SCHEDULE_API_KEY` to the browser (do not prefix it with `NEXT_PUBLIC_`). Use it only in **server** code (Route Handlers, Server Actions, `instrumentation.ts`, scripts).
+
+The deployment manager uses a separate **`PORT_SCHEDULE_MASTER_API_KEY`** (shared with the port-schedule container) only to call **admin** routes such as `PUT /admin/apps/:appId/credentials`. That master key is **not** injected into app containers.
+
+### Tenant API (what your Next.js app calls)
+
+All tenant routes are under **`/v1`** and require:
+
+```http
+Authorization: Bearer <PORT_SCHEDULE_API_KEY>
+Content-Type: application/json
+```
+
+Examples:
+
+- `GET /v1/jobs` — list **active** jobs (soft-deleted jobs are omitted).
+- `POST /v1/jobs` — create a job (body includes `name`, `cron_expression`, `timezone`, `http_method`, `url`, optional `body`, `headers_json`, `webhook_secret`, `enabled`).
+- `GET /v1/jobs/:jobId/runs` — paginated run history for a job.
+
+Job names are **unique per app among non-deleted jobs**. Use a **stable `name`** (e.g. `nightly-sync`) so you can safely “ensure exists” on startup.
+
+**Cron** uses a **six-field** expression (`second minute hour day month weekday`) with **10-second** granularity on the scheduler tick. Use an **IANA** timezone string (e.g. `America/Mexico_City`) per job.
+
+**Webhook `url`** must satisfy the service’s **public URL policy** (typically `https://` to your real app hostname as seen from the internet—not `localhost`, Docker service names, or raw IPs). Use your public site URL and a dedicated path (e.g. `https://yourdomain.com/api/cron/nightly`).
+
+When a job defines **`webhook_secret`**, every outbound request from port-schedule includes:
+
+```http
+X-PortAuNext-Schedule: <webhook_secret>
+```
+
+Your route should compare this value to a secret you also store in app env (see example below). This is **independent** of the Bearer API key used to talk **to** port-schedule.
+
+### Next.js: ensure jobs once on server startup (`instrumentation.ts`)
+
+Use root **`instrumentation.ts`** (or `src/instrumentation.ts`) and export **`register()`**. Run scheduler setup only in the **Node** runtime (not Edge). Depending on your Next.js version, you may need `experimental.instrumentationHook: true` in `next.config.js`—check the docs for your release.
+
+Example pattern: list jobs, find by stable name, create if missing.
+
+```typescript
+// instrumentation.ts
+export async function register() {
+  if (process.env.NEXT_RUNTIME !== 'nodejs') return;
+
+  const base = process.env.PORT_SCHEDULE_URL;
+  const token = process.env.PORT_SCHEDULE_API_KEY;
+  if (!base || !token) return;
+
+  const auth = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+  const site = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '');
+  const webhookSecret = process.env.CRON_WEBHOOK_SECRET;
+  if (!site || !webhookSecret) {
+    console.warn('port-schedule: skip job ensure (NEXT_PUBLIC_SITE_URL or CRON_WEBHOOK_SECRET unset)');
+    return;
+  }
+
+  const jobName = 'nightly-sync';
+  const listRes = await fetch(`${base}/v1/jobs?limit=200`, { headers: auth });
+  if (!listRes.ok) {
+    console.error('port-schedule: list jobs failed', await listRes.text());
+    return;
+  }
+  const { jobs } = (await listRes.json()) as { jobs: { name: string }[] };
+  if (jobs.some((j) => j.name === jobName)) return;
+
+  const body = {
+    name: jobName,
+    cron_expression: '0 0 2 * * *',
+    timezone: 'UTC',
+    http_method: 'POST',
+    url: `${site}/api/cron/nightly`,
+    webhook_secret: webhookSecret,
+    enabled: true,
+  };
+
+  const createRes = await fetch(`${base}/v1/jobs`, { method: 'POST', headers: auth, body: JSON.stringify(body) });
+  if (!createRes.ok) {
+    console.error('port-schedule: create job failed', await createRes.text());
+  }
+}
+```
+
+Add **`CRON_WEBHOOK_SECRET`** to your app’s environment in the deployment manager (a long random string). It must match the `webhook_secret` you register on the job (here the same variable is passed in the `POST` body). In development, `register()` may run more than once (restarts/HMR); relying on a **unique job `name`** keeps the logic idempotent.
+
+### Next.js: webhook Route Handler and verifying `X-PortAuNext-Schedule`
+
+Implement a **public** POST route that port-schedule can call. Verify the header using a **timing-safe** compare so secrets are not leaked via short-circuiting.
+
+```typescript
+// app/api/cron/nightly/route.ts
+import { timingSafeEqual } from 'crypto';
+
+export async function POST(request: Request) {
+  const expected = process.env.CRON_WEBHOOK_SECRET;
+  const header = request.headers.get('x-portau-next-schedule') ?? '';
+  if (!expected || header.length !== expected.length) {
+    return new Response('Unauthorized', { status: 401 });
+  }
+  const a = Buffer.from(header, 'utf8');
+  const b = Buffer.from(expected, 'utf8');
+  if (!timingSafeEqual(a, b)) {
+    return new Response('Unauthorized', { status: 401 });
+  }
+
+  // … your scheduled work …
+  return Response.json({ ok: true });
+}
+```
+
+Use the **same** secret value in the job’s `webhook_secret` field and in `CRON_WEBHOOK_SECRET` for the app.
+
+### Public nginx hostname (optional)
+
+If you set **`PORT_SCHEDULE_HOST`** in the root `.env`, the deployment manager writes an nginx vhost so you can reach port-schedule via that hostname. App containers still use the fixed internal `PORT_SCHEDULE_URL` for API calls.
+
+### Further detail
+
+For the full contract (soft delete, undelete routes, admin API, URL policy), see the statement of work in `.plans/CUSTOM_HTTP_SCHEDULER_PLAN.md` in this repository (if present in your checkout).
 
 ## API Reference
 

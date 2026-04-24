@@ -104,4 +104,35 @@ export async function setupMinio(): Promise<void> {
     await logger.error('Error setting up Minio', error as Error);
     throw error;
   }
-} 
+}
+
+export async function setupPortSchedule(): Promise<void> {
+  const host = process.env.PORT_SCHEDULE_HOST?.trim();
+  if (!host) {
+    console.log(
+      'PORT_SCHEDULE_HOST not set; skipping nginx vhost for port-schedule (apps still use internal PORT_SCHEDULE_URL)'
+    );
+    return;
+  }
+
+  try {
+    const containerIp = await getServiceContainerIp('port-schedule');
+
+    await createServiceVhostConfig(
+      'port-schedule',
+      host,
+      [
+        {
+          path: '/',
+          proxyPass: `http://${containerIp}:8080`,
+        },
+      ],
+      { clientMaxBodySize: '5M' }
+    );
+
+    await logger.info('port-schedule nginx vhost created successfully');
+  } catch (error) {
+    await logger.error('Error setting up port-schedule nginx', error as Error);
+    throw error;
+  }
+}

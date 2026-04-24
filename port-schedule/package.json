@@ -1,0 +1,29 @@
+{
+  "name": "port-schedule",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "migrate": "node dist/migrate-cli.js",
+    "dev": "node --import tsx src/index.ts"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.2",
+    "cron-parser": "^5.4.0",
+    "fastify": "^5.2.1",
+    "pg": "^8.14.1",
+    "p-limit": "^6.2.0"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^22.14.0",
+    "@types/pg": "^8.11.12",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
