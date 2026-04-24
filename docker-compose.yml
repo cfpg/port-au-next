@@ -57,6 +57,30 @@ services:
     networks:
       - port_au_next_network
 
+  # Shared HTTP job scheduler (port-schedule)
+  port-schedule:
+    build:
+      context: ./port-schedule
+      dockerfile: Dockerfile
+    restart: always
+    environment:
+      - NODE_ENV=production
+      - PORT=8080
+      - POSTGRES_HOST=postgres
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      # Required: set PORT_SCHEDULE_MASTER_API_KEY in .env (see .env.example). Compose fails fast if unset/empty.
+      - MASTER_API_KEY=${PORT_SCHEDULE_MASTER_API_KEY:?Set PORT_SCHEDULE_MASTER_API_KEY in .env (see .env.example)}
+      # Set to "true" once to apply SQL migrations in migrations/001_init.sql (idempotent); then set back to false if you prefer.
+      - MIGRATE_ON_START=${PORT_SCHEDULE_MIGRATE_ON_START:-false}
+    ports:
+      - "${PORT_SCHEDULE_HOST_PORT:-8085}:8080"
+    depends_on:
+      - postgres
+    networks:
+      - port_au_next_network
+
   # Image optimization service
   imgproxy:
     image: darthsim/imgproxy@sha256:2431fbc04ba06d2d598af7a4565286dd7e1a48a5eeb6365878119d75d7db75c0
@@ -112,10 +136,15 @@ services:
       - MINIO_ROOT_USER=${MINIO_ROOT_USER}
       - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
       - IMGPROXY_HOST=${IMGPROXY_HOST}
+      # Same secret as port-schedule service; used to call PUT /admin/apps/:id/credentials on each production deploy.
+      - PORT_SCHEDULE_MASTER_API_KEY=${PORT_SCHEDULE_MASTER_API_KEY:-}
+      # Public hostname for optional nginx → port-schedule (leave unset to skip vhost only).
+      - PORT_SCHEDULE_HOST=${PORT_SCHEDULE_HOST:-}
     ports:
       - "3000:3000"
     depends_on:
       - postgres
+      - port-schedule
     networks:
       - port_au_next_network
 

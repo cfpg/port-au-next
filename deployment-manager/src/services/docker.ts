@@ -13,6 +13,7 @@ import { ServiceStatus } from '~/types';
 import { Service } from '~/types';
 import { ServiceHealth } from '~/types';
 import { getMinioEnvVars } from './minio';
+import { ensurePortScheduleForProductionApp } from './portSchedule';
 import { App } from '~/types';
 import fetchAppServiceCredentialsQuery from '~/queries/fetchAppServiceCredentialsQuery';
 
@@ -58,12 +59,19 @@ async function getAppEnvVars(app: App, branch: string = 'main', filterPrefix: st
     value
   }));
 
+  let portScheduleEnvVars: EnvVar[] = [];
+  if (isProduction) {
+    const scheduleVars = await ensurePortScheduleForProductionApp(app);
+    portScheduleEnvVars = Object.entries(scheduleVars).map(([key, value]) => ({ key, value }));
+  }
+
   return [
     { key: 'IMGPROXY_HOST', value: process.env.IMGPROXY_HOST || '' },
     { key: 'NEXT_PUBLIC_IMGPROXY_HOST', value: process.env.IMGPROXY_HOST || '' },
     { key: 'NEXT_PUBLIC_SITE_URL', value: `https://${app.domain}` },
     ...envVars,
-    ...minioEnvVarsArray
+    ...minioEnvVarsArray,
+    ...portScheduleEnvVars
   ];
 }
 
