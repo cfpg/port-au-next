@@ -159,6 +159,16 @@ Port-Au-Next will use a repository's Dockerfile if present. Otherwise, it create
 - Production-optimized settings
 - Non-root user execution
 
+### Uses Prisma
+
+In **Settings → Database**, enable **Uses Prisma** for apps that use Prisma ORM:
+
+- **CREATEDB** is granted on the app's production PostgreSQL user (for shadow databases during local/CLI migrations).
+- If the repo has **no** `Dockerfile`, Port-Au-Next writes a platform-managed Dockerfile tagged with `# generated-by-port-au-next v1` and optional `-uses_prisma`. The Prisma template uses Node 24, runs `npx prisma generate` before `next build` (no database connection during build), and copies schema plus generated client output into the runtime image.
+- Toggling Uses Prisma updates the generated Dockerfile on the **next deployment** (marker version/flags must match the feature). Do not commit the `# generated-by-port-au-next` line unless you accept the platform overwriting that file on deploy.
+- **Custom Dockerfile:** If your repo includes its own `Dockerfile`, the platform never modifies it; configure Prisma yourself.
+- **`.dockerignore`:** Do not exclude `prisma/`, `prisma.config.ts`, or your Prisma client output paths (`generated/`, `src/generated/`, etc.).
+
 ### Environment Variables
 
 Environment variables can be configured:

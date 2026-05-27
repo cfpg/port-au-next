@@ -16,6 +16,13 @@ import { getMinioEnvVars } from './minio';
 import { ensurePortScheduleForProductionApp } from './portSchedule';
 import { App } from '~/types';
 import fetchAppServiceCredentialsQuery from '~/queries/fetchAppServiceCredentialsQuery';
+import { isUsesPrismaEnabled } from '~/services/appFeatures';
+import { buildGeneratedDockerfileContent } from '~/services/generatedDockerfileTemplates';
+import {
+  buildDesiredGeneratedDockerfileMarker,
+  parseGeneratedDockerfileMarker,
+  shouldRegenerateGeneratedDockerfile,
+} from '~/utils/generatedDockerfileMarker';
 
 // Types
 interface EnvVar {
@@ -75,65 +82,42 @@ async function getAppEnvVars(app: App, branch: string = 'main', filterPrefix: st
   ];
 }
 
-async function ensureDockerfile(appDir: string): Promise<void> {
+async function ensureDockerfile(appDir: string, appId: number): Promise<void> {
   const dockerfilePath = path.join(appDir, 'Dockerfile');
-  
+  const usesPrisma = await isUsesPrismaEnabled(appId);
+  const markerLine = buildDesiredGeneratedDockerfileMarker(usesPrisma);
+  const dockerfileContent = buildGeneratedDockerfileContent(usesPrisma, markerLine);
+
   if (!fs.existsSync(dockerfilePath)) {
-    await logger.info('No Dockerfile found, creating one...');
-
-    const dockerfile = `
-# Prisma requires Node 20.19+, 22.12+, or 24+; use 22 LTS so npm ci meets the minimum.
-FROM node:22-alpine AS base
-
-# 1. Install dependencies only when needed
-FROM base as deps
-# Check https://github.com/nodejs/docker-node/tree/b4117f9333da4138b03a546ec926ef50a31506c3#nodealpine to understand why libc6-compat might be needed.
-RUN apk add --no-cache libc6-compat
-
-WORKDIR /app
-
-# Install dependencies based on the preferred package manager
-COPY package.json package-lock.json* ./
-RUN npm ci
-
-# 2. Rebuild the source code only when needed
-FROM base AS builder
-WORKDIR /app
-
-COPY --from=deps /app/node_modules ./node_modules
-COPY . .
-
-ENV NODE_ENV=production
-ENV NEXT_TELEMETRY_DISABLED=1
-
-# Copy env file for build time
-RUN npm run build
-
-# 3. Production image, copy all the files and run next
-FROM base AS runner
-WORKDIR /app
-
-ENV NODE_ENV=production
-ENV NEXT_TELEMETRY_DISABLED=1
-
-RUN addgroup -g 1001 -S nodejs
-RUN adduser -S nextjs -u 1001
-
-COPY --from=builder /app/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-
-ENV HOSTNAME="0.0.0.0"
-ENV NEXT_TELEMETRY_DISABLED=1
-ENV NODE_ENV=production
-EXPOSE 3000
-CMD ["node", "server.js"]
-`;
-    fs.writeFileSync(dockerfilePath, dockerfile);
-    await logger.info('Created default Dockerfile');
-  } else {
-    await logger.debug('Using existing Dockerfile');
+    await logger.info('No Dockerfile found, creating platform Dockerfile', {
+      usesPrisma,
+      marker: markerLine,
+    });
+    fs.writeFileSync(dockerfilePath, dockerfileContent);
+    return;
   }
+
+  const existingContent = fs.readFileSync(dockerfilePath, 'utf8');
+  const parsed = parseGeneratedDockerfileMarker(existingContent);
+
+  if (!parsed) {
+    await logger.debug('Using existing Dockerfile (not platform-managed)');
+    return;
+  }
+
+  if (!shouldRegenerateGeneratedDockerfile(parsed, usesPrisma)) {
+    await logger.debug('Using existing platform-managed Dockerfile', {
+      marker: parsed.raw,
+    });
+    return;
+  }
+
+  await logger.info('Regenerating platform-managed Dockerfile', {
+    previousMarker: parsed.raw,
+    usesPrisma,
+    marker: markerLine,
+  });
+  fs.writeFileSync(dockerfilePath, dockerfileContent);
 }
 
 async function buildImage(appName: string, version: string): Promise<string> {
@@ -208,7 +192,7 @@ async function buildAndStartContainer(
 ): Promise<ContainerInfo> {
   try {
     const appDir = path.join(APPS_DIR, app.name);
-    await ensureDockerfile(appDir);
+    await ensureDockerfile(appDir, app.id);
 
     await modifyNextConfig(appDir);
 

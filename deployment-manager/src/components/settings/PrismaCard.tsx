@@ -55,7 +55,10 @@ export default function PrismaCard({ app }: PrismaCardProps) {
         <div>
           <h3 className="text-lg font-medium">Uses Prisma</h3>
           <p className="text-sm text-gray-500">
-            Grants CREATEDB to the app database user, required for Prisma shadow database during migrations
+            Grants CREATEDB on the app database user for Prisma shadow databases. When this app has no
+            custom Dockerfile in git, the platform maintains a generated Dockerfile (Node 24,{' '}
+            <code className="text-xs">prisma generate</code> at build) on the next deploy. Commit your
+            own Dockerfile to override.
           </p>
         </div>
         <Button

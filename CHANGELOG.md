@@ -4,6 +4,16 @@ All notable changes to Port-Au-Next will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Uses Prisma:** Platform-generated Dockerfiles when the feature is enabled and the app has no custom `Dockerfile` — Node 24, `prisma generate` at build, marker line `# generated-by-port-au-next v1 -uses_prisma` with version/flag regeneration on deploy.
+
+### Changed
+
+- Default platform Next.js Dockerfile (non-Prisma) remains Node 22; marker format `# generated-by-port-au-next v1`.
+
 ## [0.4.5] - 2025-05-11
 
 ### Added
