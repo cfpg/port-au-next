@@ -35,13 +35,30 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# Match a recent buildx release; used for DOCKER_BUILDKIT=1 app image builds (Prisma Dockerfiles).
+ARG BUILDX_VERSION=0.19.2
+
 # Install production dependencies
 RUN apk add --no-cache \
     docker-cli \
     docker-compose \
     git \
     openssh-client \
-    shadow
+    shadow \
+    curl \
+    && mkdir -p /usr/local/lib/docker/cli-plugins \
+    && ARCH="$(uname -m)" \
+    && case "${ARCH}" in \
+         x86_64) BUILDX_ARCH=amd64 ;; \
+         aarch64|arm64) BUILDX_ARCH=arm64 ;; \
+         armv7l) BUILDX_ARCH=arm-v7 ;; \
+         *) echo "Unsupported architecture for docker-buildx: ${ARCH}" && exit 1 ;; \
+       esac \
+    && curl -fsSL \
+         "https://github.com/docker/buildx/releases/download/v${BUILDX_VERSION}/buildx-v${BUILDX_VERSION}.linux-${BUILDX_ARCH}" \
+         -o /usr/local/lib/docker/cli-plugins/docker-buildx \
+    && chmod +x /usr/local/lib/docker/cli-plugins/docker-buildx \
+    && docker buildx version
 
 # Create docker group with GID 1001 and add node user to it
 RUN addgroup -g 1001 docker && \
