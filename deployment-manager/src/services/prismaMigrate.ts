@@ -1,11 +1,13 @@
+import { exec } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
+import { promisify } from 'util';
 
 import logger from '~/services/logger';
-import { execCommand } from '~/utils/docker';
 import getAppsDir from '~/utils/getAppsDir';
 import { formatDockerEnvString } from '~/utils/dockerEnv';
 
+const execAsync = promisify(exec);
 const networkName = 'port-au-next_port_au_next_network';
 
 export function migratorImageTag(appName: string, version: string): string {
@@ -27,6 +29,53 @@ export function hasPrismaMigrationsDir(appName: string): boolean {
   }
 }
 
+type MigratorCommandResult = {
+  stdout: string;
+  stderr: string;
+  exitCode: number;
+};
+
+async function runMigratorCommand(
+  imageTag: string,
+  envString: string,
+  shellCmd: string
+): Promise<MigratorCommandResult> {
+  const command = `docker run --rm --network ${networkName} ${envString} ${imageTag} sh -c ${JSON.stringify(shellCmd)}`;
+  await logger.debug('Executing migrator command', { command, phase: 'migrate' });
+
+  try {
+    const { stdout, stderr } = await execAsync(command);
+    return { stdout, stderr, exitCode: 0 };
+  } catch (error) {
+    const err = error as { stdout?: string; stderr?: string; code?: number | string };
+    const exitCode =
+      typeof err.code === 'number' ? err.code : 1;
+    return {
+      stdout: err.stdout ?? '',
+      stderr: err.stderr ?? '',
+      exitCode,
+    };
+  }
+}
+
+function formatMigratorOutput(result: MigratorCommandResult): string {
+  return [result.stdout, result.stderr].filter((part) => part.trim()).join('\n').trim();
+}
+
+async function logMigratorResult(
+  message: string,
+  step: 'status' | 'deploy',
+  result: MigratorCommandResult
+): Promise<void> {
+  const output = formatMigratorOutput(result);
+  await logger.info(message, {
+    phase: 'migrate',
+    step,
+    exitCode: result.exitCode,
+    output: output || '(no output)',
+  });
+}
+
 export async function runPrismaMigrations(
   appName: string,
   version: string,
@@ -42,23 +91,33 @@ export async function runPrismaMigrations(
 
   const imageTag = migratorImageTag(appName, version);
   const envString = formatDockerEnvString(appEnv);
-  const migrateCmd =
-    'npx prisma migrate status && npx prisma migrate deploy';
 
-  await logger.info('Phase: migrate — running prisma migrate status and deploy', {
-    phase: 'migrate',
+  const statusResult = await runMigratorCommand(
     imageTag,
-  });
+    envString,
+    'npx prisma migrate status'
+  );
+  await logMigratorResult(
+    'Phase: migrate — prisma migrate status (informational, does not gate deploy)',
+    'status',
+    statusResult
+  );
 
-  const output = (await execCommand(
-    `docker run --rm --network ${networkName} ${envString} ${imageTag} sh -c ${JSON.stringify(migrateCmd)}`
-  )) as string;
+  const deployResult = await runMigratorCommand(
+    imageTag,
+    envString,
+    'npx prisma migrate deploy'
+  );
+  await logMigratorResult(
+    'Phase: migrate — prisma migrate deploy',
+    'deploy',
+    deployResult
+  );
 
-  if (output.trim()) {
-    await logger.info('Prisma migrate output', {
-      phase: 'migrate',
-      output: output.trim(),
-    });
+  if (deployResult.exitCode !== 0) {
+    throw new Error(
+      `prisma migrate deploy failed with exit code ${deployResult.exitCode}`
+    );
   }
 
   await logger.info('Phase: migrate — completed successfully', { phase: 'migrate' });

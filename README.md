@@ -175,7 +175,7 @@ Port-Au-Next can run **`prisma migrate deploy`** during deploy (Settings → Dat
 
 1. Build images and start the new (green) container.
 2. **Preflight** — confirm the container is running (no traffic switch yet).
-3. **Migrate** — one-off container from `{app}:{version}-migrate` runs `prisma migrate status` then `prisma migrate deploy`.
+3. **Migrate** — one-off container from `{app}:{version}-migrate` logs `prisma migrate status`, then runs `prisma migrate deploy` (only deploy gates success).
 4. **Switch** — nginx routes traffic to the new container.
 
 Migrations run against the **live** database for that app (or preview branch). While the previous version may still be serving traffic, the database schema may already be updated. You must use **expand/contract** migrations:

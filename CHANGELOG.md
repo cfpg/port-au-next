@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Uses Prisma:** Platform-generated Dockerfiles when the feature is enabled and the app has no custom `Dockerfile` — Node 24, `prisma generate` at build, marker line `# generated-by-port-au-next v1 -uses_prisma` with version/flag regeneration on deploy.
-- **Auto-migrate on deploy:** Nested setting under Uses Prisma (`auto_migrate`, default off). When enabled, deploy runs preflight → `prisma migrate status` / `prisma migrate deploy` in a `{app}:{version}-migrate` job → nginx switch. New deployment statuses `preflight` and `migrating`. README expand/contract guidance.
+- **Auto-migrate on deploy:** Nested setting under Uses Prisma (`auto_migrate`, default off). When enabled, deploy runs preflight → `prisma migrate deploy` in a `{app}:{version}-migrate` job (`migrate status` logged only) → nginx switch. New deployment statuses `preflight` and `migrating`. README expand/contract guidance.
 
 ### Changed
 
