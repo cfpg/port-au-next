@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Prisma platform Dockerfile: `npm ci --ignore-scripts` in deps, then `prisma generate` after full source copy (marker `v4`); avoids BuildKit `required=false` bind mounts.
 - deployment-manager image installs `docker-buildx` CLI plugin (Alpine `docker-cli` does not include it).
+- Bulk import environment variables from pasted `.env` content (skips existing and platform-reserved keys).
 - Default platform Next.js Dockerfile (non-Prisma) remains Node 22; marker format `# generated-by-port-au-next v1`.
 
 ## [0.4.5] - 2025-05-11

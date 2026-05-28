@@ -3,7 +3,9 @@
 import { useState, useEffect } from 'react';
 import useSWR from 'swr';
 import { EnvVarsForm } from '~/components/EnvVarsForm';
+import ImportEnvVarsModal from '~/components/env-vars/ImportEnvVarsModal';
 import Select from '~/components/general/Select';
+import Button from '~/components/general/Button';
 import fetcher from '~/utils/fetcher';
 import { App } from '~/types';
 import { AppEnvVar } from '~/queries/fetchAppEnvVars';
@@ -17,9 +19,10 @@ export default function EnvVarsSettings({ app }: EnvVarsSettingsProps) {
   const [isPreview, setIsPreview] = useState(false);
   const [envVars, setEnvVars] = useState<AppEnvVar[]>([]);
   const [unsavedChanges, setUnsavedChanges] = useState(false);
-  
+  const [importModalOpen, setImportModalOpen] = useState(false);
+
   // Fetch both production and preview environment variables
-  const { data: productionEnvVars, error: productionError } = useSWR(
+  const { data: productionEnvVars, error: productionError, mutate: mutateProduction } = useSWR(
     `/api/apps/${app.id}/env-vars?isPreview=false`,
     fetcher,
     {
@@ -28,7 +31,7 @@ export default function EnvVarsSettings({ app }: EnvVarsSettingsProps) {
     }
   );
   
-  const { data: previewEnvVars, error: previewError } = useSWR(
+  const { data: previewEnvVars, error: previewError, mutate: mutatePreview } = useSWR(
     `/api/apps/${app.id}/env-vars?isPreview=true`,
     fetcher,
     {
@@ -122,13 +125,17 @@ export default function EnvVarsSettings({ app }: EnvVarsSettingsProps) {
     }
   };
 
+  const handleImported = async () => {
+    await Promise.all([mutateProduction(), mutatePreview()]);
+  };
+
   if (error) {
     return <div className="text-red-500">Failed to load environment variables</div>;
   }
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-4">
+      <div className="flex flex-wrap items-end gap-4">
         <Select
           id="env-type"
           label="Environment Type"
@@ -140,7 +147,21 @@ export default function EnvVarsSettings({ app }: EnvVarsSettingsProps) {
           ]}
           className="w-48"
         />
+        <Button type="button" color="blue" onClick={() => setImportModalOpen(true)}>
+          <i className="fas fa-file-import mr-2" />
+          Import from .env
+        </Button>
       </div>
+
+      <ImportEnvVarsModal
+        isOpen={importModalOpen}
+        onClose={() => setImportModalOpen(false)}
+        appId={app.id}
+        branch={isPreview ? null : app.branch}
+        isPreview={isPreview}
+        existingEnvVars={envVars}
+        onImported={handleImported}
+      />
 
       {isLoading ? (
         <div className="text-gray-500">Loading environment variables...</div>
