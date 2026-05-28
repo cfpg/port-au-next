@@ -9,10 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Uses Prisma:** Platform-generated Dockerfiles when the feature is enabled and the app has no custom `Dockerfile` — Node 24, `prisma generate` at build, marker line `# generated-by-port-au-next v1 -uses_prisma` with version/flag regeneration on deploy.
+- **Auto-migrate on deploy:** Nested setting under Uses Prisma (`auto_migrate`, default off). When enabled, deploy runs preflight → `prisma migrate status` / `prisma migrate deploy` in a `{app}:{version}-migrate` job → nginx switch. New deployment statuses `preflight` and `migrating`. README expand/contract guidance.
 
 ### Changed
 
-- Prisma platform Dockerfile: `npm ci --ignore-scripts` in deps, then `prisma generate` after full source copy (marker `v4`); avoids BuildKit `required=false` bind mounts.
+- Prisma platform Dockerfile: `npm ci --ignore-scripts` in deps, then `prisma generate` after full source copy; adds **`migrator`** build stage (marker `v5`); avoids BuildKit `required=false` bind mounts.
+- Production and preview deploys use a shared release pipeline (build → preflight → optional migrate → traffic switch) instead of flipping nginx immediately after container start.
 - deployment-manager image installs `docker-buildx` CLI plugin (Alpine `docker-cli` does not include it).
 - Bulk import environment variables from pasted `.env` content (skips existing and platform-reserved keys).
 - Default platform Next.js Dockerfile (non-Prisma) remains Node 22; marker format `# generated-by-port-au-next v1`.

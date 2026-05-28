@@ -1,5 +1,5 @@
 export const GENERATED_DOCKERFILE_MARKER_PREFIX = '# generated-by-port-au-next';
-export const GENERATED_DOCKERFILE_VERSION = 4;
+export const GENERATED_DOCKERFILE_VERSION = 5;
 export const FLAG_USES_PRISMA = 'uses_prisma';
 
 export type ParsedGeneratedDockerfileMarker = {

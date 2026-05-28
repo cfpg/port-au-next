@@ -169,6 +169,33 @@ In **Settings → Database**, enable **Uses Prisma** for apps that use Prisma OR
 - **Custom Dockerfile:** If your repo includes its own `Dockerfile`, the platform never modifies it; configure Prisma yourself.
 - **`.dockerignore`:** Do not exclude `prisma/`, `prisma.config.ts`, or your Prisma client output paths (`generated/`, `src/generated/`, etc.).
 
+#### Prisma migrations and expand/contract
+
+Port-Au-Next can run **`prisma migrate deploy`** during deploy (Settings → Database → **Run migrations on deploy**, under **Uses Prisma**). The pipeline is:
+
+1. Build images and start the new (green) container.
+2. **Preflight** — confirm the container is running (no traffic switch yet).
+3. **Migrate** — one-off container from `{app}:{version}-migrate` runs `prisma migrate status` then `prisma migrate deploy`.
+4. **Switch** — nginx routes traffic to the new container.
+
+Migrations run against the **live** database for that app (or preview branch). While the previous version may still be serving traffic, the database schema may already be updated. You must use **expand/contract** migrations:
+
+| Phase | What to do | Example |
+|-------|------------|---------|
+| **Expand** | Add new schema in a way old code still works | Add a **nullable** column or new table |
+| **Deploy** | Ship app code that uses the new schema | Enable feature flags if needed |
+| **Contract** | Remove old schema in a **later** deploy | Drop deprecated column after nothing reads it |
+
+**Do not** rely on rolling back the app to undo schema changes — rollback traffic only; the database keeps migrated state.
+
+**Requirements for auto-migrate:**
+
+- Committed `prisma/migrations/` (if missing, migrate is skipped with a warning).
+- `prisma` CLI available in a Docker **`migrator`** stage. Platform-generated Prisma Dockerfiles include this stage automatically. Custom Dockerfiles must define `migrator` (copy `node_modules`, `prisma/`, `package.json`, and `prisma.config.ts` when used) or the migrator image build will fail.
+- Environment variables (`DATABASE_URL`, etc.) set in the deployment manager; Prisma 7 apps use `prisma.config.ts` to read them — configure that file in your repo.
+
+**Local workflow:** `npx prisma migrate dev` → commit migration SQL → deploy with auto-migrate enabled.
+
 ### Environment Variables
 
 Environment variables can be configured:

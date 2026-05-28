@@ -69,7 +69,22 @@ export const PATCH = withAuth(async (request: Request, { params }: { params: { a
       );
     }
 
-    await pool.query(`
+    const existing = await pool.query(
+      `SELECT config FROM app_features WHERE app_id = $1 AND feature = $2`,
+      [appId, feature]
+    );
+    const existingConfig = existing.rows[0]?.config ?? {};
+    let mergedConfig =
+      config !== undefined
+        ? { ...existingConfig, ...config }
+        : { ...existingConfig };
+
+    if (feature === AppFeature.USES_PRISMA && !enabled) {
+      mergedConfig = { ...mergedConfig, auto_migrate: false };
+    }
+
+    await pool.query(
+      `
       INSERT INTO app_features (app_id, feature, enabled, config)
       VALUES ($1, $2, $3, $4)
       ON CONFLICT (app_id, feature)
@@ -77,7 +92,9 @@ export const PATCH = withAuth(async (request: Request, { params }: { params: { a
         enabled = EXCLUDED.enabled,
         config = EXCLUDED.config,
         updated_at = CURRENT_TIMESTAMP
-    `, [appId, feature, enabled, config || {}]);
+    `,
+      [appId, feature, enabled, mergedConfig]
+    );
 
     // Grant or revoke CREATEDB when the uses_prisma feature is toggled
     if (feature === AppFeature.USES_PRISMA) {

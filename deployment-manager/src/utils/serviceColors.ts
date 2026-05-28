@@ -25,6 +25,8 @@ export const getServiceStatusColor = (status: ServiceStatus) => {
       return 'red';
     case 'pending':
     case 'building':
+    case 'preflight':
+    case 'migrating':
       return 'yellow';
     default:
       return 'gray';

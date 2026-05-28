@@ -120,7 +120,7 @@ export async function cleanupStaleBuildingDeployments() {
   const result = await pool.query(`
     UPDATE deployments
     SET status = 'failed'
-    WHERE status IN ('building', 'pending')
+    WHERE status IN ('building', 'pending', 'preflight', 'migrating')
     RETURNING id, app_id, branch
   `);
   return result.rows;

@@ -2,7 +2,8 @@ import pool from './database';
 import { setupAppDatabase, deleteAppDatabase } from './database';
 import logger from './logger';
 import { updateNginxConfig, deletePreviewBranchConfig } from './nginx';
-import { buildAndStartContainer, stopContainer } from './docker';
+import { stopContainer } from './docker';
+import { runReleasePipeline } from './releasePipeline';
 import { pullLatestChanges, getLatestCommit } from './git';
 import { getPreviewBranchSubdomain, sanitizeBranchForSubdomain } from '~/utils/previewBranches';
 import { generateBucketName } from '~/utils/bucket';
@@ -153,7 +154,12 @@ export async function updatePreviewBranchStatus(id: number, status: string, cont
   );
 }
 
-export async function deployPreviewBranch(appId: number, branch: string) {
+export async function deployPreviewBranch(
+  appId: number,
+  branch: string,
+  deploymentId?: number,
+  version?: string
+) {
   try {
     // Get app details
     const appResult = await pool.query(
@@ -206,9 +212,9 @@ export async function deployPreviewBranch(appId: number, branch: string) {
       envVars.MINIO_BUCKET = generateBucketName(app.name, true);
     }
 
-    // Build and start container
-    const version = new Date().toISOString().replace(/[^0-9]/g, '');
-    const { containerId } = await buildAndStartContainer(app, version, {
+    const releaseVersion =
+      version ?? new Date().toISOString().replace(/[^0-9]/g, '');
+    const appEnv = {
       POSTGRES_USER: previewBranch.db_user,
       POSTGRES_PASSWORD: previewBranch.db_password,
       POSTGRES_DB: previewBranch.db_name,
@@ -216,17 +222,19 @@ export async function deployPreviewBranch(appId: number, branch: string) {
       BRANCH: branch,
       DATABASE_URL: `postgres://${previewBranch.db_user}:${previewBranch.db_password}@postgres:5432/${previewBranch.db_name}`,
       ...envVars
+    };
+
+    const { containerId } = await runReleasePipeline({
+      app,
+      version: releaseVersion,
+      branch,
+      appEnv,
+      deploymentId,
+      switchTraffic: async (id) => {
+        await updateNginxConfig(app.name, app.preview_domain, id, branch);
+      },
     });
 
-    // Update nginx config
-    await updateNginxConfig(
-      app.name,
-      app.preview_domain,
-      containerId,
-      branch
-    );
-
-    // Update preview branch status
     await updatePreviewBranchStatus(previewBranch.id, 'active', containerId);
 
     await logger.info('Preview branch deployed successfully', {

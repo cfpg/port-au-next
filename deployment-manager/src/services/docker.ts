@@ -8,7 +8,9 @@ import pool from '~/services/database';
 import { modifyNextConfig } from '~/services/nextConfig';
 
 import { execCommand } from '~/utils/docker';
+import { formatDockerEnvString } from '~/utils/dockerEnv';
 import getAppsDir from '~/utils/getAppsDir';
+import { migratorImageTag } from '~/services/prismaMigrate';
 import { ServiceStatus } from '~/types';
 import { Service } from '~/types';
 import { ServiceHealth } from '~/types';
@@ -120,31 +122,50 @@ async function ensureDockerfile(appDir: string, appId: number): Promise<void> {
   fs.writeFileSync(dockerfilePath, dockerfileContent);
 }
 
-async function buildImage(appName: string, version: string): Promise<string> {
-  const logFile = path.join(getAppsDir(), `log-build-${appName}-${version}.log`);
+interface BuildImageOptions {
+  target?: string;
+  imageTag?: string;
+  logSuffix?: string;
+}
+
+async function buildImage(
+  appName: string,
+  version: string,
+  options: BuildImageOptions = {}
+): Promise<string> {
+  const logSuffix = options.logSuffix ?? '';
+  const logFile = path.join(
+    getAppsDir(),
+    `log-build-${appName}-${version}${logSuffix}.log`
+  );
 
   try {
-    const imageTag = `${appName}:${version}`;
+    const imageTag = options.imageTag ?? `${appName}:${version}`;
     const appDir = path.join(getAppsDir(), appName);
-    
-    await logger.info('Building Docker image', { imageTag });
+    const targetArg = options.target ? ` --target ${options.target}` : '';
+
+    await logger.info('Building Docker image', { imageTag, target: options.target });
     await logger.info('You can find the build log in the file', { logFile });
-    
-    // Use shell redirection to write directly to the log file
-    await execCommand(`DOCKER_BUILDKIT=1 docker build -t ${imageTag} ${appDir} &> ${logFile}`);
-    
-    // Check if the build output contains any error messages
+
+    await execCommand(
+      `DOCKER_BUILDKIT=1 docker build${targetArg} -t ${imageTag} ${appDir} &> ${logFile}`
+    );
+
     const buildOutput = fs.readFileSync(logFile, 'utf8');
-    if (buildOutput.includes('ERROR: failed to solve:') || buildOutput.includes('error: failed to solve:')) {
+    if (
+      buildOutput.includes('ERROR: failed to solve:') ||
+      buildOutput.includes('error: failed to solve:')
+    ) {
       throw new Error(`Docker build failed: ${buildOutput}`);
     }
-    
-    // Verify the image was built successfully
-    const imageExists = await execCommand(`docker image inspect ${imageTag}`).catch(() => null);
+
+    const imageExists = await execCommand(`docker image inspect ${imageTag}`).catch(
+      () => null
+    );
     if (!imageExists) {
       throw new Error('Docker build failed - image not found after build');
     }
-    
+
     await logger.info('Docker image built successfully', { imageTag });
 
     return imageTag;
@@ -152,10 +173,56 @@ async function buildImage(appName: string, version: string): Promise<string> {
     await logger.error(`Error building image`, error as Error);
     throw error;
   } finally {
-    // Read log file and log the output
     const logContent = fs.readFileSync(logFile, 'utf8');
     await logger.info('Docker build log', { logContent });
   }
+}
+
+async function buildReleaseImages(
+  appName: string,
+  version: string,
+  buildMigrator: boolean
+): Promise<{ runnerTag: string; migratorTag?: string }> {
+  const runnerTag = await buildImage(appName, version);
+
+  if (!buildMigrator) {
+    return { runnerTag };
+  }
+
+  const migrateTag = migratorImageTag(appName, version);
+  await buildImage(appName, version, {
+    target: 'migrator',
+    imageTag: migrateTag,
+    logSuffix: '-migrate',
+  });
+
+  return { runnerTag, migratorTag: migrateTag };
+}
+
+async function waitForContainerRunning(
+  containerId: string,
+  timeout: number = 60000
+): Promise<void> {
+  const startTime = Date.now();
+
+  while (Date.now() - startTime < timeout) {
+    const status = (await execCommand(
+      `docker inspect -f '{{.State.Status}}' ${containerId}`
+    )) as string;
+    const normalized = status.trim();
+
+    if (normalized === 'running') {
+      return;
+    }
+
+    if (normalized === 'exited' || normalized === 'dead') {
+      throw new Error(`Container entered ${normalized} state during preflight`);
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+
+  throw new Error('Container preflight timeout — not running before deadline');
 }
 
 async function startContainer(
@@ -212,15 +279,13 @@ async function buildAndStartContainer(
     fs.writeFileSync(envFilePath, envFileContent, { encoding: 'utf-8' });
     await logger.info('Created .env file', { path: envFilePath });
 
-    const imageTag = await buildImage(app.name, version);
+    const { runnerTag } = await buildReleaseImages(app.name, version, false);
     const timestamp = new Date().getTime();
     const containerName = `${app.name}_${version}_${timestamp}`;
 
-    const envString = Object.entries(appEnv)
-      .map(([key, value]) => `"-e${key}=${value}"`)
-      .join(' ');
+    const envString = formatDockerEnvString(appEnv);
 
-    return await startContainer(containerName, imageTag, networkName, envString);
+    return await startContainer(containerName, runnerTag, networkName, envString);
   } catch (error) {
     await logger.error(`Error building and starting container`, error as Error);
     throw error;
@@ -563,12 +628,15 @@ async function getServiceContainerIp(serviceName: string): Promise<string> {
 
 export {
   buildAndStartContainer,
+  buildReleaseImages,
   startContainer,
   stopContainer,
+  waitForContainerRunning,
   waitForHealthyContainer,
   recoverContainers,
   containerExists,
   deleteAppContainers,
   getServicesHealth,
-  getServiceContainerIp
+  getServiceContainerIp,
+  ensureDockerfile,
 }; 

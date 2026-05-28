@@ -11,7 +11,8 @@ export const APP_FEATURES = {
   },
   [AppFeature.USES_PRISMA]: {
     name: 'Uses Prisma',
-    description: 'Grants CREATEDB to the app database user, required for Prisma shadow database during migrations',
+    description:
+      'Grants CREATEDB, platform Prisma Dockerfile, and optional auto-migrate on deploy (config.auto_migrate)',
     enabled: false
   }
 } as const;

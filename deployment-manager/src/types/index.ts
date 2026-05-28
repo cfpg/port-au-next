@@ -60,7 +60,16 @@ export interface AppSettings {
 
 
 export type Service = 'nginx' | 'postgres' | 'redis' | 'imgproxy' | 'minio';
-export type ServiceStatus = 'running' | 'stopped' | 'unknown' | 'pending' | 'building' | 'error' | 'failed';
+export type ServiceStatus =
+  | 'running'
+  | 'stopped'
+  | 'unknown'
+  | 'pending'
+  | 'building'
+  | 'preflight'
+  | 'migrating'
+  | 'error'
+  | 'failed';
 
 export interface ServiceHealth {
   id: string;

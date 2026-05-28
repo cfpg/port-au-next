@@ -2,7 +2,8 @@
 
 import pool from '~/services/database';
 import logger from '~/services/logger';
-import { buildAndStartContainer, stopContainer } from '~/services/docker';
+import { stopContainer } from '~/services/docker';
+import { runReleasePipeline } from '~/services/releasePipeline';
 import { updateNginxConfig } from '~/services/nginx';
 import cloudflare from '~/services/cloudflare';
 import { getLatestCommit } from '~/services/git';
@@ -32,7 +33,6 @@ export const fetchRecentDeployments = withAuth(async () => {
 
 export const triggerDeployment = withAuth(async (appName: string, { pathname, branch }: { pathname?: string; branch?: string } = {}) => {
   let deploymentId: number;
-console.log("TRIGGERING DEPLOYMENT FOR BRANCH ",branch)
   try {
     // Get app details
     const appResult = await pool.query(
@@ -117,10 +117,13 @@ console.log("TRIGGERING DEPLOYMENT FOR BRANCH ",branch)
         );
 
         if (isPreviewBranch) {
-          // Handle preview branch deployment
-          const result = await deployPreviewBranch(app.id, targetBranch);
+          const result = await deployPreviewBranch(
+            app.id,
+            targetBranch,
+            deploymentId,
+            version
+          );
 
-          // Update deployment status with container ID and commit ID from preview branch deployment
           await logger.info('Marking deployment as active');
           await pool.query(
             `UPDATE deployments 
@@ -129,14 +132,20 @@ console.log("TRIGGERING DEPLOYMENT FOR BRANCH ",branch)
             ['active', result.commitId, result.containerId, deploymentId]
           );
         } else {
-          // Handle production branch deployment (existing logic)
           await logger.info(`Pulling latest changes from branch ${targetBranch}`);
           await pullLatestChanges(appName, targetBranch);
 
           const commitId = await getLatestCommit(appName, targetBranch);
           await logger.info('Got latest commit', { commitId });
 
-          // Get environment variables for the branch
+          const oldDeployment = await pool.query(
+            `SELECT container_id, commit_id FROM deployments 
+             WHERE app_id = $1 AND status = 'active' AND branch = $2`,
+            [app.id, targetBranch]
+          );
+          const oldContainerId = oldDeployment.rows[0]?.container_id;
+          const oldCommitId = oldDeployment.rows[0]?.commit_id;
+
           const envVarsResult = await pool.query(`
             SELECT key, value 
             FROM app_env_vars 
@@ -151,8 +160,7 @@ console.log("TRIGGERING DEPLOYMENT FOR BRANCH ",branch)
             envVarsResult.rows.map(row => [row.key, row.value])
           );
 
-          await logger.info('Starting new container');
-          const { containerId } = await buildAndStartContainer(app, version, {
+          const appEnv = {
             POSTGRES_USER: app.db_user,
             POSTGRES_PASSWORD: app.db_password,
             POSTGRES_DB: app.db_name,
@@ -160,21 +168,19 @@ console.log("TRIGGERING DEPLOYMENT FOR BRANCH ",branch)
             BRANCH: targetBranch,
             DATABASE_URL: `postgres://${app.db_user}:${app.db_password}@postgres:5432/${app.db_name}`,
             ...envVars
+          };
+
+          const { containerId } = await runReleasePipeline({
+            app,
+            version,
+            branch: targetBranch,
+            appEnv,
+            deploymentId,
+            switchTraffic: async (id) => {
+              await updateNginxConfig(appName, app.domain, id);
+            },
           });
-          await logger.info('Container started successfully', { containerId });
 
-          // Get old container ID if exists for this branch
-          const oldDeployment = await pool.query(
-            `SELECT container_id FROM deployments 
-             WHERE app_id = $1 AND status = 'active' AND branch = $2`,
-            [app.id, targetBranch]
-          );
-
-          await logger.info('Updating nginx configuration');
-          await updateNginxConfig(appName, app.domain, containerId);
-          await logger.info('Nginx configuration updated');
-
-          // Mark new deployment as active
           await logger.info('Marking deployment as active');
           await pool.query(
             `UPDATE deployments 
@@ -183,10 +189,7 @@ console.log("TRIGGERING DEPLOYMENT FOR BRANCH ",branch)
             ['active', commitId, containerId, deploymentId]
           );
 
-          // If there was a previous deployment for this branch, stop its container.
-          // This is best-effort cleanup - a missing old container must not fail the new deployment.
-          if (oldDeployment.rows.length > 0) {
-            const oldContainerId = oldDeployment.rows[0].container_id;
+          if (oldContainerId) {
             try {
               await logger.info('Stopping old container', { oldContainerId });
               await stopContainer(oldContainerId);
@@ -203,18 +206,6 @@ console.log("TRIGGERING DEPLOYMENT FOR BRANCH ",branch)
               );
             }
           }
-
-          // Handle Cloudflare cache purging for production deployments
-          const oldDeploymentCommit = await pool.query(
-            `SELECT d.commit_id 
-             FROM deployments d
-             WHERE app_id = $1 AND status = 'active' AND branch = $2
-             ORDER BY deployed_at DESC
-             LIMIT 1`,
-            [app.id, targetBranch]
-          );
-
-          const oldCommitId = oldDeploymentCommit.rows[0]?.commit_id;
 
           if (oldCommitId && app.cloudflare_zone_id) {
             try {
@@ -233,7 +224,6 @@ console.log("TRIGGERING DEPLOYMENT FOR BRANCH ",branch)
               }
             } catch (error) {
               await logger.warning('Failed to purge Cloudflare cache', error as Error);
-              // Don't fail the deployment if cache purge fails
             }
           }
         }

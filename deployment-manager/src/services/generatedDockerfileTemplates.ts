@@ -84,6 +84,17 @@ RUN set -e; \\
   fi; \\
   if [ -f prisma.config.ts ]; then cp prisma.config.ts "$stage/"; fi
 
+RUN mkdir -p /migrate-artifacts && \\
+  cp -r prisma /migrate-artifacts/ && \\
+  cp package.json /migrate-artifacts/ && \\
+  cp -r node_modules /migrate-artifacts/ && \\
+  (cp prisma.config.ts /migrate-artifacts/ 2>/dev/null || true)
+
+FROM base AS migrator
+WORKDIR /app
+COPY --from=builder /migrate-artifacts/ ./
+ENV NODE_ENV=production
+
 FROM base AS runner
 WORKDIR /app
 
