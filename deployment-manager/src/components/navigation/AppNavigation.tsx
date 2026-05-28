@@ -59,6 +59,7 @@ export default function AppNavigation({ appName, size }: AppNavigationProps) {
 
   const navItems = [
     { href: `/apps/${appName}`, label: 'Overview' },
+    { href: `/apps/${appName}/envvars`, label: 'Env Vars' },
     { href: `/apps/${appName}/settings`, label: 'Settings' },
   ];
 
