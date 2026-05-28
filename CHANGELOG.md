@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Prisma platform Dockerfile: copy `prisma/` before `npm ci`; optional `prisma.config.ts` via BuildKit bind mount; app builds use `DOCKER_BUILDKIT=1` (marker `v3`).
 - Default platform Next.js Dockerfile (non-Prisma) remains Node 22; marker format `# generated-by-port-au-next v1`.
 
 ## [0.4.5] - 2025-05-11

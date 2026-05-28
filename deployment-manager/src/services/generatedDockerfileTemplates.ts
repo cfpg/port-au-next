@@ -51,6 +51,10 @@ FROM base AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 COPY package.json package-lock.json* ./
+COPY prisma ./prisma
+RUN --mount=type=bind,source=prisma.config.ts,target=/mnt/prisma.config.ts,required=false \\
+  sh -c '[ -f /mnt/prisma.config.ts ] && cp /mnt/prisma.config.ts ./prisma.config.ts || true'
+ENV DATABASE_URL="postgresql://build:build@127.0.0.1:5432/build"
 RUN npm ci
 
 FROM base AS builder

@@ -131,7 +131,7 @@ async function buildImage(appName: string, version: string): Promise<string> {
     await logger.info('You can find the build log in the file', { logFile });
     
     // Use shell redirection to write directly to the log file
-    await execCommand(`docker build -t ${imageTag} ${appDir} &> ${logFile}`);
+    await execCommand(`DOCKER_BUILDKIT=1 docker build -t ${imageTag} ${appDir} &> ${logFile}`);
     
     // Check if the build output contains any error messages
     const buildOutput = fs.readFileSync(logFile, 'utf8');
