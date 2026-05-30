@@ -7,7 +7,7 @@ import { getServiceStatusColor } from '~/utils/serviceColors';
 import Badge from '~/components/general/Badge';
 import AppDeployButton from '~/components/buttons/AppDeployButton';
 import getGithubRepoPath from '~/utils/getGithubRepoPath';
-import getRelativeTime from '~/utils/getRelativeTime';
+import DateTimeText from '~/components/general/DateTimeText';
 import Table, {
   TableBody,
   TableCell,
@@ -34,10 +34,16 @@ interface ActivePreviewBranchesProps {
 
 export default function ActivePreviewBranches({ app }: ActivePreviewBranchesProps) {
   const { data: previewBranches, mutate } = useSWR<PreviewBranch[]>(
-    `/api/apps/${app.id}/preview-branches`,
+    app?.id ? `/api/apps/${app.id}/preview-branches` : null,
     fetcher,
     { refreshInterval: 10000 }
   );
+
+  if (!app?.id) {
+    return (
+      <div className="text-center py-4 text-gray-500">Loading preview branches…</div>
+    );
+  }
 
   if (!previewBranches?.length) {
     return (
@@ -107,10 +113,10 @@ export default function ActivePreviewBranches({ app }: ActivePreviewBranchesProp
               </TableCell>
               <TableCell>
                 {previewBranch.last_deployment_at ? (
-                  <>
-                    {new Date(previewBranch.last_deployment_at).toLocaleString()}
-                    <span className="text-gray-400"> ({getRelativeTime(previewBranch.last_deployment_at)})</span>
-                  </>
+                  <DateTimeText
+                    value={previewBranch.last_deployment_at}
+                    showRelative
+                  />
                 ) : (
                   'Never'
                 )}

@@ -17,7 +17,7 @@ export default function SingleAppDashboard({ appId }: { appId: number }) {
         className='bg-white text-black mb-8'
         title="Active Preview Branches"
         padding="table"
-        content={<ActivePreviewBranches app={app} />}
+        content={app ? <ActivePreviewBranches app={app} /> : <div className="text-center py-4 text-gray-500">Loading…</div>}
       />
 
       {/* Deployment History Section */}
@@ -26,7 +26,7 @@ export default function SingleAppDashboard({ appId }: { appId: number }) {
         title="Deployment History"
         padding="table"
         content={
-          <DeploymentHistoryTable deployments={deployments} />
+          <DeploymentHistoryTable deployments={deployments ?? []} />
         }
       />
     </>

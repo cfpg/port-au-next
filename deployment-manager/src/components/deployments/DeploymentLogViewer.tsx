@@ -10,26 +10,32 @@ import {
 } from 'react';
 import useSWR from 'swr';
 
+import BuildLogContent, { BuildLogLevelLegend } from '~/components/deployments/BuildLogContent';
+import DeploymentLogEntry from '~/components/deployments/DeploymentLogEntry';
 import NginxLogTable from '~/components/deployments/NginxLogTable';
+import type { FileLogResponse } from '~/components/deployments/deploymentLogTypes';
 import Badge from '~/components/general/Badge';
 import Button from '~/components/general/Button';
+import {
+  extractBuildLogText,
+  normalizeDeploymentLogMetadata,
+} from '~/lib/deploymentLogDisplay';
+import { isDeploymentInFlight } from '~/lib/deploymentLogStatus';
 import { getServiceStatusColor } from '~/utils/serviceColors';
-import fetcher from '~/utils/fetcher';
+import { fileLogFetcher } from '~/utils/fileLogFetcher';
 import { AppDeployment, DeploymentLog, ServiceStatus } from '~/types';
 
-type LogTab = 'deploy' | 'access' | 'error';
+type LogTab = 'deploy' | 'build' | 'access' | 'error';
 
 const AUTO_REFRESH_INTERVAL_SEC = 4;
 const SCROLL_PAUSE_THRESHOLD_PX = 40;
 
-interface FileLogResponse {
-  deploymentId: number;
-  appName: string;
-  path: string;
-  sizeBytes: number;
-  truncated: boolean;
-  content: string;
-}
+const TAB_SORT_LABELS: Record<LogTab, string> = {
+  deploy: 'Oldest first',
+  build: 'Oldest first',
+  access: 'Newest first',
+  error: 'Newest first',
+};
 
 interface DeploymentLogViewerProps {
   app: AppDeployment;
@@ -42,11 +48,16 @@ interface DeploymentLogViewerProps {
 }
 
 function getAutoRefreshLabel(
+  activeTab: LogTab,
   autoRefresh: boolean,
   pausedByScroll: boolean,
   isUpdating: boolean,
   countdown: number
 ): string {
+  if (activeTab === 'deploy' || activeTab === 'build') {
+    return 'Auto-refresh (Paused)';
+  }
+
   if (!autoRefresh) {
     return 'Auto-refresh';
   }
@@ -74,6 +85,9 @@ export default function DeploymentLogViewer({
   const [countdown, setCountdown] = useState(AUTO_REFRESH_INTERVAL_SEC);
   const [isUpdating, setIsUpdating] = useState(false);
 
+  const deployInFlight = isDeploymentInFlight(app.status);
+  const deployScrollRef = useRef<HTMLDivElement>(null);
+
   const accessKey =
     activeTab === 'access'
       ? `/api/apps/deployments/${appName}/${deploymentId}/logs/access`
@@ -82,29 +96,45 @@ export default function DeploymentLogViewer({
     activeTab === 'error'
       ? `/api/apps/deployments/${appName}/${deploymentId}/logs/error`
       : null;
+  const buildKey =
+    activeTab === 'build'
+      ? `/api/apps/deployments/${appName}/${deploymentId}/logs/build`
+      : null;
 
   const {
     data: accessData,
     error: accessError,
     isLoading: accessLoading,
     mutate: refreshAccess,
-  } = useSWR<FileLogResponse>(accessKey, fetcher);
+  } = useSWR<FileLogResponse>(accessKey, fileLogFetcher);
 
   const {
     data: errorData,
     error: errorError,
     isLoading: errorLoading,
     mutate: refreshError,
-  } = useSWR<FileLogResponse>(errorKey, fetcher);
+  } = useSWR<FileLogResponse>(errorKey, fileLogFetcher);
+
+  const {
+    data: buildData,
+    error: buildError,
+    isLoading: buildLoading,
+    mutate: refreshBuild,
+  } = useSWR<FileLogResponse>(buildKey, fileLogFetcher);
 
   const sortedDeployLogs = useMemo(
     () =>
       [...deployLogs].sort(
         (a, b) =>
-          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
       ),
     [deployLogs]
   );
+
+  const deployLogBuildFallback = useMemo(() => {
+    const dockerLog = deployLogs.find((log) => log.message === 'Docker build log');
+    return extractBuildLogText(normalizeDeploymentLogMetadata(dockerLog?.metadata));
+  }, [deployLogs]);
 
   const refreshActive = useCallback(async () => {
     if (activeTab === 'deploy') {
@@ -113,18 +143,61 @@ export default function DeploymentLogViewer({
       await refreshAccess();
     } else if (activeTab === 'error') {
       await refreshError();
+    } else if (activeTab === 'build') {
+      await refreshBuild();
     }
-  }, [activeTab, onRefreshDeploy, refreshAccess, refreshError]);
+  }, [activeTab, onRefreshDeploy, refreshAccess, refreshError, refreshBuild]);
 
   const refreshActiveRef = useRef(refreshActive);
   refreshActiveRef.current = refreshActive;
 
+  const onRefreshDeployRef = useRef(onRefreshDeploy);
+  onRefreshDeployRef.current = onRefreshDeploy;
+
   useEffect(() => {
+    if (activeTab === 'deploy') {
+      setPausedByScroll(false);
+      return;
+    }
     setPausedByScroll(false);
   }, [activeTab]);
 
+  const buildRefreshRef = useRef(refreshBuild);
+  buildRefreshRef.current = refreshBuild;
+  const activeTabRef = useRef(activeTab);
+  activeTabRef.current = activeTab;
+
+  // Deploy / Build tabs: poll while deployment is in-flight (ignores checkbox / scroll pause).
   useEffect(() => {
-    if (!autoRefresh || pausedByScroll) {
+    if (!deployInFlight) {
+      return;
+    }
+    if (activeTab !== 'deploy' && activeTab !== 'build') {
+      return;
+    }
+
+    const intervalId = setInterval(() => {
+      if (activeTabRef.current === 'deploy') {
+        void onRefreshDeployRef.current();
+      } else if (activeTabRef.current === 'build') {
+        void buildRefreshRef.current();
+      }
+    }, AUTO_REFRESH_INTERVAL_SEC * 1000);
+
+    return () => clearInterval(intervalId);
+  }, [activeTab, deployInFlight]);
+
+  // Scroll deploy log to bottom when new entries arrive during an in-flight deploy.
+  useEffect(() => {
+    if (activeTab !== 'deploy' || !deployInFlight || !deployScrollRef.current) {
+      return;
+    }
+    deployScrollRef.current.scrollTop = deployScrollRef.current.scrollHeight;
+  }, [activeTab, deployInFlight, sortedDeployLogs.length]);
+
+  // Access / Error: checkbox-driven countdown refresh with scroll pause.
+  useEffect(() => {
+    if (activeTab === 'deploy' || !autoRefresh || pausedByScroll) {
       setCountdown(AUTO_REFRESH_INTERVAL_SEC);
       setIsUpdating(false);
       return;
@@ -170,16 +243,21 @@ export default function DeploymentLogViewer({
 
   const tabs: { id: LogTab; label: string }[] = [
     { id: 'deploy', label: 'Deploy' },
+    { id: 'build', label: 'Build' },
     { id: 'access', label: 'Access' },
     { id: 'error', label: 'Error' },
   ];
 
   const autoRefreshLabel = getAutoRefreshLabel(
+    activeTab,
     autoRefresh,
     pausedByScroll,
     isUpdating,
     countdown
   );
+
+  const sortLabel = TAB_SORT_LABELS[activeTab];
+  const checkboxDisabled = activeTab === 'deploy' || activeTab === 'build';
 
   return (
     <div className="flex flex-col flex-1 min-h-0 h-full gap-4">
@@ -205,7 +283,7 @@ export default function DeploymentLogViewer({
         </div>
       </div>
 
-      <div className="flex items-center justify-between border-b border-gray-200 shrink-0">
+      <div className="flex items-center justify-between border-b border-gray-200 shrink-0 gap-4">
         <div className="flex gap-1">
           {tabs.map((tab) => (
             <button
@@ -222,13 +300,19 @@ export default function DeploymentLogViewer({
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-3">
-          <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none min-w-[10.5rem]">
+        <div className="flex items-center gap-3 shrink-0 flex-wrap justify-end">
+          <span className="text-xs text-gray-500">{sortLabel}</span>
+          <label
+            className={`flex items-center gap-2 text-sm text-gray-600 select-none min-w-[10.5rem] ${
+              checkboxDisabled ? 'cursor-default opacity-80' : 'cursor-pointer'
+            }`}
+          >
             <input
               type="checkbox"
-              checked={autoRefresh}
+              checked={checkboxDisabled ? false : autoRefresh}
+              disabled={checkboxDisabled}
               onChange={(event) => setAutoRefresh(event.target.checked)}
-              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:opacity-50"
             />
             <span className="tabular-nums">{autoRefreshLabel}</span>
           </label>
@@ -240,38 +324,50 @@ export default function DeploymentLogViewer({
       </div>
 
       <div className="flex flex-col flex-1 min-h-0">
-      {activeTab === 'deploy' && (
-        <DeployTabContent
-          logs={sortedDeployLogs}
-          loading={deployLoading && deployLogs.length === 0}
-          error={deployError}
-          onScrollPausedChange={setPausedByScroll}
-        />
-      )}
+        {activeTab === 'deploy' && (
+          <DeployTabContent
+            logs={sortedDeployLogs}
+            loading={deployLoading && deployLogs.length === 0}
+            error={deployError}
+            scrollRef={deployScrollRef}
+            liveUpdating={deployInFlight}
+          />
+        )}
 
-      {activeTab === 'access' && (
-        <FileLogTabContent
-          label="Access log"
-          logVariant="access"
-          data={accessData}
-          loading={accessLoading && !accessData}
-          error={accessError}
-          emptyHint="Access logs are recorded after traffic is switched to this deployment."
-          onScrollPausedChange={setPausedByScroll}
-        />
-      )}
+        {activeTab === 'build' && (
+          <BuildTabContent
+            data={buildData}
+            loading={buildLoading && !buildData}
+            error={buildError}
+            fallbackContent={deployLogBuildFallback}
+            onScrollPausedChange={setPausedByScroll}
+            liveUpdating={deployInFlight}
+          />
+        )}
 
-      {activeTab === 'error' && (
-        <FileLogTabContent
-          label="Error log"
-          logVariant="error"
-          data={errorData}
-          loading={errorLoading && !errorData}
-          error={errorError}
-          emptyHint="Error logs are recorded after traffic is switched to this deployment."
-          onScrollPausedChange={setPausedByScroll}
-        />
-      )}
+        {activeTab === 'access' && (
+          <FileLogTabContent
+            label="Access log"
+            logVariant="access"
+            data={accessData}
+            loading={accessLoading && !accessData}
+            error={accessError}
+            emptyHint="Access logs are recorded after traffic is switched to this deployment."
+            onScrollPausedChange={setPausedByScroll}
+          />
+        )}
+
+        {activeTab === 'error' && (
+          <FileLogTabContent
+            label="Error log"
+            logVariant="error"
+            data={errorData}
+            loading={errorLoading && !errorData}
+            error={errorError}
+            emptyHint="Error logs are recorded after traffic is switched to this deployment."
+            onScrollPausedChange={setPausedByScroll}
+          />
+        )}
       </div>
     </div>
   );
@@ -282,14 +378,20 @@ function LogScrollArea({
   onScrollPausedChange,
 }: {
   children: ReactNode;
-  onScrollPausedChange: (paused: boolean) => void;
+  onScrollPausedChange?: (paused: boolean) => void;
 }) {
   return (
     <div
       className="flex-1 min-h-0 overflow-y-auto"
-      onScroll={(event) => {
-        onScrollPausedChange(event.currentTarget.scrollTop > SCROLL_PAUSE_THRESHOLD_PX);
-      }}
+      onScroll={
+        onScrollPausedChange
+          ? (event) => {
+              onScrollPausedChange(
+                event.currentTarget.scrollTop > SCROLL_PAUSE_THRESHOLD_PX
+              );
+            }
+          : undefined
+      }
     >
       {children}
     </div>
@@ -300,12 +402,14 @@ function DeployTabContent({
   logs,
   loading,
   error,
-  onScrollPausedChange,
+  scrollRef,
+  liveUpdating,
 }: {
   logs: DeploymentLog[];
   loading: boolean;
   error: unknown;
-  onScrollPausedChange: (paused: boolean) => void;
+  scrollRef: React.RefObject<HTMLDivElement | null>;
+  liveUpdating: boolean;
 }) {
   if (error) {
     return <p className="text-red-500 text-center py-4">Error loading deploy logs.</p>;
@@ -320,28 +424,85 @@ function DeployTabContent({
   }
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 h-full">
-    <LogScrollArea onScrollPausedChange={onScrollPausedChange}>
-      <div className="space-y-4">
-        {logs.map((log) => (
-          <div key={log.id} className={`log-entry p-4 rounded ${getLogTypeClass(log.type)}`}>
-            <div className="flex items-start justify-between">
-              <span className="font-mono text-xs text-gray-500">
-                {new Date(log.created_at).toLocaleString()}
-              </span>
-              <span className="uppercase text-xs font-semibold ml-2">{log.type}</span>
-            </div>
-            <div className="mt-1">{log.message}</div>
-            {log.metadata && Object.keys(log.metadata).length > 0 && (
-              <pre className="text-xs mt-2 text-gray-600 whitespace-pre-wrap break-words">
-                {JSON.stringify(log.metadata, null, 2)}
-              </pre>
-            )}
-          </div>
-        ))}
+    <div className="flex flex-col flex-1 min-h-0 h-full gap-2">
+      {liveUpdating && (
+        <p className="text-xs text-blue-600 shrink-0">
+          Live — updating every {AUTO_REFRESH_INTERVAL_SEC}s while deployment is in progress
+        </p>
+      )}
+      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto">
+        <div className="space-y-4">
+          {logs.map((log) => (
+            <DeploymentLogEntry key={log.id} log={log} hideInlineBuildLog />
+          ))}
+        </div>
       </div>
-    </LogScrollArea>
     </div>
+  );
+}
+
+function BuildTabContent({
+  data,
+  loading,
+  error,
+  fallbackContent,
+  onScrollPausedChange,
+  liveUpdating,
+}: {
+  data?: FileLogResponse;
+  loading: boolean;
+  error: unknown;
+  fallbackContent: string | null;
+  onScrollPausedChange: (paused: boolean) => void;
+  liveUpdating: boolean;
+}) {
+  const content = data?.content ?? fallbackContent;
+
+  if (loading && !content) {
+    return <p className="text-gray-500 text-center py-4">Loading build log...</p>;
+  }
+
+  if (!content) {
+    return (
+      <div className="text-center py-4 space-y-2">
+        <p className="text-gray-500">Build log is written during the docker build phase.</p>
+        <p className="text-sm text-gray-400">
+          {error instanceof Error ? error.message : 'Log file not available yet.'}
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <FileLogTabContent
+      label="Build log"
+      data={
+        data ?? {
+          deploymentId: 0,
+          appName: '',
+          path: '(from deployment log snapshot)',
+          sizeBytes: content.length,
+          truncated: false,
+          content,
+        }
+      }
+      loading={false}
+      error={undefined}
+      emptyHint=""
+      onScrollPausedChange={onScrollPausedChange}
+      renderContent={(fileContent) => (
+        <>
+          {!data?.content && fallbackContent && (
+            <p className="text-xs text-amber-700 px-2 py-1 bg-amber-50 border-b border-amber-100">
+              Showing build output saved on the Deploy log (build file not found on disk).
+            </p>
+          )}
+          <BuildLogLevelLegend />
+          <BuildLogContent content={fileContent} />
+        </>
+      )}
+      liveUpdating={liveUpdating && Boolean(data?.content)}
+    />
   );
 }
 
@@ -353,14 +514,18 @@ function FileLogTabContent({
   error,
   emptyHint,
   onScrollPausedChange,
+  renderContent,
+  liveUpdating = false,
 }: {
   label: string;
-  logVariant: 'access' | 'error';
+  logVariant?: 'access' | 'error';
   data?: FileLogResponse;
   loading: boolean;
   error: unknown;
   emptyHint: string;
   onScrollPausedChange: (paused: boolean) => void;
+  renderContent?: (content: string) => ReactNode;
+  liveUpdating?: boolean;
 }) {
   if (loading) {
     return <p className="text-gray-500 text-center py-4">Loading {label.toLowerCase()}...</p>;
@@ -370,45 +535,54 @@ function FileLogTabContent({
     return (
       <div className="text-center py-4 space-y-2">
         <p className="text-gray-500">{emptyHint}</p>
+        <p className="text-sm text-gray-400">
+          {error instanceof Error ? error.message : 'Log file not available yet.'}
+        </p>
+      </div>
+    );
+  }
+
+  if (!data?.content) {
+    return (
+      <div className="text-center py-4 space-y-2">
+        <p className="text-gray-500">{emptyHint}</p>
         <p className="text-sm text-gray-400">Log file not available yet.</p>
       </div>
     );
   }
 
-  if (!data) {
-    return <p className="text-gray-500 text-center py-4">No data found.</p>;
-  }
+  const truncatedNote = data.truncated
+    ? logVariant === 'access' || logVariant === 'error'
+      ? 'Newest entries appear at the top.'
+      : 'Showing the end of the file (oldest lines may be omitted).'
+    : null;
 
   return (
     <div className="flex flex-col flex-1 min-h-0 h-full gap-2">
+      {liveUpdating && (
+        <p className="text-xs text-blue-600 shrink-0">
+          Live — updating every {AUTO_REFRESH_INTERVAL_SEC}s while deployment is in progress
+        </p>
+      )}
       <details className="text-xs text-gray-500 shrink-0">
         <summary className="cursor-pointer hover:text-gray-700">File path</summary>
         <code className="block mt-1 break-all">{data.path}</code>
         {data.truncated && (
           <span className="block mt-1 text-amber-600">
             Showing last portion of file ({data.sizeBytes.toLocaleString()} bytes total).
-            Newest entries appear at the top.
+            {truncatedNote ? ` ${truncatedNote}` : null}
           </span>
         )}
       </details>
       <LogScrollArea onScrollPausedChange={onScrollPausedChange}>
         <div className="rounded border border-gray-200 bg-white min-h-full">
-          <NginxLogTable content={data.content} variant={logVariant} />
+          {renderContent ? (
+            renderContent(data.content)
+          ) : (
+            <NginxLogTable content={data.content} variant={logVariant!} />
+          )}
         </div>
       </LogScrollArea>
     </div>
   );
-}
-
-function getLogTypeClass(type: string): string {
-  switch (type) {
-    case 'error':
-      return 'bg-red-50 border-l-4 border-red-500';
-    case 'warning':
-      return 'bg-yellow-50 border-l-4 border-yellow-500';
-    case 'debug':
-      return 'bg-gray-50 border-l-4 border-gray-500';
-    default:
-      return 'bg-blue-50 border-l-4 border-blue-500';
-  }
 }

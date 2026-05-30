@@ -87,8 +87,8 @@ export function parseErrorLogLine(line: string): ParsedLogRow {
   };
 }
 
-export function splitLogContentNewestFirst(content: string): string[] {
-  if (!content.trim()) {
+export function splitLogContentNewestFirst(content: string | undefined | null): string[] {
+  if (!content?.trim()) {
     return [];
   }
   return content
@@ -98,7 +98,7 @@ export function splitLogContentNewestFirst(content: string): string[] {
 }
 
 export function parseLogLines(
-  content: string,
+  content: string | undefined | null,
   variant: 'access' | 'error'
 ): ParsedLogRow[] {
   const parseLine = variant === 'access' ? parseAccessLogLine : parseErrorLogLine;

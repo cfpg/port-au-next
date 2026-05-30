@@ -19,7 +19,7 @@ interface NginxLogTableProps {
 }
 
 export default function NginxLogTable({ content, variant }: NginxLogTableProps) {
-  const rows = parseLogLines(content, variant);
+  const rows = parseLogLines(content ?? '', variant);
 
   if (rows.length === 0) {
     return (

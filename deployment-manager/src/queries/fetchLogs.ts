@@ -1,5 +1,14 @@
 import pool from "~/services/database";
+import { normalizeDeploymentLogMetadata, normalizeDeploymentLogType } from "~/lib/deploymentLogDisplay";
 import { AppDeployment, DeploymentLog } from "~/types";
+
+function normalizeDeploymentLogRow(row: DeploymentLog): DeploymentLog {
+  return {
+    ...row,
+    type: normalizeDeploymentLogType(row.type),
+    metadata: normalizeDeploymentLogMetadata(row.metadata),
+  };
+}
 
 export default async function fetchLogs(appName: string, deploymentId: number): Promise<{app: AppDeployment; logs: DeploymentLog[]}> {
   const existingDeployment = await pool.query<{id: number; name: string; repo_url: string; branch: string; status: string; deployed_at: Date}>(`
@@ -20,5 +29,8 @@ export default async function fetchLogs(appName: string, deploymentId: number): 
        ORDER BY created_at ASC
   `, [deploymentId]);
 
-  return {app: existingDeployment.rows[0], logs: logs.rows};
+  return {
+    app: existingDeployment.rows[0],
+    logs: logs.rows.map(normalizeDeploymentLogRow),
+  };
 }

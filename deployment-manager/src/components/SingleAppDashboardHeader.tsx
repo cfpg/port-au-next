@@ -4,7 +4,7 @@ import { ServiceStatus } from "~/types";
 import Card from "./general/Card";
 import Badge from "./general/Badge";
 import { getServiceStatusColor } from "~/utils/serviceColors";
-import getRelativeTime from "~/utils/getRelativeTime";
+import DateTimeText from "~/components/general/DateTimeText";
 import AppDeployButton from "./buttons/AppDeployButton";
 import AppDeleteButton from "./buttons/AppDeleteButton";
 import useSWR from "swr";
@@ -12,6 +12,10 @@ import fetcher from "~/utils/fetcher";
 
 export default function SingleAppDashboardHeader({ appId }: { appId: number }) {
   const { data: app } = useSWR(`/api/apps/${appId}`, fetcher, { refreshInterval: 10000 });
+
+  if (!app) {
+    return null;
+  }
 
   return (
     <Card
@@ -53,11 +57,13 @@ export default function SingleAppDashboardHeader({ appId }: { appId: number }) {
             <h3 className="font-semibold mb-2">Last Deployment</h3>
             <p className="text-sm text-gray-500">
               {app.last_deployment ? (
-                <>
-                  {new Date(app.last_deployment.deployed_at).toLocaleString()}
-                  <span className="text-gray-400"> ({getRelativeTime(app.last_deployment.deployed_at)})</span>
-                </>
-              ) : 'Never'}
+                <DateTimeText
+                  value={app.last_deployment.deployed_at}
+                  showRelative
+                />
+              ) : (
+                'Never'
+              )}
             </p>
           </div>
         </div>

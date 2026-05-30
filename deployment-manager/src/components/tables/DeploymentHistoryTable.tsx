@@ -6,7 +6,7 @@ import Table, {
   TableHeader,
   TableRow,
 } from '~/components/general/Table';
-import getRelativeTime from '~/utils/getRelativeTime';
+import DateTimeText from '~/components/general/DateTimeText';
 import getGithubRepoPath from '~/utils/getGithubRepoPath';
 import Badge from '~/components/general/Badge';
 import { getServiceStatusColor } from '~/utils/serviceColors';
@@ -19,7 +19,7 @@ interface DeploymentHistoryTableProps {
 }
 
 export default function DeploymentHistoryTable({
-  deployments,
+  deployments = [],
 }: DeploymentHistoryTableProps) {
   return (
     <div className="overflow-x-auto">
@@ -52,8 +52,11 @@ export default function DeploymentHistoryTable({
                 <Badge color={getServiceStatusColor(deployment.status as ServiceStatus)} withDot>{deployment.status}</Badge>
               </TableCell>
               <TableCell>
-                {new Date(deployment.deployed_at).toLocaleString()}
-                {deployment.deployed_at && <span className="text-gray-400"> ({getRelativeTime(deployment.deployed_at)})</span>}
+                {deployment.deployed_at ? (
+                  <DateTimeText value={deployment.deployed_at} showRelative />
+                ) : (
+                  '—'
+                )}
               </TableCell>
               <TableCell className="font-medium flex justify-end space-x-2">
                 <AppDeployButton app={{ name: deployment.app_name, id: deployment.app_id } as App} branch={deployment.branch} />
