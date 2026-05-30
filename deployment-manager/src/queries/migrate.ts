@@ -254,6 +254,18 @@ export async function migrate() {
     END $$;
     `);
 
+    await pool.query(`
+      ALTER TABLE deployments
+      ADD COLUMN IF NOT EXISTS inactive_at TIMESTAMP,
+      ADD COLUMN IF NOT EXISTS failed_at TIMESTAMP
+    `);
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_deployments_retention
+      ON deployments (status, inactive_at, failed_at)
+      WHERE status IN ('inactive', 'failed')
+    `);
+
     await pool.query('COMMIT');
     console.log('Database migration completed successfully');
   } catch (error) {

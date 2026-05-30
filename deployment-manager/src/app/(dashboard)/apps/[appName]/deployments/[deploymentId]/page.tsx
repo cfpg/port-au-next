@@ -1,40 +1,47 @@
-import {AppDeploymentInformation, AppDeploymentLogs} from "~/components/deployments/AppDeploymentInformationContainer";
-import { notFound } from "next/navigation";
-import Card from "~/components/general/Card";
+import { notFound } from 'next/navigation';
 
-import fetchLogs from "~/queries/fetchLogs";
+import DeploymentLogViewerContainer from '~/components/deployments/DeploymentLogViewerContainer';
+import Card from '~/components/general/Card';
+import fetchLogs from '~/queries/fetchLogs';
+
 interface SingleAppDeploymentPageProps {
-  params: {
+  params: Promise<{
     appName: string;
     deploymentId: string;
-  };
+  }>;
 }
 
 export default async function SingleAppDeploymentPage({ params }: SingleAppDeploymentPageProps) {
-  const { appName, deploymentId } = params;
+  const { appName, deploymentId } = await params;
+  const parsedDeploymentId = parseInt(deploymentId, 10);
+
+  if (!Number.isFinite(parsedDeploymentId)) {
+    notFound();
+  }
 
   try {
-    const { app, logs } = await fetchLogs(appName, parseInt(deploymentId));
+    const { app, logs } = await fetchLogs(appName, parsedDeploymentId);
 
-    if (!app || !logs || logs.length === 0) {
+    if (!app) {
       notFound();
     }
 
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold">
-            Deployment Details - {appName}
-          </h1>
+          <h1 className="text-2xl font-bold">Deployment Logs - {appName}</h1>
         </div>
 
         <Card
-          title={`App Deployment Information - ${appName} - Deployment ID: ${deploymentId}`}
-          content={<AppDeploymentInformation app={app} />}
-        />
-
-        <Card
-          content={<AppDeploymentLogs logs={logs} />}
+          title={`Deployment #${deploymentId}`}
+          content={
+            <DeploymentLogViewerContainer
+              appName={appName}
+              deploymentId={parsedDeploymentId}
+              initialApp={app}
+              initialDeployLogs={logs}
+            />
+          }
         />
       </div>
     );

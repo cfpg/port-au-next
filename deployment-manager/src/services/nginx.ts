@@ -4,16 +4,31 @@ import { exec } from 'child_process';
 import logger from '~/services/logger';
 import { getContainerIp, execCommand } from '~/utils/docker';
 import getAppsDir from '~/utils/getAppsDir';
+import {
+  ensureNginxDeploymentLogDir,
+  getNginxContainerAccessLogPath,
+  getNginxContainerErrorLogPath,
+} from '~/lib/logPaths';
 
-// Use absolute path from project root
 const NGINX_CONFIG_DIR = path.join(getAppsDir(), '../nginx/conf.d');
 
-// Common nginx configuration blocks
-const getCommonNginxConfig = (domain: string, upstreamServer: string) => `
+const getCommonNginxConfig = (
+  domain: string,
+  upstreamServer: string,
+  appName: string,
+  deploymentId: number
+) => {
+  const accessLog = getNginxContainerAccessLogPath(appName, deploymentId);
+  const errorLog = getNginxContainerErrorLogPath(appName, deploymentId);
+
+  return `
 server {
     listen 80;
     listen [::]:80;
     server_name ${domain};
+
+    access_log ${accessLog} combined;
+    error_log ${errorLog} warn;
     
     # Increase buffer size settings
     proxy_buffer_size 128k;
@@ -22,7 +37,7 @@ server {
     proxy_max_temp_file_size 0;
     
     # Cache settings for static files, images and Next.js image optimization
-    location ~* (\.(jpg|jpeg|png|gif|ico|webp|svg|woff2|woff|ttf|mp4)$|/_next/image\?) {
+    location ~* (\\.(jpg|jpeg|png|gif|ico|webp|svg|woff2|woff|ttf|mp4)$|/_next/image\\?) {
         proxy_pass http://${upstreamServer};
         proxy_http_version 1.1;
         proxy_set_header Host $host;
@@ -52,19 +67,24 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 }`;
+};
 
-// Preview branch markers
 const getBranchMarkers = (branch: string) => ({
   start: `# START PREVIEW BRANCH === ${branch} ===`,
   end: `# END PREVIEW BRANCH === ${branch} ===`
 });
 
-// Get preview branch configuration with markers
-const getPreviewBranchConfig = (branch: string, domain: string, upstreamServer: string) => {
+const getPreviewBranchConfig = (
+  branch: string,
+  domain: string,
+  upstreamServer: string,
+  appName: string,
+  deploymentId: number
+) => {
   const markers = getBranchMarkers(branch);
   return `
 ${markers.start}
-${getCommonNginxConfig(`${branch}.${domain}`, upstreamServer)}
+${getCommonNginxConfig(`${branch}.${domain}`, upstreamServer, appName, deploymentId)}
 ${markers.end}
 `;
 };
@@ -73,15 +93,19 @@ async function updateNginxConfig(
   appName: string, 
   domain: string, 
   containerId: string | null = null,
-  previewBranch?: string
+  previewBranch?: string,
+  deploymentId?: number
 ) {
   try {
     await logger.info(`Using nginx config directory: ${NGINX_CONFIG_DIR}`);
     
-    // Ensure nginx config directory exists
     if (!fs.existsSync(NGINX_CONFIG_DIR)) {
       await logger.info(`Creating nginx config directory: ${NGINX_CONFIG_DIR}`);
       fs.mkdirSync(NGINX_CONFIG_DIR, { recursive: true });
+    }
+
+    if (deploymentId !== undefined) {
+      ensureNginxDeploymentLogDir(appName, deploymentId);
     }
 
     let configPath: string;
@@ -95,16 +119,17 @@ async function updateNginxConfig(
     }
 
     if (previewBranch) {
-      // For preview branches, use a separate config file
+      if (deploymentId === undefined) {
+        throw new Error('deploymentId is required for preview branch nginx config');
+      }
+
       configPath = path.join(NGINX_CONFIG_DIR, `preview-${appName}.conf`);
 
-      // Create or update the preview branch configuration
       let existingConfig = '';
       if (fs.existsSync(configPath)) {
         existingConfig = fs.readFileSync(configPath, 'utf8');
       }
 
-      // Remove existing configuration for this branch if it exists
       const markers = getBranchMarkers(previewBranch);
       const startIndex = existingConfig.indexOf(markers.start);
       const endIndex = existingConfig.indexOf(markers.end);
@@ -114,15 +139,22 @@ async function updateNginxConfig(
                         existingConfig.substring(endIndex + markers.end.length);
       }
 
-      // Create new configuration for this branch
-      const branchConfig = getPreviewBranchConfig(previewBranch, domain, upstreamServer);
+      const branchConfig = getPreviewBranchConfig(
+        previewBranch,
+        domain,
+        upstreamServer,
+        appName,
+        deploymentId
+      );
 
-      // Append new configuration
       fs.writeFileSync(configPath, (existingConfig + branchConfig).trim() + '\n');
     } else {
-      // For main branch, use the standard config file
+      if (deploymentId === undefined) {
+        throw new Error('deploymentId is required for production nginx config');
+      }
+
       configPath = path.join(NGINX_CONFIG_DIR, `app-${domain}.conf`);
-      const config = getCommonNginxConfig(domain, upstreamServer);
+      const config = getCommonNginxConfig(domain, upstreamServer, appName, deploymentId);
       fs.writeFileSync(configPath, config);
     }
 
@@ -157,39 +189,31 @@ async function reloadNginx() {
 
 async function deleteAppConfig(domain: string) {
   try {
-    // Validate domain doesn't contain path traversal attempts
     if (!domain || domain.includes('/') || domain.includes('..')) {
       throw new Error('Invalid domain name');
     }
 
     const configPath = path.join(NGINX_CONFIG_DIR, `app-${domain}.conf`);
     
-    // Ensure the path is still within NGINX_CONFIG_DIR after joining
     if (!configPath.startsWith(NGINX_CONFIG_DIR)) {
       throw new Error('Invalid nginx config path');
     }
     
-    // Check if config exists before trying to delete
     if (fs.existsSync(configPath)) {
       await logger.info(`Found nginx config at ${configPath}, deleting...`);
-      // Use promises version for better async handling
       await fs.promises.unlink(configPath);
       
-      // Verify nginx config before reloading
       try {
-        // Test nginx configuration first
         await execCommand('nginx -t');
-        // Only reload if test passes
         await reloadNginx();
         await logger.info('Nginx configuration reloaded successfully');
       } catch (nginxError) {
         await logger.error('Failed to reload nginx after config deletion', nginxError as Error);
-        // Still consider deletion successful since file is gone
       }
     } else {
       await logger.info(`No nginx config found at ${configPath}, skipping deletion`);
     }
-    return true; // Success either way for idempotency
+    return true;
   } catch (error) {
     await logger.error(`Error deleting nginx config`, error as Error);
     throw error;
@@ -208,14 +232,11 @@ async function deletePreviewBranchConfig(appName: string, branch: string) {
       const endIndex = config.indexOf(markers.end);
 
       if (startIndex !== -1 && endIndex !== -1) {
-        // Remove the branch configuration
         config = config.substring(0, startIndex) + 
                 config.substring(endIndex + markers.end.length);
         
-        // Write back the config file
         fs.writeFileSync(configPath, config.trim() + '\n');
         
-        // If the file is empty (except for whitespace), delete it
         if (!config.trim()) {
           fs.unlinkSync(configPath);
         }
@@ -249,10 +270,8 @@ async function createServiceVhostConfig(
   try {
     const configPath = path.join(NGINX_CONFIG_DIR, `service-${serviceName}.conf`);
     
-    // Set default client_max_body_size if not provided
     const clientMaxBodySize = options.clientMaxBodySize || '5M';
     
-    // Generate location blocks from the locations array
     const locationBlocks = locations.map(loc => {
       const baseConfig = `
     # ${serviceName} ${loc.path === '/' ? 'API' : loc.path}
@@ -268,7 +287,6 @@ async function createServiceVhostConfig(
         chunked_transfer_encoding off;
         client_max_body_size ${clientMaxBodySize};`;
 
-      // Add CORS headers if enabled
       if (loc.allowCors) {
         return `${baseConfig}
         # CORS headers

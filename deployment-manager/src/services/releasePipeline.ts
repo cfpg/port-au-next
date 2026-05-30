@@ -9,6 +9,11 @@ import { formatDockerEnvString } from '~/utils/dockerEnv';
 import { isAutoMigrateEnabled } from '~/services/appFeatures';
 import { runPrismaMigrations } from '~/services/prismaMigrate';
 import { modifyNextConfig } from '~/services/nextConfig';
+import { updateDeploymentStatus } from '~/services/deploymentStatus';
+import {
+  getNginxContainerAccessLogPath,
+  getNginxContainerErrorLogPath,
+} from '~/lib/logPaths';
 import {
   ensureDockerfile,
   buildReleaseImages,
@@ -23,8 +28,8 @@ export interface RunReleasePipelineParams {
   version: string;
   branch: string;
   appEnv: Record<string, string>;
-  deploymentId?: number;
-  switchTraffic: (containerId: string) => Promise<void>;
+  deploymentId: number;
+  switchTraffic: (containerId: string, deploymentId: number) => Promise<void>;
 }
 
 async function setDeploymentStatus(
@@ -34,16 +39,15 @@ async function setDeploymentStatus(
   if (deploymentId === undefined) {
     return;
   }
-  await pool.query('UPDATE deployments SET status = $1 WHERE id = $2', [
-    status,
-    deploymentId,
-  ]);
+  await updateDeploymentStatus(deploymentId, status);
 }
 
 export async function runReleasePipeline(
   params: RunReleasePipelineParams
 ): Promise<{ containerId: string }> {
   const { app, version, branch, appEnv, deploymentId, switchTraffic } = params;
+
+  logger.setRedactionContext(appEnv);
 
   const appDir = path.join(getAppsDir(), app.name);
   await setDeploymentStatus(deploymentId, 'building');
@@ -60,7 +64,12 @@ export async function runReleasePipeline(
   await logger.info('Created .env file for build', { path: envFilePath });
 
   const buildMigrator = await isAutoMigrateEnabled(app.id);
-  const { runnerTag } = await buildReleaseImages(app.name, version, buildMigrator);
+  const { runnerTag } = await buildReleaseImages(
+    app.name,
+    version,
+    buildMigrator,
+    deploymentId
+  );
 
   const timestamp = Date.now();
   const containerName = `${app.name}_${version}_${timestamp}`;
@@ -88,8 +97,16 @@ export async function runReleasePipeline(
   }
 
   await logger.info('Phase: switch — updating traffic routing', { phase: 'switch' });
-  await switchTraffic(containerId);
-  await logger.info('Phase: switch — traffic routing updated', { phase: 'switch', containerId });
+  await switchTraffic(containerId, deploymentId);
+
+  const accessLogPath = getNginxContainerAccessLogPath(app.name, deploymentId);
+  const errorLogPath = getNginxContainerErrorLogPath(app.name, deploymentId);
+  await logger.info('Phase: switch — traffic routing updated', {
+    phase: 'switch',
+    containerId,
+    accessLogPath,
+    errorLogPath,
+  });
 
   return { containerId };
 }

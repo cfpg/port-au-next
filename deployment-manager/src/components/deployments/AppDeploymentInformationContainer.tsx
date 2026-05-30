@@ -45,7 +45,7 @@ export function AppDeploymentLogs({ logs }: { logs: DeploymentLog[] }) {
                 <div className="mt-1">{log.message}</div>
                 {log.metadata && (
                   <pre className="text-xs mt-2 text-gray-600 whitespace-pre-wrap break-words">
-                    <span dangerouslySetInnerHTML={{ __html: JSON.stringify(log.metadata, null, 2).replace(/\\n/g, '<br />') }} />
+                    {JSON.stringify(log.metadata, null, 2)}
                   </pre>
                 )}
               </div>

@@ -6,12 +6,16 @@ export async function register() {
     const { setupImgproxy } = await import('./lib/startup');
     const { setupPortSchedule } = await import('./lib/startup');
     const { migrate } = await import('./queries/migrate');
+    const { scheduleLogRetentionCleanup } = await import('./lib/logRetention');
     const { recoverContainers } = await import('./services/docker');
     
     try {
       // Run database migrations
       await migrate();
       console.log('Database migrations completed');
+
+      scheduleLogRetentionCleanup();
+      console.log('Log retention cleanup scheduled');
 
       // Ensure admin user exists on startup
       await ensureAdminUser();

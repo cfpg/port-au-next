@@ -1,9 +1,29 @@
 import { exec } from 'child_process';
 import logger from '~/services/logger';
+import {
+  getActiveRedactionSecrets,
+  redactLogText,
+} from '~/lib/redactLogs';
+
+function getPlatformSecrets(): string[] {
+  return [
+    process.env.MINIO_ROOT_USER,
+    process.env.MINIO_ROOT_PASSWORD,
+    process.env.POSTGRES_PASSWORD,
+    process.env.DEPLOYMENT_MANAGER_AUTH_PASSWORD,
+    process.env.PORT_SCHEDULE_MASTER_API_KEY,
+    process.env.BETTER_AUTH_SECRET,
+  ].filter((value): value is string => Boolean(value));
+}
 
 export async function execCommand(command: string) {
+  const redactedCommand = redactLogText(command, [
+    ...getActiveRedactionSecrets(),
+    ...getPlatformSecrets(),
+  ]);
+
   return new Promise((resolve, reject) => {
-    logger.debug(`Executing command`, { command });
+    logger.debug('Executing command', { command: redactedCommand });
     exec(command, (error: Error | null, stdout: string, stderr: string) => {
       if (error) {
         logger.error('Command execution failed', error);

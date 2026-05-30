@@ -352,7 +352,10 @@ Port-Au-Next exposes a REST API for programmatic control. Here are key endpoints
 - `POST /api/:app/deploy`: Trigger a deployment for an application
 - `GET /api/apps`: List all registered applications
 - `GET /api/apps/:name/deployments`: List deployments for a specific application
-- `GET /api/apps/:name/logs/:deploymentId`: Fetch logs for a specific deployment
+- `GET /api/apps/deployments/:appName/:deploymentId/logs/deploy`: Deployment pipeline logs (JSON)
+- `GET /api/apps/deployments/:appName/:deploymentId/logs/access`: Tail nginx access log (`?bytes=65536`, max 256 KiB)
+- `GET /api/apps/deployments/:appName/:deploymentId/logs/error`: Tail nginx error log
+- `GET /api/apps/deployments/:appName/:deploymentId/logs/build`: Tail docker build log
 
 ### Preview Branches
 - `POST /api/apps/:appId/preview-branches`: Enable preview branches for an app
@@ -371,7 +374,8 @@ Port-Au-Next exposes a REST API for programmatic control. Here are key endpoints
 The deployment manager provides:
 
 - Deployment status tracking
-- Container logs
+- Per-deployment deploy, access, and error logs in the UI
+- Automatic log cleanup 90 days after a deployment becomes inactive or failed (`LOG_RETENTION_DAYS`)
 - Health metrics
 - Preview branch status monitoring
 - Rollback capability for failed deployments

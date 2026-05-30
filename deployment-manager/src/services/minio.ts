@@ -68,7 +68,7 @@ async function createBucket(bucketName: string): Promise<boolean> {
 
 async function createMinioUser(accessKey: string, secretKey: string): Promise<boolean> {
   try {
-    await logger.info(`Creating Minio user with access key: ${accessKey}`);
+    await logger.info('Creating Minio user with access key', { accessKey });
     
     // First, ensure mc is configured with admin credentials
     await execCommand(`docker compose exec minio mc alias set myminio http://minio:80 ${rootUser} ${rootPassword}`);

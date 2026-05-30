@@ -65,7 +65,7 @@ export async function modifyNextConfig(appDir: string) {
 
     // Read existing config
     configContent = fs.readFileSync(configPath, 'utf8');
-    await logger.debug('Original config content:', { content: configContent });
+    await logger.debug('Read Next.js config for modification', { configPath, isTypeScript });
 
     // Parse the configuration while preserving the overall structure
     let modifiedContent = configContent;
@@ -137,7 +137,6 @@ export async function modifyNextConfig(appDir: string) {
       configPath,
       isTypeScript,
       cloudflareEnabled: cloudflare.enabled,
-      modifiedContent
     });
 
   } catch (error) {

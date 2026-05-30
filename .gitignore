@@ -32,6 +32,7 @@ minio/policies/
 # Ignore apps
 apps/*
 log-build*.log
+apps/logs/
 
 # Ignore nginx configs
 nginx/conf.d/app-*.conf

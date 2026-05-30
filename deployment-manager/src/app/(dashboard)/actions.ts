@@ -13,6 +13,10 @@ import fetchRecentDeploymentsQuery from '~/queries/fetchRecentDeploymentsQuery';
 import { revalidatePath } from 'next/cache';
 import { withAuth } from '~/lib/auth-utils';
 import {
+  updateDeploymentStatus,
+  markDeploymentInactiveByContainerId,
+} from '~/services/deploymentStatus';
+import {
   isPreviewBranchesEnabled,
   setupPreviewBranch,
   getPreviewBranch,
@@ -176,8 +180,8 @@ export const triggerDeployment = withAuth(async (appName: string, { pathname, br
             branch: targetBranch,
             appEnv,
             deploymentId,
-            switchTraffic: async (id) => {
-              await updateNginxConfig(appName, app.domain, id);
+            switchTraffic: async (id, depId) => {
+              await updateNginxConfig(appName, app.domain, id, undefined, depId);
             },
           });
 
@@ -200,10 +204,7 @@ export const triggerDeployment = withAuth(async (appName: string, { pathname, br
                 error: (error as Error).message
               });
             } finally {
-              await pool.query(
-                `UPDATE deployments SET status = 'inactive' WHERE container_id = $1`,
-                [oldContainerId]
-              );
+              await markDeploymentInactiveByContainerId(oldContainerId);
             }
           }
 
@@ -232,10 +233,7 @@ export const triggerDeployment = withAuth(async (appName: string, { pathname, br
 
       } catch (error) {
         await logger.error('Deployment failed', error as Error);
-        await pool.query(
-          'UPDATE deployments SET status = $1 WHERE id = $2',
-          ['failed', deploymentId]
-        );
+        await updateDeploymentStatus(deploymentId, 'failed');
       } finally {
         // Clear the deployment context when done
         logger.clearDeploymentContext();

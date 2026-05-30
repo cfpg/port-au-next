@@ -24,6 +24,12 @@ const modal = tv({
       "5xl": { container: "max-w-5xl max-h-[90vh]" },
       "6xl": { container: "max-w-6xl max-h-[90vh]" },
       "7xl": { container: "max-w-7xl max-h-[90vh]" },
+      logs: {
+        backdrop: "fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-3 sm:p-4",
+        container:
+          "max-w-[1600px] w-full h-[calc(100dvh-1.5rem)] max-h-[calc(100dvh-1.5rem)] min-h-0",
+        content: "p-4 overflow-hidden flex-1 min-h-0 flex flex-col",
+      },
     }
   },
   defaultVariants: {

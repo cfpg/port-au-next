@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Deployment logging:** Per-deployment build logs (`apps/logs/{app}/{id}/`), nginx access/error logs (`nginx/logs/apps/{app}/{id}/`), secret redaction in deploy logs, UI tabs (Deploy / Access / Error), and 90-day cleanup after `inactive` or `failed`.
 - **Uses Prisma:** Platform-generated Dockerfiles when the feature is enabled and the app has no custom `Dockerfile` — Node 24, `prisma generate` at build, marker line `# generated-by-port-au-next v1 -uses_prisma` with version/flag regeneration on deploy.
 - **Auto-migrate on deploy:** Nested setting under Uses Prisma (`auto_migrate`, default off). When enabled, deploy runs preflight → `prisma migrate deploy` in a `{app}:{version}-migrate` job (`migrate status` logged only) → nginx switch. New deployment statuses `preflight` and `migrating`. README expand/contract guidance.
 
@@ -17,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Production and preview deploys use a shared release pipeline (build → preflight → optional migrate → traffic switch) instead of flipping nginx immediately after container start.
 - deployment-manager image installs `docker-buildx` CLI plugin (Alpine `docker-cli` does not include it).
 - Bulk import environment variables from pasted `.env` content (skips existing and platform-reserved keys).
-- Default platform Next.js Dockerfile (non-Prisma) remains Node 22; marker format `# generated-by-port-au-next v1`.
+- Deployment pipeline logs redact env secrets; full docker build output is stored on disk only (not in Postgres metadata).
 
 ## [0.4.5] - 2025-05-11
 

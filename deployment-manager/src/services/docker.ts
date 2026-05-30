@@ -21,6 +21,13 @@ import fetchAppServiceCredentialsQuery from '~/queries/fetchAppServiceCredential
 import { isUsesPrismaEnabled } from '~/services/appFeatures';
 import { buildGeneratedDockerfileContent } from '~/services/generatedDockerfileTemplates';
 import {
+  BUILD_LOG_TAIL_MAX_BYTES,
+  ensureDeploymentBuildLogDir,
+  getBuildLogPath,
+} from '~/lib/logPaths';
+import { readLogTail } from '~/lib/readLogFile';
+import { redactLogText } from '~/lib/redactLogs';
+import {
   buildDesiredGeneratedDockerfileMarker,
   parseGeneratedDockerfileMarker,
   shouldRegenerateGeneratedDockerfile,
@@ -125,7 +132,8 @@ async function ensureDockerfile(appDir: string, appId: number): Promise<void> {
 interface BuildImageOptions {
   target?: string;
   imageTag?: string;
-  logSuffix?: string;
+  deploymentId?: number;
+  buildVariant?: 'build' | 'build-migrate';
 }
 
 async function buildImage(
@@ -133,11 +141,13 @@ async function buildImage(
   version: string,
   options: BuildImageOptions = {}
 ): Promise<string> {
-  const logSuffix = options.logSuffix ?? '';
-  const logFile = path.join(
-    getAppsDir(),
-    `log-build-${appName}-${version}${logSuffix}.log`
-  );
+  if (options.deploymentId === undefined) {
+    throw new Error('deploymentId is required to write build logs');
+  }
+
+  const buildVariant = options.buildVariant ?? 'build';
+  ensureDeploymentBuildLogDir(appName, options.deploymentId);
+  const logFile = getBuildLogPath(appName, options.deploymentId, buildVariant);
 
   try {
     const imageTag = options.imageTag ?? `${appName}:${version}`;
@@ -145,7 +155,7 @@ async function buildImage(
     const targetArg = options.target ? ` --target ${options.target}` : '';
 
     await logger.info('Building Docker image', { imageTag, target: options.target });
-    await logger.info('You can find the build log in the file', { logFile });
+    await logger.info('Build log file', { buildLogPath: logFile });
 
     await execCommand(
       `DOCKER_BUILDKIT=1 docker build${targetArg} -t ${imageTag} ${appDir} &> ${logFile}`
@@ -173,17 +183,24 @@ async function buildImage(
     await logger.error(`Error building image`, error as Error);
     throw error;
   } finally {
-    const logContent = fs.readFileSync(logFile, 'utf8');
-    await logger.info('Docker build log', { logContent });
+    if (fs.existsSync(logFile)) {
+      const { content, sizeBytes } = readLogTail(logFile, BUILD_LOG_TAIL_MAX_BYTES);
+      await logger.info('Docker build log', {
+        buildLogPath: logFile,
+        sizeBytes,
+        tailRedacted: content ? redactLogText(content) : undefined,
+      });
+    }
   }
 }
 
 async function buildReleaseImages(
   appName: string,
   version: string,
-  buildMigrator: boolean
+  buildMigrator: boolean,
+  deploymentId: number
 ): Promise<{ runnerTag: string; migratorTag?: string }> {
-  const runnerTag = await buildImage(appName, version);
+  const runnerTag = await buildImage(appName, version, { deploymentId });
 
   if (!buildMigrator) {
     return { runnerTag };
@@ -193,7 +210,8 @@ async function buildReleaseImages(
   await buildImage(appName, version, {
     target: 'migrator',
     imageTag: migrateTag,
-    logSuffix: '-migrate',
+    deploymentId,
+    buildVariant: 'build-migrate',
   });
 
   return { runnerTag, migratorTag: migrateTag };
@@ -255,7 +273,8 @@ async function startContainer(
 async function buildAndStartContainer(
   app: App, 
   version: string, 
-  env: Record<string, string> = {}
+  env: Record<string, string> = {},
+  deploymentId?: number
 ): Promise<ContainerInfo> {
   try {
     const appDir = path.join(APPS_DIR, app.name);
@@ -279,7 +298,11 @@ async function buildAndStartContainer(
     fs.writeFileSync(envFilePath, envFileContent, { encoding: 'utf-8' });
     await logger.info('Created .env file', { path: envFilePath });
 
-    const { runnerTag } = await buildReleaseImages(app.name, version, false);
+    if (deploymentId === undefined) {
+      throw new Error('deploymentId is required for buildAndStartContainer');
+    }
+
+    const { runnerTag } = await buildReleaseImages(app.name, version, false, deploymentId);
     const timestamp = new Date().getTime();
     const containerName = `${app.name}_${version}_${timestamp}`;
 
@@ -447,7 +470,9 @@ async function recoverContainers(): Promise<void> {
             await updateNginxConfig(
               deployment.name,
               deployment.domain,
-              containerId
+              containerId,
+              undefined,
+              deployment.deployment_id
             );
 
             await updateDeploymentContainer(deployment.container_id, containerId);
@@ -465,13 +490,16 @@ async function recoverContainers(): Promise<void> {
             const { containerId } = await buildAndStartContainer(
               deployment,
               deployment.version,
-              dbEnv
+              dbEnv,
+              deployment.deployment_id
             );
 
             await updateNginxConfig(
               deployment.name,
               deployment.domain,
-              containerId
+              containerId,
+              undefined,
+              deployment.deployment_id
             );
 
             await updateDeploymentContainer(deployment.container_id, containerId);
@@ -511,12 +539,14 @@ async function recoverContainers(): Promise<void> {
             await updateNginxConfig(
               deployment.name,
               deployment.domain,
-              deployment.container_id
+              deployment.container_id,
+              undefined,
+              deployment.deployment_id
             );
 
-            await logger.info(`Successfully recovered existing container`, { 
+            await logger.info(`Successfully recovered existing container`, {
               name: deployment.name,
-              containerId: deployment.container_id 
+              containerId: deployment.container_id,
             });
           } else {
             await logger.info(`Container recovered on its own`, { 
@@ -534,7 +564,9 @@ async function recoverContainers(): Promise<void> {
           await updateNginxConfig(
             deployment.name,
             deployment.domain,
-            deployment.container_id
+            deployment.container_id,
+            undefined,
+            deployment.deployment_id
           );
           await logger.info(`Nginx config updated with container's new internal IP address`, {
             name: deployment.name,

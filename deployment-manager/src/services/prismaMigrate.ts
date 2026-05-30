@@ -41,7 +41,7 @@ async function runMigratorCommand(
   shellCmd: string
 ): Promise<MigratorCommandResult> {
   const command = `docker run --rm --network ${networkName} ${envString} ${imageTag} sh -c ${JSON.stringify(shellCmd)}`;
-  await logger.debug('Executing migrator command', { command, phase: 'migrate' });
+  await logger.debug('Executing migrator command', { phase: 'migrate', imageTag, shellCmd });
 
   try {
     const { stdout, stderr } = await execAsync(command);

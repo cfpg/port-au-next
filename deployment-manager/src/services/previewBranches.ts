@@ -157,7 +157,7 @@ export async function updatePreviewBranchStatus(id: number, status: string, cont
 export async function deployPreviewBranch(
   appId: number,
   branch: string,
-  deploymentId?: number,
+  deploymentId: number,
   version?: string
 ) {
   try {
@@ -230,8 +230,8 @@ export async function deployPreviewBranch(
       branch,
       appEnv,
       deploymentId,
-      switchTraffic: async (id) => {
-        await updateNginxConfig(app.name, app.preview_domain, id, branch);
+      switchTraffic: async (id, depId) => {
+        await updateNginxConfig(app.name, app.preview_domain, id, branch, depId);
       },
     });
 

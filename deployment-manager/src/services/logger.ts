@@ -1,7 +1,15 @@
 import pool from '~/services/database';
+import {
+  clearActiveRedactionSecrets,
+  collectSecretValues,
+  redactLogText,
+  redactMetadata,
+  setActiveRedactionSecrets,
+} from '~/lib/redactLogs';
 
 class Logger {
   private deploymentId: number | null;
+
   constructor() {
     this.deploymentId = null;
   }
@@ -12,68 +20,85 @@ class Logger {
 
   clearDeploymentContext() {
     this.deploymentId = null;
+    clearActiveRedactionSecrets();
   }
 
-  async log(type: string, message: string, metadata: Record<string, any> = {}) {
+  setRedactionContext(env: Record<string, string>) {
+    setActiveRedactionSecrets(collectSecretValues(env));
+  }
+
+  async log(type: string, message: string, metadata: Record<string, unknown> = {}) {
     try {
-      // Always log to console first
+      const redactedMessage = redactLogText(message);
+      const redactedMetadata = redactMetadata(metadata);
+
       const timestamp = new Date().toISOString();
-      const consoleMessage = `[${timestamp}] [${type.toUpperCase()}] ${message}`;
-      
+      const consoleMessage = `[${timestamp}] [${type.toUpperCase()}] ${redactedMessage}`;
+
       switch (type) {
         case 'error':
-          console.error(consoleMessage, metadata);
+          console.error(consoleMessage, redactedMetadata);
           break;
         case 'warning':
-          console.warn(consoleMessage, metadata);
+          console.warn(consoleMessage, redactedMetadata);
           break;
         case 'debug':
-          console.debug(consoleMessage, metadata);
+          console.debug(consoleMessage, redactedMetadata);
           break;
         default:
-          console.log(consoleMessage, metadata);
+          console.log(consoleMessage, redactedMetadata);
       }
 
-      // If we have a deployment context, also log to database
-      if (this.deploymentId) {
+      const skipDbForDebug =
+        type === 'debug' && process.env.NODE_ENV === 'production';
+
+      if (this.deploymentId && !skipDbForDebug) {
         await pool.query(
           `INSERT INTO deployment_logs 
            (deployment_id, type, message, metadata) 
            VALUES ($1, $2, $3, $4)`,
-          [this.deploymentId, type, message, JSON.stringify(metadata)]
+          [
+            this.deploymentId,
+            type,
+            redactedMessage,
+            JSON.stringify(redactedMetadata),
+          ]
         );
       }
     } catch (error) {
-      // If we can't log to the database, at least log to console
       console.error('Error saving log to database:', error);
     }
   }
 
-  async info(message: string, metadata: Record<string, any> = {}) {
+  async info(message: string, metadata: Record<string, unknown> = {}) {
     return this.log('info', message, metadata);
   }
 
-  async error(message: string, error: (Error & { code?: string; status?: string; headers?: any }) | null = null) {
-    const metadata = error ? {
-      error: {
-        message: error.message,
-        stack: error.stack,
-        code: (error as any).code || null,
-        name: error.name
-      }
-    } : {};
+  async error(
+    message: string,
+    error: (Error & { code?: string; status?: string; headers?: unknown }) | null = null
+  ) {
+    const metadata = error
+      ? {
+          error: {
+            message: error.message,
+            stack: error.stack,
+            code: (error as Error & { code?: string }).code || null,
+            name: error.name,
+          },
+        }
+      : {};
     return this.log('error', message, metadata);
   }
 
-  async warning(message: string, metadata: Record<string, any> = {}) {
+  async warning(message: string, metadata: Record<string, unknown> = {}) {
     return this.log('warning', message, metadata);
   }
 
-  async debug(message: string, metadata: Record<string, any> = {}) {
+  async debug(message: string, metadata: Record<string, unknown> = {}) {
     return this.log('debug', message, metadata);
   }
 }
 
-// Create and export singleton instance
 const logger = new Logger();
 export default logger;
