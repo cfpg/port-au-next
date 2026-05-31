@@ -6,8 +6,6 @@ import { stopContainer } from './docker';
 import { runReleasePipeline } from './releasePipeline';
 import { pullLatestChanges, getLatestCommit } from './git';
 import { getPreviewBranchSubdomain, sanitizeBranchForSubdomain } from '~/utils/previewBranches';
-import { generateBucketName } from '~/utils/bucket';
-import fetchAppServiceCredentialsQuery from '~/queries/fetchAppServiceCredentialsQuery';
 
 interface PreviewBranchSetup {
   appId: number;
@@ -186,32 +184,6 @@ export async function deployPreviewBranch(
     await pullLatestChanges(app.name, branch);
     const commitId = await getLatestCommit(app.name, branch);
 
-    // Get environment variables for the branch
-    const envVarsResult = await pool.query(`
-      SELECT key, value 
-      FROM app_env_vars 
-      WHERE app_id = $1 
-      AND (
-        (branch = $2 AND is_preview = true) OR
-        (branch IS NULL AND is_preview = true)
-      )
-    `, [appId, branch]);
-
-    const envVars = Object.fromEntries(
-      envVarsResult.rows.map(row => [row.key, row.value])
-    );
-
-    // Get Minio credentials
-    const minioResult = await fetchAppServiceCredentialsQuery(appId, 'minio', true);
-
-    const minio = minioResult?.[0];
-    
-    if (minio) {
-      envVars.MINIO_ACCESS_KEY = minio.public_key;
-      envVars.MINIO_SECRET_KEY = minio.secret_key;
-      envVars.MINIO_BUCKET = generateBucketName(app.name, true);
-    }
-
     const releaseVersion =
       version ?? new Date().toISOString().replace(/[^0-9]/g, '');
     const appEnv = {
@@ -221,7 +193,6 @@ export async function deployPreviewBranch(
       POSTGRES_HOST: 'postgres',
       BRANCH: branch,
       DATABASE_URL: `postgres://${previewBranch.db_user}:${previewBranch.db_password}@postgres:5432/${previewBranch.db_name}`,
-      ...envVars
     };
 
     const { containerId } = await runReleasePipeline({

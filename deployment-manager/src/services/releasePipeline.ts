@@ -14,6 +14,7 @@ import {
   getNginxContainerAccessLogPath,
   getNginxContainerErrorLogPath,
 } from '~/lib/logPaths';
+import { mergeAppEnv } from '~/services/appEnv';
 import {
   ensureDockerfile,
   buildReleaseImages,
@@ -45,7 +46,9 @@ async function setDeploymentStatus(
 export async function runReleasePipeline(
   params: RunReleasePipelineParams
 ): Promise<{ containerId: string }> {
-  const { app, version, branch, appEnv, deploymentId, switchTraffic } = params;
+  const { app, version, branch, deploymentId, switchTraffic } = params;
+  const isPreview = branch !== app.branch;
+  const appEnv = await mergeAppEnv(app, branch, params.appEnv, { isPreview });
 
   logger.setRedactionContext(appEnv);
 

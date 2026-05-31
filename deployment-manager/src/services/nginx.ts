@@ -5,10 +5,10 @@ import logger from '~/services/logger';
 import { getContainerIp, execCommand } from '~/utils/docker';
 import getAppsDir from '~/utils/getAppsDir';
 import {
-  ensureNginxDeploymentLogDir,
   getNginxContainerAccessLogPath,
   getNginxContainerErrorLogPath,
 } from '~/lib/logPaths';
+import { ensureNginxDeploymentLogDir } from '~/lib/nginxLogs';
 
 const NGINX_CONFIG_DIR = path.join(getAppsDir(), '../nginx/conf.d');
 
@@ -105,7 +105,7 @@ async function updateNginxConfig(
     }
 
     if (deploymentId !== undefined) {
-      ensureNginxDeploymentLogDir(appName, deploymentId);
+      await ensureNginxDeploymentLogDir(appName, deploymentId);
     }
 
     let configPath: string;

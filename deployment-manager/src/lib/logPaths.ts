@@ -53,10 +53,6 @@ export function getNginxContainerErrorLogPath(appName: string, deploymentId: num
   return `/var/log/nginx/apps/${appName}/${deploymentId}/error.log`;
 }
 
-export function ensureNginxDeploymentLogDir(appName: string, deploymentId: number): void {
-  fs.mkdirSync(getNginxDeploymentLogDir(appName, deploymentId), { recursive: true });
-}
-
 export function ensureDeploymentBuildLogDir(appName: string, deploymentId: number): void {
   fs.mkdirSync(getDeploymentBuildLogDir(appName, deploymentId), { recursive: true });
 }

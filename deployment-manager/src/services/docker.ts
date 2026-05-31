@@ -4,7 +4,6 @@ import * as path from 'path';
 import { getActiveDeployments, updateDeploymentContainer, deduplicateActiveDeployments, cleanupStaleBuildingDeployments, cleanupOrphanedPreviewDeployments } from '~/services/database';
 import { updateNginxConfig } from '~/services/nginx';
 import logger from '~/services/logger';
-import pool from '~/services/database';
 import { modifyNextConfig } from '~/services/nextConfig';
 
 import { execCommand } from '~/utils/docker';
@@ -14,10 +13,8 @@ import { migratorImageTag } from '~/services/prismaMigrate';
 import { ServiceStatus } from '~/types';
 import { Service } from '~/types';
 import { ServiceHealth } from '~/types';
-import { getMinioEnvVars } from './minio';
-import { ensurePortScheduleForProductionApp } from './portSchedule';
+import { mergeAppEnv } from '~/services/appEnv';
 import { App } from '~/types';
-import fetchAppServiceCredentialsQuery from '~/queries/fetchAppServiceCredentialsQuery';
 import { isUsesPrismaEnabled } from '~/services/appFeatures';
 import { buildGeneratedDockerfileContent } from '~/services/generatedDockerfileTemplates';
 import {
@@ -33,12 +30,6 @@ import {
   shouldRegenerateGeneratedDockerfile,
 } from '~/utils/generatedDockerfileMarker';
 
-// Types
-interface EnvVar {
-  key: string;
-  value: string;
-}
-
 interface ContainerInfo {
   containerId: string;
   containerName?: string;
@@ -47,49 +38,6 @@ interface ContainerInfo {
 // Constants
 const APPS_DIR: string = getAppsDir();
 const networkName: string = 'port-au-next_port_au_next_network';
-
-async function getAppEnvVars(app: App, branch: string = 'main', filterPrefix: string | null = null): Promise<EnvVar[]> {
-  const query = `
-    SELECT key, value 
-    FROM app_env_vars av
-    JOIN apps a ON a.id = av.app_id
-    WHERE a.id = $1 AND av.branch = $2
-    ${filterPrefix ? `AND key LIKE '${filterPrefix}%'` : ''}
-  `;
-
-  const envResult = await pool.query(query, [app.id, branch]);
-  const envVars = envResult.rows;
-
-  // Get Minio credentials for the app
-  const isProduction = branch === app.branch;
-  const minioCredentials = await fetchAppServiceCredentialsQuery(app.id, 'minio', !isProduction);
-
-  let minioEnvVars = {};
-  if (minioCredentials.length) {
-    minioEnvVars = getMinioEnvVars(minioCredentials[0], app.name);
-  }
-
-  // Convert Minio env vars to the same format as database env vars
-  const minioEnvVarsArray = Object.entries(minioEnvVars).map(([key, value]) => ({
-    key,
-    value
-  }));
-
-  let portScheduleEnvVars: EnvVar[] = [];
-  if (isProduction) {
-    const scheduleVars = await ensurePortScheduleForProductionApp(app);
-    portScheduleEnvVars = Object.entries(scheduleVars).map(([key, value]) => ({ key, value }));
-  }
-
-  return [
-    { key: 'IMGPROXY_HOST', value: process.env.IMGPROXY_HOST || '' },
-    { key: 'NEXT_PUBLIC_IMGPROXY_HOST', value: process.env.IMGPROXY_HOST || '' },
-    { key: 'NEXT_PUBLIC_SITE_URL', value: `https://${app.domain}` },
-    ...envVars,
-    ...minioEnvVarsArray,
-    ...portScheduleEnvVars
-  ];
-}
 
 async function ensureDockerfile(appDir: string, appId: number): Promise<void> {
   const dockerfilePath = path.join(appDir, 'Dockerfile');
@@ -282,13 +230,8 @@ async function buildAndStartContainer(
 
     await modifyNextConfig(appDir);
 
-    await logger.debug('Fetching environment variables');
-    const envVars = await getAppEnvVars(app, env.BRANCH || 'main');
-
-    const appEnv = {
-      ...env,
-      ...Object.fromEntries(envVars.map(row => [row.key, row.value]))
-    };
+    const targetBranch = env.BRANCH || app.branch || 'main';
+    const appEnv = await mergeAppEnv(app, targetBranch, env);
 
     const envFilePath = path.join(appDir, '.env');
     const envFileContent = Object.entries(appEnv)
@@ -450,9 +393,9 @@ async function recoverContainers(): Promise<void> {
               imageTag
             });
 
-            // Get environment variables from database
-            const envVars = await getAppEnvVars(deployment, targetBranch);
-            const allEnv = { ...dbEnv, ...Object.fromEntries(envVars.map(r => [r.key, r.value])) };
+            const allEnv = await mergeAppEnv(deployment, targetBranch, dbEnv, {
+              isPreview: targetBranch !== deployment.branch,
+            });
             const envString = Object.entries(allEnv)
               .map(([key, value]) => `"-e${key}=${value}"`)
               .join(' ');

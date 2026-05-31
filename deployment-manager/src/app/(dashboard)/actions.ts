@@ -22,8 +22,6 @@ import {
   getPreviewBranch,
   deployPreviewBranch
 } from '~/services/previewBranches';
-import fetchAppServiceCredentialsQuery from '~/queries/fetchAppServiceCredentialsQuery';
-import { generateBucketName } from '~/utils/bucket';
 
 export const fetchApps = withAuth(async () => {
   const apps = await fetchAppsQuery();
@@ -150,20 +148,6 @@ export const triggerDeployment = withAuth(async (appName: string, { pathname, br
           const oldContainerId = oldDeployment.rows[0]?.container_id;
           const oldCommitId = oldDeployment.rows[0]?.commit_id;
 
-          const envVarsResult = await pool.query(`
-            SELECT key, value 
-            FROM app_env_vars 
-            WHERE app_id = $1 
-            AND (
-              (branch = $2 AND is_preview = false) OR
-              (branch IS NULL AND is_preview = false)
-            )
-          `, [app.id, targetBranch]);
-
-          const envVars = Object.fromEntries(
-            envVarsResult.rows.map(row => [row.key, row.value])
-          );
-
           const appEnv = {
             POSTGRES_USER: app.db_user,
             POSTGRES_PASSWORD: app.db_password,
@@ -171,7 +155,6 @@ export const triggerDeployment = withAuth(async (appName: string, { pathname, br
             POSTGRES_HOST: 'postgres',
             BRANCH: targetBranch,
             DATABASE_URL: `postgres://${app.db_user}:${app.db_password}@postgres:5432/${app.db_name}`,
-            ...envVars
           };
 
           const { containerId } = await runReleasePipeline({

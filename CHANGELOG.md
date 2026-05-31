@@ -10,7 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Deploy env assembly is centralized in `mergeAppEnv()` so production, preview, recovery, and the release pipeline all inject the same platform-managed variables (Minio, Imgproxy, port-schedule, site URL).
+
 ### Fixed
+
+- **Release pipeline env vars:** Redeploys no longer omit platform-injected reserved keys (`MINIO_HOST`, `IMGPROXY_HOST`, etc.) from the build `.env`, fixing Next.js build failures for apps that validate those variables at build time.
+- **Nginx deployment logs:** Per-deployment log directories are created via the nginx container with correct ownership, fixing `EACCES` errors during startup container recovery after 0.5.0 logging was enabled.
 
 ## [0.5.0] - 2026-05-30
 

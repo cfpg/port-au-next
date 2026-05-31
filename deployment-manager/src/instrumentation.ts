@@ -7,7 +7,7 @@ export async function register() {
     const { setupPortSchedule } = await import('./lib/startup');
     const { migrate } = await import('./queries/migrate');
     const { scheduleLogRetentionCleanup } = await import('./lib/logRetention');
-    const { recoverContainers } = await import('./services/docker');
+    const { ensureNginxAppsLogRoot } = await import('./lib/nginxLogs');
     
     try {
       // Run database migrations
@@ -32,6 +32,11 @@ export async function register() {
       // Optional: nginx vhost for public port-schedule hostname
       await setupPortSchedule();
       console.log('port-schedule vhost step finished (no vhost if PORT_SCHEDULE_HOST unset)');
+
+      await ensureNginxAppsLogRoot();
+      console.log('Nginx apps log directory permissions configured');
+
+      const { recoverContainers } = await import('./services/docker');
 
       // Recover any containers that are not running
       await recoverContainers();
