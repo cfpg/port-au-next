@@ -15,6 +15,7 @@ interface AppSettingsFormProps {
     repo_url?: string;
     branch?: string;
     cloudflare_zone_id?: string;
+    root_path?: string;
   };
 }
 
@@ -71,6 +72,20 @@ export function AppSettingsForm({ appId, initialSettings }: AppSettingsFormProps
           onChange={(e) => handleChange('branch', e.target.value)}
           placeholder="main"
         />
+
+        <div className="md:col-span-2">
+          <Input
+            id="root_path"
+            label="Project path"
+            value={settings.root_path || ''}
+            onChange={(e) => handleChange('root_path', e.target.value)}
+            placeholder="marketing-site"
+          />
+          <p className="mt-1 text-sm text-gray-500">
+            For monorepos, set the subdirectory containing your Next.js app (must include
+            package.json and next.config.ts). Leave empty to use the repository root.
+          </p>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

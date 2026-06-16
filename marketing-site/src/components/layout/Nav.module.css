@@ -1,0 +1,143 @@
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  backdrop-filter: blur(10px);
+  background: rgba(253, 251, 247, 0.82);
+  border-bottom: 1px solid var(--pan-border-light);
+}
+
+.inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-block: 14px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.brandName {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 17px;
+  letter-spacing: -0.01em;
+}
+
+.desktopLinks {
+  display: flex;
+  align-items: center;
+  gap: 30px;
+}
+
+.link {
+  font-size: 14.5px;
+  color: var(--pan-text);
+}
+
+.githubBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 14px;
+  background: var(--pan-ink);
+  color: var(--pan-cream);
+  border-radius: var(--pan-radius-sm);
+  padding: 9px 16px;
+}
+
+.menuToggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--pan-ink);
+  cursor: pointer;
+  padding: 4px;
+}
+
+.mobileMenu {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .desktopLinks {
+    display: none;
+  }
+
+  .menuToggle {
+    display: flex;
+  }
+
+  .mobileMenu {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+  }
+
+  .mobileMenuOpen {
+    pointer-events: auto;
+    opacity: 1;
+  }
+
+  .mobileBackdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(39, 31, 26, 0.35);
+  }
+
+  .mobilePanel {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: min(320px, 85vw);
+    height: 100%;
+    background: var(--pan-cream);
+    border-left: 1px solid var(--pan-border);
+    padding: 80px 28px 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    transform: translateX(100%);
+    transition: transform 0.25s ease;
+    box-shadow: -8px 0 32px rgba(39, 31, 26, 0.12);
+  }
+
+  .mobileMenuOpen .mobilePanel {
+    transform: translateX(0);
+  }
+
+  .mobileLink {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 18px;
+    color: var(--pan-text);
+    padding: 14px 0;
+    border-bottom: 1px solid var(--pan-border-light);
+  }
+
+  .mobileGithub {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 16px;
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 15px;
+    background: var(--pan-ink);
+    color: var(--pan-cream);
+    border-radius: var(--pan-radius-sm);
+    padding: 14px 20px;
+  }
+}

@@ -1,0 +1,254 @@
+.section {
+  background: var(--pan-warm);
+  border-top: 1px solid var(--pan-border-warm);
+  border-bottom: 1px solid var(--pan-border-warm);
+  padding-block: 74px;
+}
+
+.header {
+  text-align: center;
+  margin-inline: auto;
+  margin-bottom: 44px;
+}
+
+.panel {
+  background: var(--pan-white);
+  border: 1px solid var(--pan-border);
+  border-radius: 22px;
+  padding: 32px;
+  box-shadow: 0 12px 34px rgba(39, 31, 26, 0.05);
+}
+
+.panelTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-bottom: 28px;
+}
+
+.panelTitle {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 19px;
+}
+
+.panelPhase {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--pan-text-faint);
+  margin-top: 5px;
+}
+
+.deployBtn {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 14.5px;
+  background: var(--pan-accent);
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  padding: 13px 22px;
+  cursor: pointer;
+  box-shadow: 0 7px 18px rgba(226, 85, 59, 0.24);
+}
+
+.pipeline {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+  margin-bottom: 28px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.pipelineStep {
+  background: var(--pan-warm);
+  border: 1px solid var(--pan-border);
+  border-radius: 9px;
+  padding: 8px 13px;
+  color: var(--pan-text);
+}
+
+.pipelineArrow {
+  color: #c7b8a8;
+}
+
+.pipelineRouter {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--pan-ink);
+  color: var(--pan-cream);
+  border-radius: 9px;
+  padding: 8px 13px;
+}
+
+.trafficDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 99px;
+  transition: background 0.5s ease;
+}
+
+.slots {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+
+.slotWrap {
+  position: relative;
+  border-radius: 16px;
+}
+
+.liveRing {
+  position: absolute;
+  inset: 0;
+  border-radius: 16px;
+  border: 2px solid transparent;
+  pointer-events: none;
+  z-index: 3;
+  transition: opacity 0.5s ease;
+}
+
+.blueBorder {
+  border-color: var(--pan-harbour);
+  box-shadow: 0 0 0 4px rgba(62, 124, 140, 0.1);
+}
+
+.greenBorder {
+  border-color: var(--pan-green);
+  box-shadow: 0 0 0 4px rgba(79, 160, 107, 0.12);
+}
+
+.buildPulse {
+  position: absolute;
+  inset: 0;
+  border-radius: 16px;
+  background: var(--pan-sun);
+  animation: buildPulse 1s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 2;
+  mix-blend-mode: multiply;
+  transition: opacity 0.3s ease;
+}
+
+.slotInner {
+  position: relative;
+  z-index: 1;
+  border: 1px solid transparent;
+  border-radius: 16px;
+  padding: 20px;
+}
+
+.blueBg {
+  background: var(--pan-blue-bg);
+  border-color: var(--pan-blue-border);
+}
+
+.greenBg {
+  background: var(--pan-green-bg);
+  border-color: var(--pan-green-border);
+}
+
+.flowBar {
+  height: 5px;
+  width: 62px;
+  border-radius: 99px;
+  background-size: 100% 18px;
+  animation: panFlow 0.7s linear infinite;
+  transition: opacity 0.4s;
+  margin-bottom: 16px;
+}
+
+.slotHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.slotName {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 16px;
+}
+
+.slotBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  border-radius: 999px;
+  padding: 5px 11px;
+  white-space: nowrap;
+}
+
+.slotDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 99px;
+  transition: background 0.4s;
+}
+
+.slotVersion {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: #5c7b83;
+  margin-top: 12px;
+}
+
+.slotBlocks {
+  display: flex;
+  gap: 6px;
+  margin-top: 14px;
+}
+
+.slotBlocks div {
+  flex: 1;
+  height: 24px;
+  border-radius: 6px;
+}
+
+.footerNote {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin-top: 24px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--pan-text-subtle);
+  flex-wrap: wrap;
+}
+
+.zeroDowntime {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: #ebf5ee;
+  color: var(--pan-green-text);
+  border-radius: 999px;
+  padding: 6px 13px;
+  flex-shrink: 0;
+}
+
+.zeroDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 99px;
+  background: var(--pan-green);
+}
+
+@media (max-width: 768px) {
+  .slots {
+    grid-template-columns: 1fr;
+  }
+
+  .panel {
+    padding: 24px 20px;
+  }
+}

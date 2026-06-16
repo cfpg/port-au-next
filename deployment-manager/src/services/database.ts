@@ -160,7 +160,7 @@ export async function cleanupOrphanedPreviewDeployments() {
 
 export async function getActiveDeployments() {
   const result = await pool.query(`
-    SELECT a.id, a.name, a.domain, a.branch, a.db_user, a.db_password, a.db_name,
+    SELECT a.id, a.name, a.domain, a.branch, a.root_path, a.db_user, a.db_password, a.db_name,
            d.id AS deployment_id, d.container_id, d.version, d.branch AS deployment_branch
     FROM deployments d
     JOIN apps a ON a.id = d.app_id

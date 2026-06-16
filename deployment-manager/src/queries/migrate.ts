@@ -266,6 +266,11 @@ export async function migrate() {
       WHERE status IN ('inactive', 'failed')
     `);
 
+    await pool.query(`
+      ALTER TABLE apps
+      ADD COLUMN IF NOT EXISTS root_path TEXT NOT NULL DEFAULT ''
+    `);
+
     await pool.query('COMMIT');
     console.log('Database migration completed successfully');
   } catch (error) {

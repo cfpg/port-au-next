@@ -1,0 +1,49 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  border-radius: 999px;
+}
+
+.md {
+  font-size: 10.5px;
+  padding: 5px 10px;
+}
+
+.sm {
+  font-size: 11px;
+  padding: 4px 10px;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 99px;
+  flex-shrink: 0;
+}
+
+.sm .dot {
+  width: 6px;
+  height: 6px;
+}
+
+.live {
+  background: #ebf5ee;
+  color: var(--pan-green-text);
+}
+
+.building {
+  background: #fcefd9;
+  color: #b07a1e;
+}
+
+.preview {
+  background: #e9f1f3;
+  color: #356575;
+}
+
+.idle {
+  background: #f1ece4;
+  color: var(--pan-text-subtle);
+}

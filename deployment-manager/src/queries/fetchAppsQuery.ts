@@ -19,6 +19,7 @@ export default async function fetchAppsQuery({ where: { appId, appName } = {} }:
         a.db_user,
         a.db_password,
         a.cloudflare_zone_id,
+        a.root_path,
         COALESCE(
           jsonb_object_agg(
             env.key, 
@@ -60,6 +61,7 @@ export default async function fetchAppsQuery({ where: { appId, appName } = {} }:
         a.db_user,
         a.db_password,
         a.cloudflare_zone_id,
+        a.root_path,
         d.id,
         d.version,
         d.commit_id,
