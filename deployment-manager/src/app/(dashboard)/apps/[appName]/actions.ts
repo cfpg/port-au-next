@@ -17,6 +17,13 @@ import { AppSettings } from '~/types';
 import fetchActivePreviewBranchesQuery from '~/queries/fetchActivePreviewBranches';
 import { cloneRepository } from '~/services/git';
 import { setupAppDatabase } from '~/services/database';
+import {
+  assertAppProjectLayout,
+  getAppProjectDir,
+  normalizeRootPath,
+  validateRootPathFormat,
+} from '~/utils/appPaths';
+import fs from 'fs';
 
 export const fetchApp = withAuth(async (appName: string) => {
   const app = await fetchSingleAppQuery({appName});
@@ -36,11 +43,32 @@ export const updateAppSettings = withAuth(async (
   settings: AppSettings
 ) => {
   try {
-    await updateAppSettingsQuery(appId, settings);
+    const normalizedRootPath = normalizeRootPath(settings.root_path);
+    validateRootPathFormat(normalizedRootPath);
+
+    const appResult = await pool.query<{ name: string }>(
+      'SELECT name FROM apps WHERE id = $1',
+      [appId]
+    );
+    const appName = appResult.rows[0]?.name;
+    if (!appName) {
+      return { success: false, error: 'App not found' };
+    }
+
+    const projectDir = getAppProjectDir(appName, normalizedRootPath);
+    if (fs.existsSync(projectDir)) {
+      assertAppProjectLayout(projectDir);
+    }
+
+    await updateAppSettingsQuery(appId, {
+      ...settings,
+      root_path: normalizedRootPath,
+    });
     return { success: true };
   } catch (error) {
     await logger.error('Failed to update app settings', error as Error);
-    return { success: false, error: 'Failed to update app settings' };
+    const message = error instanceof Error ? error.message : 'Failed to update app settings';
+    return { success: false, error: message };
   }
 });
 
@@ -65,23 +93,39 @@ export const fetchZoneId = withAuth(async (appName: string) => {
   return zoneId;
 });
 
-export const createApp = withAuth(async ({name, repo_url, branch, domain}: {name: string, repo_url: string, branch: string, domain: string,}) => {
-  // Try catch inserting a new app into the table apps and return the app id
+export const createApp = withAuth(async ({
+  name,
+  repo_url,
+  branch,
+  domain,
+  root_path,
+}: {
+  name: string;
+  repo_url: string;
+  branch: string;
+  domain: string;
+  root_path?: string;
+}) => {
+  const normalizedRootPath = normalizeRootPath(root_path);
+
   try {
-    // First insert the app record
+    validateRootPathFormat(normalizedRootPath);
+
     const result = await pool.query(
-      `INSERT INTO apps (name, repo_url, branch, domain) VALUES ($1, $2, $3, $4) RETURNING id`,
-      [name, repo_url, branch, domain]
+      `INSERT INTO apps (name, repo_url, branch, domain, root_path) VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+      [name, repo_url, branch, domain, normalizedRootPath]
     );
     const appId = result.rows[0].id;
     
-    // Clone the repository (idempotent)
     try {
       await cloneRepository(name, repo_url, branch);
       await logger.info(`Repository cloned for app ${name}`);
+
+      const projectDir = getAppProjectDir(name, normalizedRootPath);
+      assertAppProjectLayout(projectDir);
     } catch (error) {
       await logger.error(`Failed to clone repository for app ${name}`, error as Error);
-      // Continue with the process even if cloning fails
+      throw error;
     }
     
     // Set up the database (idempotent)
@@ -103,7 +147,8 @@ export const createApp = withAuth(async ({name, repo_url, branch, domain}: {name
     return appId;
   } catch (error) {
     await logger.error('Failed to create app', error as Error);
-    return { success: false, error: 'Failed to create app' };
+    const message = error instanceof Error ? error.message : 'Failed to create app';
+    return { success: false, error: message };
   }
 });
 

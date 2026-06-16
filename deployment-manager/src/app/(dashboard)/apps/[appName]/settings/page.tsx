@@ -32,6 +32,7 @@ export default async function AppSettingsPage({
               repo_url: app.repo_url,
               branch: app.branch,
               cloudflare_zone_id: app.cloudflare_zone_id,
+              root_path: app.root_path,
             }}
           />
         }

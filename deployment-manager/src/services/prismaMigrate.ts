@@ -4,7 +4,6 @@ import * as path from 'path';
 import { promisify } from 'util';
 
 import logger from '~/services/logger';
-import getAppsDir from '~/utils/getAppsDir';
 import { formatDockerEnvString } from '~/utils/dockerEnv';
 
 const execAsync = promisify(exec);
@@ -14,8 +13,8 @@ export function migratorImageTag(appName: string, version: string): string {
   return `${appName}:${version}-migrate`;
 }
 
-export function hasPrismaMigrationsDir(appName: string): boolean {
-  const migrationsPath = path.join(getAppsDir(), appName, 'prisma', 'migrations');
+export function hasPrismaMigrationsDir(projectDir: string): boolean {
+  const migrationsPath = path.join(projectDir, 'prisma', 'migrations');
   if (!fs.existsSync(migrationsPath)) {
     return false;
   }
@@ -79,9 +78,10 @@ async function logMigratorResult(
 export async function runPrismaMigrations(
   appName: string,
   version: string,
-  appEnv: Record<string, string>
+  appEnv: Record<string, string>,
+  projectDir: string
 ): Promise<void> {
-  if (!hasPrismaMigrationsDir(appName)) {
+  if (!hasPrismaMigrationsDir(projectDir)) {
     await logger.warning(
       'auto_migrate enabled but prisma/migrations not found; skipping database migrations',
       { phase: 'migrate', appName }

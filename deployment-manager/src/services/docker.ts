@@ -25,6 +25,10 @@ import {
 import { readLogTail } from '~/lib/readLogFile';
 import { redactLogText } from '~/lib/redactLogs';
 import {
+  assertAppProjectLayout,
+  getAppProjectDir,
+} from '~/utils/appPaths';
+import {
   buildDesiredGeneratedDockerfileMarker,
   parseGeneratedDockerfileMarker,
   shouldRegenerateGeneratedDockerfile,
@@ -82,6 +86,7 @@ interface BuildImageOptions {
   imageTag?: string;
   deploymentId?: number;
   buildVariant?: 'build' | 'build-migrate';
+  projectDir?: string;
 }
 
 async function buildImage(
@@ -99,14 +104,15 @@ async function buildImage(
 
   try {
     const imageTag = options.imageTag ?? `${appName}:${version}`;
-    const appDir = path.join(getAppsDir(), appName);
+    const projectDir = options.projectDir ?? path.join(getAppsDir(), appName);
+    const dockerfilePath = path.join(projectDir, 'Dockerfile');
     const targetArg = options.target ? ` --target ${options.target}` : '';
 
-    await logger.info('Building Docker image', { imageTag, target: options.target });
+    await logger.info('Building Docker image', { imageTag, target: options.target, projectDir });
     await logger.info('Build log file', { buildLogPath: logFile });
 
     await execCommand(
-      `DOCKER_BUILDKIT=1 docker build${targetArg} -t ${imageTag} ${appDir} &> ${logFile}`
+      `DOCKER_BUILDKIT=1 docker build${targetArg} -t ${imageTag} -f ${dockerfilePath} ${projectDir} &> ${logFile}`
     );
 
     const buildOutput = fs.readFileSync(logFile, 'utf8');
@@ -146,9 +152,10 @@ async function buildReleaseImages(
   appName: string,
   version: string,
   buildMigrator: boolean,
-  deploymentId: number
+  deploymentId: number,
+  projectDir: string
 ): Promise<{ runnerTag: string; migratorTag?: string }> {
-  const runnerTag = await buildImage(appName, version, { deploymentId });
+  const runnerTag = await buildImage(appName, version, { deploymentId, projectDir });
 
   if (!buildMigrator) {
     return { runnerTag };
@@ -160,6 +167,7 @@ async function buildReleaseImages(
     imageTag: migrateTag,
     deploymentId,
     buildVariant: 'build-migrate',
+    projectDir,
   });
 
   return { runnerTag, migratorTag: migrateTag };
@@ -225,15 +233,16 @@ async function buildAndStartContainer(
   deploymentId?: number
 ): Promise<ContainerInfo> {
   try {
-    const appDir = path.join(APPS_DIR, app.name);
-    await ensureDockerfile(appDir, app.id);
+    const projectDir = getAppProjectDir(app.name, app.root_path);
+    assertAppProjectLayout(projectDir);
+    await ensureDockerfile(projectDir, app.id);
 
-    await modifyNextConfig(appDir);
+    await modifyNextConfig(projectDir);
 
     const targetBranch = env.BRANCH || app.branch || 'main';
     const appEnv = await mergeAppEnv(app, targetBranch, env);
 
-    const envFilePath = path.join(appDir, '.env');
+    const envFilePath = path.join(projectDir, '.env');
     const envFileContent = Object.entries(appEnv)
       .map(([key, value]) => `${key}=${value}`)
       .join('\n');
@@ -245,7 +254,7 @@ async function buildAndStartContainer(
       throw new Error('deploymentId is required for buildAndStartContainer');
     }
 
-    const { runnerTag } = await buildReleaseImages(app.name, version, false, deploymentId);
+    const { runnerTag } = await buildReleaseImages(app.name, version, false, deploymentId, projectDir);
     const timestamp = new Date().getTime();
     const containerName = `${app.name}_${version}_${timestamp}`;
 

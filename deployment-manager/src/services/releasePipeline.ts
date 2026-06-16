@@ -4,7 +4,10 @@ import * as path from 'path';
 import pool from '~/services/database';
 import logger from '~/services/logger';
 import { App } from '~/types';
-import getAppsDir from '~/utils/getAppsDir';
+import {
+  assertAppProjectLayout,
+  getAppProjectDir,
+} from '~/utils/appPaths';
 import { formatDockerEnvString } from '~/utils/dockerEnv';
 import { isAutoMigrateEnabled } from '~/services/appFeatures';
 import { runPrismaMigrations } from '~/services/prismaMigrate';
@@ -52,14 +55,15 @@ export async function runReleasePipeline(
 
   logger.setRedactionContext(appEnv);
 
-  const appDir = path.join(getAppsDir(), app.name);
+  const projectDir = getAppProjectDir(app.name, app.root_path);
   await setDeploymentStatus(deploymentId, 'building');
-  await logger.info('Phase: build — preparing application', { phase: 'build', version, branch });
+  await logger.info('Phase: build — preparing application', { phase: 'build', version, branch, projectDir });
 
-  await ensureDockerfile(appDir, app.id);
-  await modifyNextConfig(appDir);
+  assertAppProjectLayout(projectDir);
+  await ensureDockerfile(projectDir, app.id);
+  await modifyNextConfig(projectDir);
 
-  const envFilePath = path.join(appDir, '.env');
+  const envFilePath = path.join(projectDir, '.env');
   const envFileContent = Object.entries(appEnv)
     .map(([key, value]) => `${key}=${value}`)
     .join('\n');
@@ -71,7 +75,8 @@ export async function runReleasePipeline(
     app.name,
     version,
     buildMigrator,
-    deploymentId
+    deploymentId,
+    projectDir
   );
 
   const timestamp = Date.now();
@@ -96,7 +101,7 @@ export async function runReleasePipeline(
 
   if (buildMigrator) {
     await setDeploymentStatus(deploymentId, 'migrating');
-    await runPrismaMigrations(app.name, version, appEnv);
+    await runPrismaMigrations(app.name, version, appEnv, projectDir);
   }
 
   await logger.info('Phase: switch — updating traffic routing', { phase: 'switch' });

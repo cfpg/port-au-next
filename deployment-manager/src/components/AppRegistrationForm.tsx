@@ -10,8 +10,9 @@ export default async function AppRegistrationForm() {
     const repo_url = formData.get('repository') as string;
     const branch = formData.get('branch') as string;
     const domain = formData.get('domain') as string;
+    const root_path = (formData.get('root_path') as string) || undefined;
 
-    await createApp({ name, repo_url, branch, domain });
+    await createApp({ name, repo_url, branch, domain, root_path });
   }
 
   return (
@@ -52,6 +53,20 @@ export default async function AppRegistrationForm() {
             label="Domain"
             required
           />
+
+          <div>
+            <Input
+              type="text"
+              id="root_path"
+              name="root_path"
+              label="Project path (optional)"
+              placeholder="marketing-site"
+            />
+            <p className="mt-1 text-sm text-gray-500">
+              For monorepos, set the subdirectory containing your Next.js app (must include
+              package.json and next.config.ts). Leave empty to use the repository root.
+            </p>
+          </div>
 
           <button
             type="submit"
