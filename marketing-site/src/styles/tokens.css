@@ -1,0 +1,61 @@
+:root {
+  /* Surfaces */
+  --pan-cream: #fdfbf7;
+  --pan-warm: #fbf6ee;
+  --pan-white: #ffffff;
+  --pan-ink: #271f1a;
+  --pan-ink-soft: #1a1411;
+
+  /* Brand */
+  --pan-accent: #e2553b;
+  --pan-accent-deep: #c2412b;
+  --pan-sun: #f0a53c;
+  --pan-harbour: #3e7c8c;
+  --pan-green: #4fa06b;
+
+  /* Text */
+  --pan-text: #5c4f45;
+  --pan-text-muted: #6b5d52;
+  --pan-text-subtle: #7a6c5f;
+  --pan-text-faint: #9a8a7b;
+  --pan-text-warm: #c7b8a8;
+
+  /* Borders & fills */
+  --pan-border: #eae0d2;
+  --pan-border-light: #efe6d8;
+  --pan-border-warm: #f0e6d6;
+  --pan-peach: #f6d9be;
+  --pan-peach-bg: #fbede7;
+  --pan-peach-border: #f4d8ce;
+
+  /* Slot colors */
+  --pan-blue-slot: #2a5663;
+  --pan-blue-bg: #f4f8f9;
+  --pan-blue-border: #dce8eb;
+  --pan-green-slot: #2f6b45;
+  --pan-green-bg: #f1f8f3;
+  --pan-green-border: #d9eadf;
+  --pan-green-text: #357a4e;
+
+  /* Dark section */
+  --pan-dark-card: #322822;
+  --pan-dark-border: #41352d;
+
+  /* Layout */
+  --pan-container: 1180px;
+  --pan-nav-height: 62px;
+  --pan-radius-sm: 10px;
+  --pan-radius-md: 13px;
+  --pan-radius-lg: 16px;
+  --pan-radius-xl: 18px;
+
+  /* Shadows */
+  --pan-shadow-card: 0 14px 34px rgba(39, 31, 26, 0.07);
+  --pan-shadow-hero: 0 26px 60px rgba(39, 31, 26, 0.13);
+  --pan-shadow-accent: 0 8px 22px rgba(226, 85, 59, 0.28);
+
+  /* Fonts (set in layout.tsx) */
+  --font-display: var(--font-space-grotesk, "Space Grotesk", sans-serif);
+  --font-body: var(--font-hanken-grotesk, "Hanken Grotesk", sans-serif);
+  --font-mono: var(--font-ibm-plex-mono, "IBM Plex Mono", monospace);
+}

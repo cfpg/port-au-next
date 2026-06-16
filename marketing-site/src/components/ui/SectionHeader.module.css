@@ -1,0 +1,16 @@
+.header {
+  margin-bottom: 46px;
+}
+
+.center {
+  text-align: center;
+  margin-inline: auto;
+}
+
+.center .pan-section-lead {
+  margin-inline: auto;
+}
+
+.header .pan-section-lead {
+  max-width: 640px;
+}

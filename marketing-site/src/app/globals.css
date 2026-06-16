@@ -1,0 +1,171 @@
+@import "../styles/tokens.css";
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+html,
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+body {
+  min-height: 100%;
+  color: var(--pan-ink);
+  background: var(--pan-cream);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+  background: var(--pan-peach);
+  color: var(--pan-ink);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font: inherit;
+}
+
+img,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+/* Layout utilities */
+.pan-container {
+  width: 100%;
+  max-width: var(--pan-container);
+  margin-inline: auto;
+  padding-inline: 28px;
+}
+
+.pan-section {
+  padding-block: 70px;
+}
+
+/* Typography utilities */
+.pan-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--pan-accent);
+  margin-bottom: 14px;
+}
+
+.pan-eyebrow--sun {
+  color: var(--pan-sun);
+}
+
+.pan-section-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(28px, 4vw, 38px);
+  letter-spacing: -0.02em;
+  line-height: 1.12;
+  margin-bottom: 14px;
+}
+
+.pan-section-lead {
+  font-size: clamp(16px, 2vw, 17px);
+  line-height: 1.6;
+  color: var(--pan-text);
+}
+
+.pan-mono {
+  font-family: var(--font-mono);
+}
+
+/* Interactive utilities from design */
+.pan-link {
+  transition: color 0.15s ease;
+}
+
+.pan-link:hover {
+  color: var(--pan-accent);
+}
+
+.pan-btn {
+  transition: transform 0.12s ease, box-shadow 0.15s ease;
+}
+
+.pan-btn:hover {
+  transform: translateY(-2px);
+}
+
+.pan-card {
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.pan-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--pan-shadow-card);
+  border-color: #e0d3c2;
+}
+
+/* Lucide stroke weight to match design */
+.lucide {
+  stroke-width: 1.9;
+}
+
+/* Animations */
+@keyframes panFlow {
+  to {
+    background-position: 0 -18px;
+  }
+}
+
+@keyframes buildPulse {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@keyframes floaty {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+/* FAQ chevron */
+details[open] .pan-chev {
+  transform: rotate(180deg);
+}
+
+.pan-chev {
+  display: inline-flex;
+  color: var(--pan-text-faint);
+  transition: transform 0.2s;
+}
+
+summary {
+  list-style: none;
+}
+
+summary::-webkit-details-marker {
+  display: none;
+}
