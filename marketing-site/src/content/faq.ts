@@ -49,4 +49,9 @@ export const faqItems: FaqItem[] = [
     answer:
       "A first-party HTTP scheduler. Instead of a crontab inside your container, each app registers cron-like jobs via an API, and port-schedule fires signed webhook requests to your app's public routes on schedule. Perfect for nightly syncs, cleanups, and recurring tasks in a stateless deploy model.",
   },
+  {
+    question: "What is Umami analytics?",
+    answer:
+      "A shared, privacy-focused analytics instance. Opt in per app from the dashboard to get an isolated website, tracking env vars on production deploy, and your own Umami login. You add the Next.js snippet yourself; cookie and consent banners stay your responsibility.",
+  },
 ];

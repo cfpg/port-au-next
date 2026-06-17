@@ -47,6 +47,8 @@ export const installSteps: InstallStep[] = [
       { type: "env", key: "MINIO_HOST", value: "storage.yourdomain.com", valueColor: "#3E7C8C" },
       { type: "env", key: "PORT_SCHEDULE_MASTER_API_KEY", value: "a_long_random_secret", valueColor: "#E2553B" },
       { type: "env", key: "PORT_SCHEDULE_HOST", value: "schedule.yourdomain.com", valueColor: "#3E7C8C" },
+      { type: "env", key: "UMAMI_HOST", value: "analytics.yourdomain.com", valueColor: "#3E7C8C" },
+      { type: "env", key: "UMAMI_APP_SECRET", value: "openssl_rand_hex_32", valueColor: "#E2553B" },
     ],
   },
   {

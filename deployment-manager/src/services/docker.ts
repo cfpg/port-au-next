@@ -585,7 +585,7 @@ async function getServicesHealth(): Promise<ServiceHealth[]> {
     };
   }).filter(status => 
     // Only include our core services
-    ['postgres', 'nginx', 'redis', 'minio', 'imgproxy'].includes(status.service)
+    ['postgres', 'nginx', 'redis', 'minio', 'imgproxy', 'umami'].includes(status.service)
   );
 
   return healthStatus;

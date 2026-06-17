@@ -136,3 +136,32 @@ export async function setupPortSchedule(): Promise<void> {
     throw error;
   }
 }
+
+export async function setupUmami(): Promise<void> {
+  const host = process.env.UMAMI_HOST?.trim();
+  if (!host) {
+    console.log('UMAMI_HOST not set; skipping nginx vhost for Umami');
+    return;
+  }
+
+  try {
+    const containerIp = await getServiceContainerIp('umami');
+
+    await createServiceVhostConfig(
+      'umami',
+      host,
+      [
+        {
+          path: '/',
+          proxyPass: `http://${containerIp}:3000`,
+        },
+      ],
+      { clientMaxBodySize: '5M' }
+    );
+
+    await logger.info('Umami nginx vhost created successfully');
+  } catch (error) {
+    await logger.error('Error setting up Umami nginx', error as Error);
+    throw error;
+  }
+}

@@ -3,6 +3,7 @@ import { App } from '~/types';
 import fetchAppServiceCredentialsQuery from '~/queries/fetchAppServiceCredentialsQuery';
 import { getMinioEnvVars } from '~/services/minio';
 import { ensurePortScheduleForProductionApp } from '~/services/portSchedule';
+import { getUmamiEnvVarsForProductionApp } from '~/services/umami';
 
 interface EnvVar {
   key: string;
@@ -11,7 +12,7 @@ interface EnvVar {
 
 /**
  * Fetches user-defined env vars from the DB and merges platform-injected vars
- * (Minio, Imgproxy, port-schedule, site URL). Platform keys listed later win over
+ * (Minio, Imgproxy, port-schedule, Umami, site URL). Platform keys listed later win over
  * duplicate keys from the DB.
  */
 export async function getPlatformAppEnvVars(
@@ -45,10 +46,14 @@ export async function getPlatformAppEnvVars(
     value,
   }));
 
-  let portScheduleEnvVars: EnvVar[] = [];
+  let productionOnlyEnvVars: EnvVar[] = [];
   if (isProduction) {
     const scheduleVars = await ensurePortScheduleForProductionApp(app);
-    portScheduleEnvVars = Object.entries(scheduleVars).map(([key, value]) => ({ key, value }));
+    const umamiVars = await getUmamiEnvVarsForProductionApp(app);
+    productionOnlyEnvVars = [
+      ...Object.entries(scheduleVars).map(([key, value]) => ({ key, value })),
+      ...Object.entries(umamiVars).map(([key, value]) => ({ key, value })),
+    ];
   }
 
   return [
@@ -57,7 +62,7 @@ export async function getPlatformAppEnvVars(
     { key: 'NEXT_PUBLIC_SITE_URL', value: `https://${app.domain}` },
     ...envVars,
     ...minioEnvVarsArray,
-    ...portScheduleEnvVars,
+    ...productionOnlyEnvVars,
   ];
 }
 

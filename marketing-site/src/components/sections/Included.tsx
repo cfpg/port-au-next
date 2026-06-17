@@ -1,4 +1,5 @@
 import {
+  BarChart3,
   CalendarClock,
   Database,
   HardDrive,
@@ -52,6 +53,12 @@ const services: {
     text: "A first-party HTTP cron scheduler. Per-app jobs fire signed webhooks at your public routes on a schedule.",
     color: "#E2553B",
   },
+  {
+    icon: BarChart3,
+    title: "Umami",
+    text: "Opt-in privacy-focused analytics with a per-app dashboard login. Enable in settings, add the snippet, redeploy.",
+    color: "#3E7C8C",
+  },
 ];
 
 export default function Included() {
@@ -98,6 +105,11 @@ export default function Included() {
           <div>
             PORT_SCHEDULE_URL=
             <span className={styles.envHarbour}>http://port-schedule:8080</span>
+          </div>
+          <div>
+            NEXT_PUBLIC_UMAMI_HOST=
+            <span className={styles.envHarbour}>analytics.yourdomain.dev</span>
+            <span className={styles.envComment}> # when analytics enabled</span>
           </div>
         </div>
       </div>

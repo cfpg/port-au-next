@@ -12,6 +12,9 @@ function getPlatformSecrets(): string[] {
     process.env.POSTGRES_PASSWORD,
     process.env.DEPLOYMENT_MANAGER_AUTH_PASSWORD,
     process.env.PORT_SCHEDULE_MASTER_API_KEY,
+    process.env.UMAMI_ADMIN_PASSWORD,
+    process.env.UMAMI_APP_SECRET,
+    process.env.UMAMI_DB_PASSWORD,
     process.env.BETTER_AUTH_SECRET,
   ].filter((value): value is string => Boolean(value));
 }

@@ -8,9 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Umami analytics:** Shared Umami instance with per-app opt-in provisioning (team, website, dashboard login), production-only `NEXT_PUBLIC_UMAMI_*` env injection, domain sync on app settings change, and Analytics settings UI.
+
 ### Changed
 
-- Deploy env assembly is centralized in `mergeAppEnv()` so production, preview, recovery, and the release pipeline all inject the same platform-managed variables (Minio, Imgproxy, port-schedule, site URL).
+- Deploy env assembly is centralized in `mergeAppEnv()` so production, preview, recovery, and the release pipeline all inject the same platform-managed variables (Minio, Imgproxy, port-schedule, Umami, site URL).
 
 ### Fixed
 
