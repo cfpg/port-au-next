@@ -3,6 +3,7 @@ import { withAuth } from '~/lib/auth-utils';
 import pool from '~/services/database';
 import { grantCreateDb, revokeCreateDb } from '~/services/database';
 import { AppFeature } from '~/types/appFeatures';
+import { syncPreviewWildcardRoute } from '~/services/cloudflareRoutes';
 
 export const GET = withAuth(async (request: Request, { params }: { params: { appId: string } }) => {
   const { appId: appIdParam } = await params;
@@ -109,6 +110,22 @@ export const PATCH = withAuth(async (request: Request, { params }: { params: { a
         } else {
           await revokeCreateDb(dbUser);
         }
+      }
+    }
+
+    if (feature === AppFeature.PREVIEW_BRANCHES) {
+      const appResult = await pool.query<{ preview_domain: string | null }>(
+        'SELECT preview_domain FROM apps WHERE id = $1',
+        [appId]
+      );
+      const previewDomain = appResult.rows[0]?.preview_domain;
+      if (enabled && previewDomain) {
+        const routeResult = await syncPreviewWildcardRoute(appId, previewDomain);
+        if (!routeResult.success && routeResult.error) {
+          return NextResponse.json({ error: routeResult.error }, { status: 400 });
+        }
+      } else if (!enabled && previewDomain) {
+        await syncPreviewWildcardRoute(appId, null, previewDomain);
       }
     }
 

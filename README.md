@@ -14,7 +14,8 @@ Whether you're deploying to a VPS, cloud server, or hardware in your own environ
 
 - **Blue/Green Deployments**: Seamless deployments with zero downtime using a true blue/green strategy
 - **Multi-Tenancy**: Host multiple Next.js applications on a single server
-- **Domain Management**: Connect multiple domains/subdomains to specific applications and branches
+- **Domain Management**: Map domains to apps; connect Cloudflare to automate tunnel routes and DNS from the dashboard
+- **Cloudflare Tunnel Integration**: Connect your account, pick a tunnel, sync published applications and proxied CNAME records per app
 - **Preview Branches**: Deploy and test feature branches with isolated environments and custom subdomains
 - **User Authentication**: Secure admin interface with user management and authentication
 - **GitHub Actions Integration**: Automatically deploy when pushing to configured branches
@@ -90,9 +91,9 @@ UMAMI_DB_PASSWORD=changeme_umami_db
 UMAMI_ADMIN_USERNAME=admin
 UMAMI_ADMIN_PASSWORD=your_chosen_admin_password
 
-# Optional: Used for cache busting
-CLOUDFLARE_API_KEY=your_cloudflare_api_token
-CLOUDFLARE_API_EMAIL=your_cloudflare_api_email
+# Optional: Cloudflare (prefer Settings → Cloudflare in the deployment manager UI)
+# CLOUDFLARE_API_KEY=your_scoped_api_token
+# CLOUDFLARE_ACCOUNT_ID=your_account_id
 ```
 
 3. Launch the system:
@@ -102,6 +103,56 @@ docker compose up --build -d
 ```
 
 4. Access the deployment manager UI at `http://localhost:80` or using the `DEPLOYMENT_MANAGER_HOST` you configured in the `.env` file and log in with the configured admin credentials
+
+## Cloudflare Tunnels
+
+Port-Au-Next integrates with your Cloudflare account to manage **tunnel published applications** and **proxied CNAME DNS** from the dashboard. You still add domains to Cloudflare and run `cloudflared` on your machine — those steps stay manual.
+
+### What Port-Au-Next automates
+
+- List tunnels in your account (name, status, replicas, route count)
+- Select an existing tunnel or create a new one
+- Create or update published application routes when you assign an app domain
+- Create proxied CNAME records pointing hostnames at your tunnel
+- Wildcard preview routes when preview branches are enabled
+- Cache purge on deploy (when a zone is linked to the app)
+
+### What you do manually
+
+1. Add your domain to Cloudflare and point nameservers at your registrar
+2. Run `cloudflared service install <token>` on your homelab (token shown in Settings → Cloudflare)
+
+### Global setup — Settings → Cloudflare
+
+1. Create a [scoped API token](https://developers.cloudflare.com/fundamentals/api/get-started/create-token/) with:
+   - Account → **Cloudflare Tunnel** → Edit
+   - Account → **Account Settings** → Read
+   - Zone → **DNS** → Edit
+   - Zone → **Zone** → Read
+2. Paste **Account ID** and **API token** in the deployment manager (in-app instructions included)
+3. **Select** an existing tunnel (e.g. one already routing your homelab) or **create** a new one
+4. Install the tunnel connector on your machine using the displayed token
+
+Optional legacy env fallback: `CLOUDFLARE_API_KEY` + `CLOUDFLARE_ACCOUNT_ID` in `.env` (UI connection is preferred).
+
+### Per-app — App Settings → Cloudflare
+
+Each app shows tunnel route status for its domain:
+
+| Status | Meaning |
+|--------|---------|
+| **Synced** | Route and DNS managed by Port-Au-Next |
+| **External** | Route exists on the tunnel from manual/legacy setup |
+| **Missing route** | Domain set but no ingress on the selected tunnel |
+| **Missing DNS** | Route exists but CNAME is not configured |
+
+Use **Sync route** to adopt existing apps without changing the domain string — useful when routes were created manually before connecting Cloudflare.
+
+Assigning or changing a domain in **App Settings** also triggers route + DNS sync automatically when Cloudflare is connected.
+
+### Preview branches
+
+When preview branches are enabled and a preview domain is saved, Port-Au-Next creates a wildcard published application (e.g. `*.preview.yourdomain.com`) and proxied CNAME on the selected tunnel.
 
 ## Deployment Workflow
 
@@ -120,8 +171,9 @@ This approach ensures your applications remain available throughout the entire d
 
 Preview branches allow you to deploy and test feature branches in isolated environments before merging to production:
 
-1. **Setup**: Enable preview branches for an application and configure a preview domain:
-   - For example, use `preview.yourdomain.com` and setup a wildcard CNAME entry in your DNS server pointing to your server: `*.preview.yourdomain.com IN CNAME yourdomain.com`
+1. **Setup**: Enable preview branches for an application and configure a preview domain (e.g. `preview.yourdomain.com`)
+   - With Cloudflare connected, Port-Au-Next creates the wildcard tunnel route and proxied CNAME automatically
+   - Without Cloudflare, add DNS for `*.preview.yourdomain.com` yourself
 2. **Deployment**: Deploy any branch to get an isolated environment with:
    - Unique subdomain (e.g., `feature-branch.preview.yourdomain.com`)
    - Isolated database
@@ -142,14 +194,20 @@ Preview branches allow you to deploy and test feature branches in isolated envir
 
 1. From the deployment manager UI, create a new application
 2. Provide the Git repository URL and branch to deploy
-3. Configure domain settings and environment variables
+3. Configure domain settings and environment variables (domain syncs Cloudflare tunnel route + DNS when connected)
 4. Initiate the first deployment
+
+### Cloudflare per app
+
+1. Connect Cloudflare globally under **Settings → Cloudflare**
+2. Open **App Settings → Cloudflare** for route status, zone info, and **Sync route**
+3. Existing apps with manual tunnel routes show as **External** until you sync
 
 ### Enabling Preview Branches
 
 1. Navigate to your application's settings
-2. Configure a preview domain (e.g., `*.preview.yourdomain.com`)
-3. Enable the preview branches feature
+2. Configure a preview domain (e.g. `preview.yourdomain.com`)
+3. Enable the preview branches feature (wildcard tunnel route + DNS when Cloudflare is connected)
 4. Configure default preview environment variables (optional)
 
 ### User Management

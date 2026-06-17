@@ -74,8 +74,8 @@ export default function Hero() {
           <p className={styles.lead}>
             A no-downtime, multi-tenant Next.js deployment manager for{" "}
             <em className={styles.em}>your own hardware</em>. Blue-green deploys,
-            preview branches, and managed Postgres, Redis and MinIO, proxied to the
-            world through Cloudflare tunnels. No cloud bill required.
+            preview branches, and managed Postgres, Redis and MinIO — with built-in Cloudflare
+            tunnel automation. No cloud bill required.
           </p>
 
           <div className={styles.actions}>

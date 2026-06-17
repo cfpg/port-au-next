@@ -46,9 +46,9 @@ export const features: FeatureItem[] = [
   },
   {
     icon: Globe,
-    title: "Domain management",
+    title: "Domain & Cloudflare tunnels",
     description:
-      "Map any domain or subdomain to a specific app and branch. Cloudflare tunnels keep it reachable without open ports.",
+      "Connect your Cloudflare account in the dashboard, pick a tunnel, and Port-Au-Next creates published application routes and proxied DNS when you assign domains — no port forwarding.",
     iconBg: "#FCEFD9",
     iconColor: "#B07A1E",
   },

@@ -41,7 +41,7 @@ export default function Install() {
         <div className={styles.sticky}>
           <SectionHeader
             eyebrow="Quick start"
-            title="Running in three commands."
+            title="Running in four steps."
             lead="Point it at a VPS, a cloud box, or that old PC humming in your closet. If it runs Docker, it runs Port-Au-Next."
             className={styles.header}
           />

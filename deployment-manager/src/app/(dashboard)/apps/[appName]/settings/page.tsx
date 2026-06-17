@@ -4,6 +4,7 @@ import PreviewBranchesCard from '~/components/settings/PreviewBranchesCard';
 import PrismaCard from '~/components/settings/PrismaCard';
 import ObjectStorageCard from '~/components/settings/ObjectStorageCard';
 import AnalyticsCard from '~/components/settings/AnalyticsCard';
+import CloudflareAppCard from '~/components/settings/CloudflareAppCard';
 import { AppSettingsForm } from '~/components/AppSettingsForm';
 
 export default async function AppSettingsPage({
@@ -37,6 +38,13 @@ export default async function AppSettingsPage({
             }}
           />
         }
+      />
+
+      <Card
+        className="bg-white text-black mb-8"
+        title="Cloudflare"
+        padding="content"
+        content={<CloudflareAppCard app={app} />}
       />
 
       <Card

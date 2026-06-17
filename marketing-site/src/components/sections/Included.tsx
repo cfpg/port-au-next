@@ -44,7 +44,7 @@ const services: {
   {
     icon: Network,
     title: "Nginx + Cloudflare",
-    text: "Reverse proxy that routes every domain and preview branch, exposed safely through Cloudflare tunnels.",
+    text: "Nginx routes every domain and preview branch internally. Connect Cloudflare in the dashboard to list tunnels, sync published application routes, and proxied DNS per app.",
     color: "#F0A53C",
   },
   {

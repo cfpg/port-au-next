@@ -6,7 +6,7 @@ const cards = [
   {
     icon: Cloud,
     title: "No ports. No static IP.",
-    text: "Cloudflare tunnels reach your apps through an outbound connection, so nothing on your home network is ever exposed. It works behind CGNAT, with no router config and no port forwarding.",
+    text: "Cloudflare tunnels reach your apps through an outbound connection — no exposed home network. Connect your account in the dashboard to automate routes and DNS; you still run cloudflared on the box.",
     bg: "#E4EFF1",
     color: "#2A5663",
   },

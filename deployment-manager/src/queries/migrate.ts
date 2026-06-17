@@ -276,6 +276,37 @@ export async function migrate() {
       ADD COLUMN IF NOT EXISTS enabled BOOLEAN DEFAULT TRUE
     `);
 
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS cloudflare_config (
+        id SERIAL PRIMARY KEY,
+        account_id TEXT NOT NULL,
+        api_token_encrypted TEXT NOT NULL,
+        tunnel_id TEXT,
+        tunnel_name TEXT,
+        tunnel_origin_url TEXT NOT NULL DEFAULT 'http://localhost',
+        connected_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS cloudflare_hostname_routes (
+        id SERIAL PRIMARY KEY,
+        hostname TEXT NOT NULL UNIQUE,
+        zone_id TEXT NOT NULL,
+        tunnel_id TEXT NOT NULL,
+        dns_record_id TEXT,
+        source_type TEXT NOT NULL CHECK (source_type IN ('app', 'service', 'preview_wildcard')),
+        source_id TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_cloudflare_hostname_routes_tunnel_id
+      ON cloudflare_hostname_routes(tunnel_id)
+    `);
+
     await pool.query('COMMIT');
     console.log('Database migration completed successfully');
   } catch (error) {

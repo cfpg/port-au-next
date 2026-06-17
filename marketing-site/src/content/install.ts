@@ -2,6 +2,7 @@ export const installPrerequisites = [
   "Docker & Docker Compose",
   "Git",
   "An SSH key for GitHub (for auto-deploys)",
+  "A Cloudflare account (recommended for tunnel exposure)",
 ] as const;
 
 export type InstallStep = {
@@ -60,6 +61,20 @@ export const installSteps: InstallStep[] = [
     lines: [
       { type: "command", prompt: true, text: "docker compose up --build -d" },
       { type: "success", text: "✓ deployment manager ready → http://localhost:80" },
+    ],
+  },
+  {
+    step: 4,
+    title: "Connect Cloudflare (optional)",
+    copyText: "# Settings → Cloudflare in the deployment manager UI",
+    accent: "#3E7C8C",
+    accentText: "#fff",
+    lines: [
+      { type: "comment", text: "# in the deployment manager dashboard" },
+      { type: "success", text: "Settings → Cloudflare → connect API token" },
+      { type: "success", text: "Select or create a tunnel → copy cloudflared install command" },
+      { type: "success", text: "App Settings → Cloudflare → Sync route per app" },
+      { type: "comment", text: "# you still add domains to Cloudflare + run cloudflared manually" },
     ],
   },
 ];
