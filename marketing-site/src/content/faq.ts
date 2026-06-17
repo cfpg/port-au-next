@@ -17,7 +17,7 @@ export const faqItems: FaqItem[] = [
   {
     question: "Do I need to open ports or have a static IP?",
     answer:
-      "No. Cloudflare tunnels open an outbound connection from your machine, so your apps are reachable without port forwarding, a static IP, or exposing your home network. It works fine behind CGNAT, which is exactly the situation most home connections are in.",
+      "No. Cloudflare tunnels open an outbound connection from your machine, so your apps are reachable without port forwarding, a static IP, or exposing your home network. Port-Au-Next can connect to your Cloudflare account and automate tunnel routes and DNS from the dashboard — you still run cloudflared on your box and add domains to Cloudflare yourself.",
   },
   {
     question: "Is it okay to leave running 24/7?",
@@ -53,5 +53,10 @@ export const faqItems: FaqItem[] = [
     question: "What is Umami analytics?",
     answer:
       "A shared, privacy-focused analytics instance. Opt in per app from the dashboard to get an isolated website, tracking env vars on production deploy, and your own Umami login. You add the Next.js snippet yourself; cookie and consent banners stay your responsibility.",
+  },
+  {
+    question: "How does Cloudflare tunnel setup work?",
+    answer:
+      "Connect your Cloudflare account under Settings → Cloudflare with a scoped API token, select or create a tunnel, then run cloudflared on your homelab using the token shown in the UI. Add domains to Cloudflare and point nameservers yourself. When you assign an app domain — or click Sync route on existing apps — Port-Au-Next creates the tunnel published application and proxied CNAME. Preview branch wildcards are provisioned when you enable preview branches.",
   },
 ];

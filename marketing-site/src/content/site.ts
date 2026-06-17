@@ -8,7 +8,7 @@ export const site = {
   tagline:
     "A no-downtime, multi-tenant Next.js deployment manager for your own hardware.",
   description:
-    "Blue-green deploys, preview branches, and managed Postgres, Redis and MinIO, proxied to the world through Cloudflare tunnels. No cloud bill required.",
+    "Blue-green deploys, preview branches, managed Postgres, Redis and MinIO, and built-in Cloudflare tunnel automation. No cloud bill required.",
 } as const;
 
 export const navLinks = [
