@@ -21,7 +21,7 @@ Whether you're deploying to a VPS, cloud server, or hardware in your own environ
 - **Health Checks**: Intelligent service switching only when new deployments are verified healthy
 - **Environment Isolation**: Each app, branch, or preview deployment can have its own environment variables
 - **Customizable Build Process**: Use the default optimized Dockerfile or create your own
-- **Shared Infrastructure**: PostgreSQL, Redis, imgproxy, and **port-schedule** (HTTP cron / webhook scheduler) available to all applications
+- **Shared Infrastructure**: PostgreSQL, Redis, imgproxy, **port-schedule** (HTTP cron / webhook scheduler), and **Umami** (opt-in analytics) available to all applications
 - **Web-Based Management UI**: Monitor and control your deployments through an intuitive interface
 
 ## Architecture
@@ -32,7 +32,7 @@ Port-Au-Next uses a Docker-based microservices architecture with the following c
 2. **Deployment Manager**: Web UI and API for managing applications and deployments, with secure authentication
 3. **Authentication Layer**: Handles user authentication and session management
 4. **Preview Branch Manager**: Manages isolated preview environments for feature branches
-5. **Shared Services**: PostgreSQL, Redis, imgproxy, and **port-schedule** (per-app API keys; schedules outbound HTTP to your apps’ public URLs)
+5. **Shared Services**: PostgreSQL, Redis, imgproxy, **port-schedule** (per-app API keys), and **Umami** (opt-in per-app analytics with dashboard login)
 6. **Application Containers**: Isolated containers for each application version and preview branch
 
 ## Quick Start
@@ -80,6 +80,15 @@ PORT_SCHEDULE_MIGRATE_ON_START=false
 PORT_SCHEDULE_HOST_PORT=8085
 # Optional: public hostname for nginx → port-schedule (see .env.example)
 # PORT_SCHEDULE_HOST=schedule.yourdomain.com
+
+# Umami analytics (see “Umami analytics” below)
+UMAMI_HOST=analytics.yourdomain.com
+# Generate: openssl rand -hex 32
+UMAMI_APP_SECRET=your_64_char_hex_secret_here
+UMAMI_DB_USER=umami
+UMAMI_DB_PASSWORD=changeme_umami_db
+UMAMI_ADMIN_USERNAME=admin
+UMAMI_ADMIN_PASSWORD=your_chosen_admin_password
 
 # Optional: Used for cache busting
 CLOUDFLARE_API_KEY=your_cloudflare_api_token
@@ -343,6 +352,37 @@ If you set **`PORT_SCHEDULE_HOST`** in the root `.env`, the deployment manager w
 ### Further detail
 
 For the full contract (soft delete, undelete routes, admin API, URL policy), see the statement of work in `.plans/CUSTOM_HTTP_SCHEDULER_PLAN.md` in this repository (if present in your checkout).
+
+## Umami analytics
+
+**Umami** is a shared, privacy-focused analytics instance. Each app can **opt in** from the deployment manager (App Settings → Analytics). When enabled, the platform provisions an isolated Umami team, website, and dashboard login for that app.
+
+### Platform setup
+
+1. Generate `UMAMI_APP_SECRET` (session encryption key for Umami; at least 32 characters):
+
+```bash
+openssl rand -hex 32
+```
+
+Copy the output into `.env` as `UMAMI_APP_SECRET=…`.
+
+2. Set `UMAMI_HOST`, `UMAMI_APP_SECRET`, `UMAMI_DB_*`, and `UMAMI_ADMIN_*` in the root `.env` (see `.env.example`). The deployment manager **syncs `UMAMI_ADMIN_*` to Umami on startup**, replacing the default `admin` / `umami` credentials on first boot.
+3. `docker compose up -d umami` (or bring up the full stack).
+4. Log in at `https://{UMAMI_HOST}` with the credentials from `UMAMI_ADMIN_*` in your `.env`.
+
+The deployment manager creates the `umami` database on shared Postgres and writes an nginx vhost for `UMAMI_HOST`. Image: `ghcr.io/umami-software/umami:postgresql-v2.18` (pin updated in `docker-compose.yml`).
+
+### Per-app behavior
+
+| Action | Behavior |
+|--------|----------|
+| **Enable** | Creates Umami team + view-only dashboard user + website for `app.domain`; stores credentials in `app_services`. |
+| **Production deploy** | Injects `NEXT_PUBLIC_UMAMI_HOST` and `NEXT_PUBLIC_UMAMI_WEBSITE_ID` when enabled. |
+| **Disable** | Stops env injection; Umami data and login are retained. **Redeploy** required (`NEXT_PUBLIC_*` are build-time). |
+| **Domain change** | Updates the Umami website domain automatically when app settings change. |
+
+Preview deployments do not receive Umami env vars. Add the tracking snippet in your Next.js app yourself (see the Analytics card in the UI). Cookie/consent banners are the app owner’s responsibility.
 
 ## API Reference
 

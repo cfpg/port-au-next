@@ -271,6 +271,11 @@ export async function migrate() {
       ADD COLUMN IF NOT EXISTS root_path TEXT NOT NULL DEFAULT ''
     `);
 
+    await pool.query(`
+      ALTER TABLE app_services
+      ADD COLUMN IF NOT EXISTS enabled BOOLEAN DEFAULT TRUE
+    `);
+
     await pool.query('COMMIT');
     console.log('Database migration completed successfully');
   } catch (error) {

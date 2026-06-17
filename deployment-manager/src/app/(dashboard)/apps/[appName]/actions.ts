@@ -13,6 +13,7 @@ import { deleteRepository } from '~/services/git';
 import { deleteAppDatabase, deleteAppRecord } from '~/services/database';
 import { withAuth } from '~/lib/auth-utils';
 import updateAppSettingsQuery from '~/queries/updateAppSettingsQuery';
+import { syncUmamiWebsiteDomain } from '~/services/umami';
 import { AppSettings } from '~/types';
 import fetchActivePreviewBranchesQuery from '~/queries/fetchActivePreviewBranches';
 import { cloneRepository } from '~/services/git';
@@ -46,11 +47,12 @@ export const updateAppSettings = withAuth(async (
     const normalizedRootPath = normalizeRootPath(settings.root_path);
     validateRootPathFormat(normalizedRootPath);
 
-    const appResult = await pool.query<{ name: string }>(
-      'SELECT name FROM apps WHERE id = $1',
+    const appResult = await pool.query<{ name: string; domain: string | null }>(
+      'SELECT name, domain FROM apps WHERE id = $1',
       [appId]
     );
     const appName = appResult.rows[0]?.name;
+    const previousDomain = appResult.rows[0]?.domain;
     if (!appName) {
       return { success: false, error: 'App not found' };
     }
@@ -64,6 +66,15 @@ export const updateAppSettings = withAuth(async (
       ...settings,
       root_path: normalizedRootPath,
     });
+
+    if (settings.domain && settings.domain !== previousDomain) {
+      try {
+        await syncUmamiWebsiteDomain(appId, settings.domain, settings.name || appName);
+      } catch (syncError) {
+        await logger.error('Failed to sync Umami website domain', syncError as Error);
+      }
+    }
+
     return { success: true };
   } catch (error) {
     await logger.error('Failed to update app settings', error as Error);

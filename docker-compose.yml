@@ -81,6 +81,26 @@ services:
     networks:
       - port_au_next_network
 
+  # Shared Umami analytics (dedicated DB on shared Postgres)
+  umami:
+    image: ghcr.io/umami-software/umami:postgresql-v2.18
+    restart: always
+    environment:
+      DATABASE_URL: postgresql://${UMAMI_DB_USER}:${UMAMI_DB_PASSWORD}@postgres:5432/${UMAMI_DB_NAME:-umami}
+      APP_SECRET: ${UMAMI_APP_SECRET:?Set UMAMI_APP_SECRET in .env (see .env.example)}
+      DISABLE_TELEMETRY: "1"
+      CLIENT_IP_HEADER: X-Forwarded-For
+    depends_on:
+      - postgres
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:3000/api/heartbeat || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    networks:
+      - port_au_next_network
+
   # Image optimization service
   imgproxy:
     image: darthsim/imgproxy@sha256:2431fbc04ba06d2d598af7a4565286dd7e1a48a5eeb6365878119d75d7db75c0
@@ -140,6 +160,13 @@ services:
       - PORT_SCHEDULE_MASTER_API_KEY=${PORT_SCHEDULE_MASTER_API_KEY:-}
       # Public hostname for optional nginx → port-schedule (leave unset to skip vhost only).
       - PORT_SCHEDULE_HOST=${PORT_SCHEDULE_HOST:-}
+      - UMAMI_HOST=${UMAMI_HOST:-}
+      - UMAMI_APP_SECRET=${UMAMI_APP_SECRET:-}
+      - UMAMI_DB_USER=${UMAMI_DB_USER:-umami}
+      - UMAMI_DB_PASSWORD=${UMAMI_DB_PASSWORD:-}
+      - UMAMI_DB_NAME=${UMAMI_DB_NAME:-umami}
+      - UMAMI_ADMIN_USERNAME=${UMAMI_ADMIN_USERNAME:-}
+      - UMAMI_ADMIN_PASSWORD=${UMAMI_ADMIN_PASSWORD:-}
     ports:
       - "3000:3000"
     depends_on:

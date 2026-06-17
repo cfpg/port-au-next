@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Hanken_Grotesk, IBM_Plex_Mono, Space_Grotesk } from "next/font/google";
 import Footer from "@/components/layout/Footer";
 import Nav from "@/components/layout/Nav";
+import { UmamiAnalytics } from "@/components/UmamiAnalytics";
 import "./globals.css";
 
 const spaceGrotesk = Space_Grotesk({
@@ -42,6 +43,7 @@ export default function RootLayout({
         <Nav />
         {children}
         <Footer />
+        <UmamiAnalytics />
       </body>
     </html>
   );

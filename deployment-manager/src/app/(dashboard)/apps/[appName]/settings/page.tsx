@@ -3,6 +3,7 @@ import Card from '~/components/general/Card';
 import PreviewBranchesCard from '~/components/settings/PreviewBranchesCard';
 import PrismaCard from '~/components/settings/PrismaCard';
 import ObjectStorageCard from '~/components/settings/ObjectStorageCard';
+import AnalyticsCard from '~/components/settings/AnalyticsCard';
 import { AppSettingsForm } from '~/components/AppSettingsForm';
 
 export default async function AppSettingsPage({
@@ -43,6 +44,13 @@ export default async function AppSettingsPage({
         title="Object Storage"
         padding="content"
         content={<ObjectStorageCard app={app} />}
+      />
+
+      <Card
+        className="bg-white text-black mb-8"
+        title="Analytics"
+        padding="content"
+        content={<AnalyticsCard app={app} />}
       />
 
       <Card

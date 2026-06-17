@@ -5,6 +5,9 @@ export async function register() {
     const { setupMinio } = await import('./lib/startup');
     const { setupImgproxy } = await import('./lib/startup');
     const { setupPortSchedule } = await import('./lib/startup');
+    const { setupUmami } = await import('./lib/startup');
+    const { ensureUmamiDatabase } = await import('./services/umamiDb');
+    const { ensureUmamiPlatformAdmin } = await import('./services/umami');
     const { migrate } = await import('./queries/migrate');
     const { scheduleLogRetentionCleanup } = await import('./lib/logRetention');
     const { ensureNginxAppsLogRoot } = await import('./lib/nginxLogs');
@@ -32,6 +35,15 @@ export async function register() {
       // Optional: nginx vhost for public port-schedule hostname
       await setupPortSchedule();
       console.log('port-schedule vhost step finished (no vhost if PORT_SCHEDULE_HOST unset)');
+
+      await ensureUmamiDatabase();
+      console.log('Umami database bootstrap finished');
+
+      await ensureUmamiPlatformAdmin();
+      console.log('Umami platform admin bootstrap finished');
+
+      await setupUmami();
+      console.log('Umami vhost step finished (no vhost if UMAMI_HOST unset)');
 
       await ensureNginxAppsLogRoot();
       console.log('Nginx apps log directory permissions configured');
