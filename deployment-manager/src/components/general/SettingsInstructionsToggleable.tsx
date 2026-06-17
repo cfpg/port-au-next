@@ -13,7 +13,6 @@ const settingsInstructions = tv({
   variants: {
     isExpanded: {
       true: {
-        container: 'max-h-[500px]',
         icon: 'rotate-180',
       },
       false: {
@@ -29,11 +28,13 @@ const settingsInstructions = tv({
 interface SettingsInstructionsToggleableProps {
   children: React.ReactNode;
   title: string;
+  expandedMaxHeightClass?: string;
 }
 
 export default function SettingsInstructionsToggleable({
   children,
   title,
+  expandedMaxHeightClass = 'max-h-[500px]',
 }: SettingsInstructionsToggleableProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const styles = settingsInstructions({ isExpanded });
@@ -48,7 +49,9 @@ export default function SettingsInstructionsToggleable({
         <span>{title}</span>
         <i className={`fas fa-chevron-down ${styles.icon()}`} />
       </button>
-      <div className={styles.container()}>
+      <div
+        className={`${styles.container()} ${isExpanded ? expandedMaxHeightClass : 'max-h-0'}`}
+      >
         <div className={styles.content()}>
           {children}
         </div>

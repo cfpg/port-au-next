@@ -1,6 +1,7 @@
 import Card from "~/components/general/Card";
 import { fetchServicesHealth } from "./actions";
 import SettingsAdminUser from "~/components/settings/SettingsAdminUser";
+import CloudflareSettingsCard from "~/components/settings/CloudflareSettingsCard";
 import { auth } from "~/lib/auth";
 import { headers } from "next/headers";
 import CardGrid from "~/components/general/CardGrid";
@@ -30,6 +31,13 @@ const SettingsPage = async () => {
         <Card
           title="Account"
           content={<SettingsAdminUser email={session?.user.email || ''} />}
+        />
+      </div>
+
+      <div className="mb-8">
+        <Card
+          title="Cloudflare"
+          content={<CloudflareSettingsCard />}
         />
       </div>
 

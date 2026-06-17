@@ -131,18 +131,18 @@ export default function PreviewBranchesCard({ app, initialPreviewDomain }: Previ
             </p>
           </div>
 
-          <SettingsInstructionsToggleable title="DNS Configuration Required">
-            <h4 className="text-sm font-medium text-blue-800 mb-2">DNS Configuration Required</h4>
+          <SettingsInstructionsToggleable title="DNS & tunnel">
             <p className="text-sm text-blue-700">
-              To enable preview branches, you need to add a wildcard DNS record:
+              When Cloudflare is connected in Settings, saving the preview domain creates a wildcard
+              tunnel route and proxied CNAME for:
             </p>
             <div className="mt-2 bg-white p-3 rounded border border-blue-200">
               <code className="text-sm">
-                *.{previewDomain.replace(/^\*\./g, '') || `preview.${app.domain}`} IN CNAME {process.env.NEXT_PUBLIC_DEPLOYMENT_MANAGER_HOST}
+                *.{previewDomain.replace(/^\*\./g, '') || `preview.${app.domain}`}
               </code>
             </div>
             <p className="mt-2 text-sm text-blue-700">
-              This will allow preview branches to be accessed via their own subdomains.
+              The domain must already exist in your Cloudflare account with active nameservers.
             </p>
           </SettingsInstructionsToggleable>
         </div>

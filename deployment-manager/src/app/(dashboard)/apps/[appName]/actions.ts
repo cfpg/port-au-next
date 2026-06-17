@@ -7,6 +7,7 @@ import pool from '~/services/database';
 import logger from '~/services/logger';
 import { updateAppEnvVarsQuery } from '~/queries/updateAppEnvVarsQuery';
 import cloudflare from '~/services/cloudflare';
+import { syncAppDomainRoute, removeAppCloudflareRoutes } from '~/services/cloudflareRoutes';
 import { deleteAppContainers, stopContainer } from '~/services/docker';
 import { deleteAppConfig } from '~/services/nginx';
 import { deleteRepository } from '~/services/git';
@@ -68,6 +69,18 @@ export const updateAppSettings = withAuth(async (
     });
 
     if (settings.domain && settings.domain !== previousDomain) {
+      const routeResult = await syncAppDomainRoute(appId, settings.domain, previousDomain);
+      if (!routeResult.success && routeResult.error) {
+        return { success: false, error: routeResult.error };
+      }
+      if (routeResult.zoneId && !settings.cloudflare_zone_id) {
+        await updateAppSettingsQuery(appId, { cloudflare_zone_id: routeResult.zoneId });
+      }
+    } else if (!settings.domain && previousDomain) {
+      await syncAppDomainRoute(appId, null, previousDomain);
+    }
+
+    if (settings.domain && settings.domain !== previousDomain) {
       try {
         await syncUmamiWebsiteDomain(appId, settings.domain, settings.name || appName);
       } catch (syncError) {
@@ -127,6 +140,20 @@ export const createApp = withAuth(async ({
       [name, repo_url, branch, domain, normalizedRootPath]
     );
     const appId = result.rows[0].id;
+
+    if (domain) {
+      const routeResult = await syncAppDomainRoute(appId, domain);
+      if (!routeResult.success && routeResult.error) {
+        await pool.query('DELETE FROM apps WHERE id = $1', [appId]);
+        return { success: false, error: routeResult.error };
+      }
+      if (routeResult.zoneId) {
+        await pool.query('UPDATE apps SET cloudflare_zone_id = $1 WHERE id = $2', [
+          routeResult.zoneId,
+          appId,
+        ]);
+      }
+    }
     
     try {
       await cloneRepository(name, repo_url, branch);
@@ -216,6 +243,13 @@ export const deleteApp = withAuth(async (appName: string): Promise<{ success: bo
       } catch (error) {
         deletionStatus.nginx.error = (error as Error).message;
         await logger.error('Failed to remove Nginx configuration', error as Error);
+      }
+
+      try {
+        await removeAppCloudflareRoutes(app.id, app.domain, app.preview_domain);
+        await logger.info('Removed Cloudflare routes');
+      } catch (error) {
+        await logger.error('Failed to remove Cloudflare routes', error as Error);
       }
 
       // 3. Remove git repository

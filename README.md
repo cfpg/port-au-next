@@ -90,9 +90,9 @@ UMAMI_DB_PASSWORD=changeme_umami_db
 UMAMI_ADMIN_USERNAME=admin
 UMAMI_ADMIN_PASSWORD=your_chosen_admin_password
 
-# Optional: Used for cache busting
-CLOUDFLARE_API_KEY=your_cloudflare_api_token
-CLOUDFLARE_API_EMAIL=your_cloudflare_api_email
+# Optional: Cloudflare (prefer Settings → Cloudflare in the deployment manager UI)
+# CLOUDFLARE_API_KEY=your_scoped_api_token
+# CLOUDFLARE_ACCOUNT_ID=your_account_id
 ```
 
 3. Launch the system:
@@ -102,6 +102,18 @@ docker compose up --build -d
 ```
 
 4. Access the deployment manager UI at `http://localhost:80` or using the `DEPLOYMENT_MANAGER_HOST` you configured in the `.env` file and log in with the configured admin credentials
+
+## Cloudflare Tunnels
+
+Connect Cloudflare from **Settings → Cloudflare** in the deployment manager:
+
+1. Create a scoped API token (Account: Cloudflare Tunnel Edit, Zone: DNS Edit + Zone Read)
+2. Connect your account and **select or create a tunnel**
+3. **Manually** run `cloudflared service install <token>` on your homelab machine
+4. **Manually** add domains to Cloudflare and point nameservers
+5. Assign app domains in app settings — Port-Au-Next creates tunnel published applications and proxied CNAME records automatically
+
+Preview branch wildcards are created when you enable preview branches and save a preview domain.
 
 ## Deployment Workflow
 

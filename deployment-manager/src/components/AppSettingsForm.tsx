@@ -3,8 +3,7 @@
 import { useState } from 'react';
 import Button from '~/components/general/Button';
 import Input from '~/components/general/Input';
-import Label from '~/components/general/Label';
-import { fetchZoneId, updateAppSettings } from '~/app/(dashboard)/apps/[appName]/actions';
+import { updateAppSettings } from '~/app/(dashboard)/apps/[appName]/actions';
 import { showToast } from '~/components/general/Toaster';
 
 interface AppSettingsFormProps {
@@ -54,8 +53,12 @@ export function AppSettingsForm({ appId, initialSettings }: AppSettingsFormProps
           label="Domain"
           value={settings.domain || ''}
           onChange={(e) => handleChange('domain', e.target.value)}
-          placeholder="example.com"
+          placeholder="srv1.example.com"
         />
+        <p className="md:col-span-2 -mt-2 text-sm text-gray-500">
+          Saving a domain creates a Cloudflare tunnel published application and proxied CNAME when
+          Cloudflare is connected in Settings.
+        </p>
 
         <Input
           id="repository"
@@ -88,27 +91,12 @@ export function AppSettingsForm({ appId, initialSettings }: AppSettingsFormProps
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Input
-          id="cloudflare_zone_id"
-          label="Cloudflare Zone ID"
-          value={settings.cloudflare_zone_id || ''}
-          onChange={(e) => handleChange('cloudflare_zone_id', e.target.value)}
-          placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-          showToggle={true}
-        />
-        <div className="flex items-end">
-          <Button
-            onClick={() => {
-              fetchZoneId(settings.name || '')
-                .then((zoneId) => handleChange('cloudflare_zone_id', typeof zoneId === 'string' ? zoneId : ''));
-            }}
-            color='gray'>
-            <i className="fas fa-sync mr-2"></i>
-            Fetch Zone ID
-          </Button>
-        </div>
-      </div>
+      {settings.cloudflare_zone_id && (
+        <p className="text-sm text-gray-500">
+          Cloudflare zone ID: <span className="font-mono">{settings.cloudflare_zone_id}</span>
+          {' '}(set automatically when the tunnel route is created)
+        </p>
+      )}
 
       <Button type="submit" color='green'>
         <i className="fas fa-save mr-2"></i>
