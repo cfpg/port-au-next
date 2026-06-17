@@ -7,6 +7,7 @@ export async function register() {
     const { setupPortSchedule } = await import('./lib/startup');
     const { setupUmami } = await import('./lib/startup');
     const { ensureUmamiDatabase } = await import('./services/umamiDb');
+    const { ensureUmamiPlatformAdmin } = await import('./services/umami');
     const { migrate } = await import('./queries/migrate');
     const { scheduleLogRetentionCleanup } = await import('./lib/logRetention');
     const { ensureNginxAppsLogRoot } = await import('./lib/nginxLogs');
@@ -37,6 +38,9 @@ export async function register() {
 
       await ensureUmamiDatabase();
       console.log('Umami database bootstrap finished');
+
+      await ensureUmamiPlatformAdmin();
+      console.log('Umami platform admin bootstrap finished');
 
       await setupUmami();
       console.log('Umami vhost step finished (no vhost if UMAMI_HOST unset)');

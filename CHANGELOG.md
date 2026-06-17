@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Umami analytics:** Shared Umami instance with per-app opt-in provisioning (team, website, dashboard login), production-only `NEXT_PUBLIC_UMAMI_*` env injection, domain sync on app settings change, and Analytics settings UI.
+- **Umami admin bootstrap:** Deployment manager syncs `UMAMI_ADMIN_*` from `.env` to Umami on startup (replaces default `admin`/`umami` on first boot).
 
 ### Changed
 

@@ -88,7 +88,7 @@ UMAMI_APP_SECRET=your_64_char_hex_secret_here
 UMAMI_DB_USER=umami
 UMAMI_DB_PASSWORD=changeme_umami_db
 UMAMI_ADMIN_USERNAME=admin
-UMAMI_ADMIN_PASSWORD=changeme_after_first_login
+UMAMI_ADMIN_PASSWORD=your_chosen_admin_password
 
 # Optional: Used for cache busting
 CLOUDFLARE_API_KEY=your_cloudflare_api_token
@@ -367,9 +367,9 @@ openssl rand -hex 32
 
 Copy the output into `.env` as `UMAMI_APP_SECRET=…`.
 
-2. Set `UMAMI_HOST`, `UMAMI_APP_SECRET`, `UMAMI_DB_*`, and `UMAMI_ADMIN_*` in the root `.env` (see `.env.example`).
+2. Set `UMAMI_HOST`, `UMAMI_APP_SECRET`, `UMAMI_DB_*`, and `UMAMI_ADMIN_*` in the root `.env` (see `.env.example`). The deployment manager **syncs `UMAMI_ADMIN_*` to Umami on startup**, replacing the default `admin` / `umami` credentials on first boot.
 3. `docker compose up -d umami` (or bring up the full stack).
-4. On first boot, log in at `https://{UMAMI_HOST}` with Umami’s default `admin` / `umami`, change the password, then set `UMAMI_ADMIN_USERNAME` / `UMAMI_ADMIN_PASSWORD` to match and restart the deployment manager.
+4. Log in at `https://{UMAMI_HOST}` with the credentials from `UMAMI_ADMIN_*` in your `.env`.
 
 The deployment manager creates the `umami` database on shared Postgres and writes an nginx vhost for `UMAMI_HOST`. Image: `ghcr.io/umami-software/umami:postgresql-v2.18` (pin updated in `docker-compose.yml`).
 

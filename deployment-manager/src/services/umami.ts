@@ -12,6 +12,7 @@ export const UMAMI_INTERNAL_BASE_URL = 'http://umami:3000';
 
 interface UmamiAuthResponse {
   token: string;
+  user: UmamiUser;
 }
 
 interface UmamiTeam {
@@ -42,6 +43,28 @@ export interface UmamiAppCredentials {
 
 let cachedAdminToken: string | null = null;
 
+const UMAMI_DEFAULT_ADMIN = {
+  username: 'admin',
+  password: 'umami',
+} as const;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isUmamiConfigured(): boolean {
+  return Boolean(process.env.UMAMI_HOST?.trim());
+}
+
+function getAdminCredentialsFromEnv(): { username: string; password: string } | null {
+  const username = process.env.UMAMI_ADMIN_USERNAME?.trim();
+  const password = process.env.UMAMI_ADMIN_PASSWORD?.trim();
+  if (!username || !password) {
+    return null;
+  }
+  return { username, password };
+}
+
 function requireUmamiHost(): string {
   const host = process.env.UMAMI_HOST?.trim();
   if (!host) {
@@ -55,12 +78,119 @@ function getPublicUmamiBaseUrl(): string {
 }
 
 function requireAdminCredentials(): { username: string; password: string } {
-  const username = process.env.UMAMI_ADMIN_USERNAME?.trim();
-  const password = process.env.UMAMI_ADMIN_PASSWORD?.trim();
-  if (!username || !password) {
+  const creds = getAdminCredentialsFromEnv();
+  if (!creds) {
     throw new Error('UMAMI_ADMIN_USERNAME and UMAMI_ADMIN_PASSWORD must be set');
   }
-  return { username, password };
+  return creds;
+}
+
+async function loginUmami(
+  username: string,
+  password: string
+): Promise<UmamiAuthResponse | null> {
+  try {
+    const res = await fetch(`${UMAMI_INTERNAL_BASE_URL}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
+    if (!res.ok) {
+      return null;
+    }
+    return (await res.json()) as UmamiAuthResponse;
+  } catch {
+    return null;
+  }
+}
+
+async function waitForUmamiReady(maxAttempts = 12, delayMs = 5000): Promise<boolean> {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const res = await fetch(`${UMAMI_INTERNAL_BASE_URL}/api/heartbeat`);
+      if (res.ok) {
+        return true;
+      }
+    } catch {
+      // Umami may still be starting (migrations, etc.)
+    }
+    if (attempt < maxAttempts) {
+      await sleep(delayMs);
+    }
+  }
+  return false;
+}
+
+async function updateUmamiUser(
+  token: string,
+  userId: string,
+  updates: { username?: string; password?: string; role?: string }
+): Promise<void> {
+  const res = await fetch(`${UMAMI_INTERNAL_BASE_URL}/api/users/${userId}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(updates),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`Umami update user failed: ${res.status} ${text}`);
+  }
+}
+
+/**
+ * On startup: ensure Umami's platform admin matches UMAMI_ADMIN_* in .env.
+ * Fresh installs use default admin/umami; we rotate to .env credentials via API.
+ */
+export async function ensureUmamiPlatformAdmin(): Promise<void> {
+  if (!isUmamiConfigured()) {
+    return;
+  }
+
+  const target = getAdminCredentialsFromEnv();
+  if (!target) {
+    console.log('UMAMI_ADMIN_* not set; skipping Umami platform admin bootstrap');
+    return;
+  }
+
+  const ready = await waitForUmamiReady();
+  if (!ready) {
+    await logger.warning('Umami not reachable; skipping platform admin bootstrap');
+    return;
+  }
+
+  const envLogin = await loginUmami(target.username, target.password);
+  if (envLogin) {
+    cachedAdminToken = envLogin.token;
+    await logger.info('Umami platform admin credentials verified');
+    return;
+  }
+
+  const defaultLogin = await loginUmami(UMAMI_DEFAULT_ADMIN.username, UMAMI_DEFAULT_ADMIN.password);
+  if (!defaultLogin) {
+    await logger.warning(
+      'Umami platform admin bootstrap skipped: .env credentials failed and default admin/umami login failed'
+    );
+    return;
+  }
+
+  await updateUmamiUser(defaultLogin.token, defaultLogin.user.id, {
+    username: target.username,
+    password: target.password,
+    role: 'admin',
+  });
+
+  cachedAdminToken = null;
+  const verify = await loginUmami(target.username, target.password);
+  if (!verify) {
+    throw new Error('Umami platform admin password sync failed verification');
+  }
+
+  cachedAdminToken = verify.token;
+  await logger.info('Umami platform admin synced from .env', { username: target.username });
 }
 
 function generateDashboardPassword(): string {
@@ -114,20 +244,15 @@ async function getAdminToken(): Promise<string> {
   }
 
   const { username, password } = requireAdminCredentials();
-  const res = await fetch(`${UMAMI_INTERNAL_BASE_URL}/api/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({ username, password }),
-  });
-
-  if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(`Umami admin login failed: ${res.status} ${text}`);
+  const login = await loginUmami(username, password);
+  if (!login) {
+    throw new Error(
+      'Umami admin login failed. Check UMAMI_ADMIN_USERNAME and UMAMI_ADMIN_PASSWORD in .env'
+    );
   }
 
-  const data = (await res.json()) as UmamiAuthResponse;
-  cachedAdminToken = data.token;
-  return data.token;
+  cachedAdminToken = login.token;
+  return login.token;
 }
 
 async function createTeam(name: string): Promise<UmamiTeam> {
