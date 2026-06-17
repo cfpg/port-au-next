@@ -238,6 +238,54 @@ async function umamiRequest<T>(
   return (await res.json()) as T;
 }
 
+/** Umami createTeam returns a Prisma transaction tuple: [Team, TeamUser]. */
+function parseCreatedTeam(payload: unknown): UmamiTeam {
+  if (Array.isArray(payload)) {
+    const team = payload.find(
+      (item): item is UmamiTeam =>
+        typeof item === 'object' &&
+        item !== null &&
+        'id' in item &&
+        'name' in item &&
+        !('teamId' in item)
+    );
+    if (team?.id) {
+      return team;
+    }
+  }
+
+  if (payload && typeof payload === 'object' && 'id' in payload) {
+    const record = payload as UmamiTeam;
+    if (record.id) {
+      return record;
+    }
+  }
+
+  throw new Error('Unexpected Umami create team response');
+}
+
+function parseCreatedUser(payload: unknown): UmamiUser {
+  if (payload && typeof payload === 'object' && 'id' in payload) {
+    const user = payload as UmamiUser;
+    if (user.id) {
+      return user;
+    }
+  }
+
+  throw new Error('Unexpected Umami create user response');
+}
+
+function parseCreatedWebsite(payload: unknown): UmamiWebsite {
+  if (payload && typeof payload === 'object' && 'id' in payload) {
+    const website = payload as UmamiWebsite;
+    if (website.id) {
+      return website;
+    }
+  }
+
+  throw new Error('Unexpected Umami create website response');
+}
+
 async function getAdminToken(): Promise<string> {
   if (cachedAdminToken) {
     return cachedAdminToken;
@@ -256,17 +304,19 @@ async function getAdminToken(): Promise<string> {
 }
 
 async function createTeam(name: string): Promise<UmamiTeam> {
-  return umamiRequest<UmamiTeam>('/api/teams', {
+  const payload = await umamiRequest<unknown>('/api/teams', {
     method: 'POST',
     body: JSON.stringify({ name }),
   });
+  return parseCreatedTeam(payload);
 }
 
 async function createUser(username: string, password: string): Promise<UmamiUser> {
-  return umamiRequest<UmamiUser>('/api/users', {
+  const payload = await umamiRequest<unknown>('/api/users', {
     method: 'POST',
     body: JSON.stringify({ username, password, role: 'user' }),
   });
+  return parseCreatedUser(payload);
 }
 
 async function addUserToTeam(teamId: string, userId: string): Promise<void> {
@@ -277,10 +327,11 @@ async function addUserToTeam(teamId: string, userId: string): Promise<void> {
 }
 
 async function createWebsite(name: string, domain: string, teamId: string): Promise<UmamiWebsite> {
-  return umamiRequest<UmamiWebsite>('/api/websites', {
+  const payload = await umamiRequest<unknown>('/api/websites', {
     method: 'POST',
     body: JSON.stringify({ name, domain, teamId }),
   });
+  return parseCreatedWebsite(payload);
 }
 
 async function updateWebsiteDomain(websiteId: string, domain: string, name: string): Promise<void> {
