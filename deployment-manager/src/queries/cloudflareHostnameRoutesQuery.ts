@@ -64,6 +64,20 @@ export async function upsertManagedHostnameRoute(input: {
   );
 }
 
+export async function fetchManagedRouteByServiceId(
+  serviceId: string
+): Promise<CloudflareHostnameRouteRow | null> {
+  const result = await pool.query<CloudflareHostnameRouteRow>(
+    `SELECT id, hostname, zone_id, tunnel_id, dns_record_id, source_type, source_id, created_at
+     FROM cloudflare_hostname_routes
+     WHERE source_type = 'service' AND source_id = $1
+     ORDER BY created_at DESC
+     LIMIT 1`,
+    [serviceId]
+  );
+  return result.rows[0] ?? null;
+}
+
 export async function deleteManagedHostnameRoute(hostname: string): Promise<void> {
   await pool.query('DELETE FROM cloudflare_hostname_routes WHERE hostname = $1', [hostname]);
 }

@@ -88,6 +88,11 @@ export const PATCH = withAuth(async (request: Request) => {
         tunnelId: String(body.tunnelId),
         tunnelName: String(body.tunnelName),
       });
+
+      const { syncPlatformServicesOnStartup } = await import(
+        '~/services/cloudflarePlatformServices'
+      );
+      void syncPlatformServicesOnStartup();
     }
 
     return NextResponse.json({ success: true });

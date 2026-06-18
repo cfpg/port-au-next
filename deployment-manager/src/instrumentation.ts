@@ -2,10 +2,12 @@ export async function register() {
   // Only run in Node.js runtime
   if (process.env.NEXT_RUNTIME === 'nodejs') {
     const { ensureAdminUser } = await import('./lib/startup');
+    const { setupDeploymentManager } = await import('./lib/startup');
     const { setupMinio } = await import('./lib/startup');
     const { setupImgproxy } = await import('./lib/startup');
     const { setupPortSchedule } = await import('./lib/startup');
     const { setupUmami } = await import('./lib/startup');
+    const { syncPlatformServicesOnStartup } = await import('./services/cloudflarePlatformServices');
     const { ensureUmamiDatabase } = await import('./services/umamiDb');
     const { ensureUmamiPlatformAdmin } = await import('./services/umami');
     const { migrate } = await import('./queries/migrate');
@@ -23,6 +25,9 @@ export async function register() {
       // Ensure admin user exists on startup
       await ensureAdminUser();
       console.log('Admin user setup completed');
+
+      await setupDeploymentManager();
+      console.log('Deployment manager vhost step finished (no vhost if DEPLOYMENT_MANAGER_HOST unset)');
 
       // Setup Minio configuration
       await setupMinio();
@@ -53,6 +58,9 @@ export async function register() {
       // Recover any containers that are not running
       await recoverContainers();
       console.log('Container recovery completed');
+
+      await syncPlatformServicesOnStartup();
+      console.log('Platform service Cloudflare route sync finished');
     } catch (error) {
       console.error('Error during startup:', error);
       process.exit(1);

@@ -42,6 +42,35 @@ export async function ensureAdminUser() {
   }
 }
 
+export async function setupDeploymentManager(): Promise<void> {
+  const host = process.env.DEPLOYMENT_MANAGER_HOST?.trim();
+  if (!host) {
+    console.log('DEPLOYMENT_MANAGER_HOST not set; skipping nginx vhost for deployment manager');
+    return;
+  }
+
+  try {
+    const containerIp = await getServiceContainerIp('deployment-manager');
+
+    await createServiceVhostConfig(
+      'deployment-manager',
+      host,
+      [
+        {
+          path: '/',
+          proxyPass: `http://${containerIp}:3000`,
+        },
+      ],
+      { clientMaxBodySize: '50M' }
+    );
+
+    await logger.info('Deployment manager nginx vhost created successfully');
+  } catch (error) {
+    await logger.error('Error setting up deployment manager nginx', error as Error);
+    throw error;
+  }
+}
+
 export async function setupImgproxy(): Promise<void> {
   const imgproxyHost = process.env.IMGPROXY_HOST;
   if (!imgproxyHost) {

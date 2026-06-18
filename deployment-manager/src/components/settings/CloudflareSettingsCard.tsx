@@ -32,9 +32,69 @@ interface PublishedApplication {
   service: string;
   type: string;
   managedBy: 'port-au-next' | 'external';
+  sourceType?: 'app' | 'service' | 'preview_wildcard';
+  sourceId?: string | null;
 }
 
-function statusBadgeClass(status: string): string {
+interface PlatformServiceStatus {
+  id: string;
+  label: string;
+  envKey: string;
+  required: boolean;
+  hostname: {
+    hostname: string | null;
+    routeStatus: string;
+    routeStatusLabel: string;
+    dnsStatus: 'present' | 'missing' | 'wrong' | 'unknown';
+  };
+}
+
+interface PlatformServicesOverview {
+  readiness: string;
+  services: PlatformServiceStatus[];
+}
+
+function routeStatusBadgeClass(routeStatus: string): string {
+  switch (routeStatus) {
+    case 'synced':
+      return 'bg-green-100 text-green-800';
+    case 'external':
+      return 'bg-blue-100 text-blue-800';
+    case 'missing_route':
+    case 'missing_dns':
+    case 'dns_wrong':
+    case 'zone_pending':
+    case 'zone_not_found':
+      return 'bg-amber-100 text-amber-800';
+    default:
+      return 'bg-gray-100 text-gray-700';
+  }
+}
+
+function dnsStatusLabel(status: PlatformServiceStatus['hostname']['dnsStatus']): string {
+  switch (status) {
+    case 'present':
+      return 'Proxied CNAME present';
+    case 'missing':
+      return 'CNAME missing';
+    case 'wrong':
+      return 'CNAME incorrect';
+    default:
+      return 'Unknown';
+  }
+}
+
+function formatManagedBy(route: PublishedApplication): string {
+  if (route.managedBy !== 'port-au-next') return 'External';
+  if (route.sourceType === 'service' && route.sourceId) {
+    return `Port-Au-Next (${route.sourceId})`;
+  }
+  if (route.sourceType === 'preview_wildcard') return 'Port-Au-Next (preview)';
+  if (route.sourceType === 'app') return 'Port-Au-Next (app)';
+  return 'Port-Au-Next';
+}
+
+function tunnelStatusBadgeClass(status: string): string {
   switch (status) {
     case 'healthy':
       return 'bg-green-100 text-green-800';
@@ -63,6 +123,11 @@ export default function CloudflareSettingsCard() {
     selectedTunnelId ? `/api/cloudflare/tunnels/${selectedTunnelId}/routes` : null,
     fetcher
   );
+  const { data: platformServicesData, mutate: mutatePlatformServices } =
+    useSWR<PlatformServicesOverview>(
+      config?.connected ? '/api/cloudflare/services' : null,
+      fetcher
+    );
 
   const [accountId, setAccountId] = useState('');
   const [apiToken, setApiToken] = useState('');
@@ -80,6 +145,11 @@ export default function CloudflareSettingsCard() {
   const connected = config?.connected === true;
   const tunnels = tunnelsData?.tunnels ?? [];
   const routes = routesData?.routes ?? [];
+  const platformServices = platformServicesData?.services ?? [];
+
+  const refreshPlatformAndRoutes = async () => {
+    await Promise.all([mutatePlatformServices(), mutateRoutes(), mutateTunnels()]);
+  };
 
   const handleConnect = async () => {
     setIsBusy(true);
@@ -144,6 +214,7 @@ export default function CloudflareSettingsCard() {
       if (!response.ok) throw new Error('Failed to select tunnel');
       await mutateConfig();
       await mutateTunnels();
+      await mutatePlatformServices();
       showToast(`Selected tunnel ${tunnel.name}`, 'success');
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Failed to select tunnel', 'error');
@@ -223,6 +294,41 @@ export default function CloudflareSettingsCard() {
       showToast(`Removed route ${hostname}`, 'success');
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Failed to remove route', 'error');
+    } finally {
+      setIsBusy(false);
+    }
+  };
+
+  const handleSyncPlatformService = async (serviceId: string) => {
+    setIsBusy(true);
+    try {
+      const response = await fetch(`/api/cloudflare/services/${serviceId}/sync`, {
+        method: 'POST',
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || 'Failed to sync service route');
+      await refreshPlatformAndRoutes();
+      showToast('Platform service route synced', 'success');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Failed to sync service route', 'error');
+    } finally {
+      setIsBusy(false);
+    }
+  };
+
+  const handleSyncAllPlatformServices = async () => {
+    setIsBusy(true);
+    try {
+      const response = await fetch('/api/cloudflare/services/sync-all', { method: 'POST' });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || 'Failed to sync platform services');
+      await refreshPlatformAndRoutes();
+      showToast('All platform service routes synced', 'success');
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : 'Failed to sync platform services',
+        'error'
+      );
     } finally {
       setIsBusy(false);
     }
@@ -491,7 +597,7 @@ export default function CloudflareSettingsCard() {
                         <td className="px-4 py-2 font-medium">{tunnel.name}</td>
                         <td className="px-4 py-2">
                           <span
-                            className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium capitalize ${statusBadgeClass(tunnel.status)}`}
+                            className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium capitalize ${tunnelStatusBadgeClass(tunnel.status)}`}
                           >
                             {tunnel.status}
                           </span>
@@ -545,6 +651,88 @@ export default function CloudflareSettingsCard() {
             </SettingsInstructionsToggleable>
           )}
 
+          {connected && (
+            <div>
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+                <div>
+                  <h4 className="text-lg font-medium">Platform services</h4>
+                  <p className="text-sm text-gray-600">
+                    Hostnames from root <code className="text-gray-800">.env</code> (
+                    <code className="text-gray-800">*_HOST</code>). Restart deployment-manager after
+                    changing them. Umami syncs when <code className="text-gray-800">UMAMI_HOST</code>{' '}
+                    is set.
+                  </p>
+                </div>
+                <Button
+                  color="blue"
+                  onClick={handleSyncAllPlatformServices}
+                  disabled={isBusy || platformServicesData?.readiness !== 'ready'}
+                >
+                  Sync all platform services
+                </Button>
+              </div>
+              <div className="overflow-x-auto border border-gray-200 rounded-lg mb-8">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-gray-50 text-left">
+                    <tr>
+                      <th className="px-4 py-2 font-medium">Service</th>
+                      <th className="px-4 py-2 font-medium">Env var</th>
+                      <th className="px-4 py-2 font-medium">Hostname</th>
+                      <th className="px-4 py-2 font-medium">Route</th>
+                      <th className="px-4 py-2 font-medium">DNS</th>
+                      <th className="px-4 py-2 font-medium">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {platformServices.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="px-4 py-6 text-gray-500 text-center">
+                          Loading platform services…
+                        </td>
+                      </tr>
+                    ) : (
+                      platformServices.map((service) => (
+                        <tr key={service.id} className="border-t border-gray-100">
+                          <td className="px-4 py-2 font-medium">{service.label}</td>
+                          <td className="px-4 py-2 font-mono text-xs">{service.envKey}</td>
+                          <td className="px-4 py-2 font-mono">
+                            {service.hostname.hostname ?? (
+                              <span className="text-gray-500">
+                                {service.required ? 'Not set' : 'Optional — not set'}
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-2">
+                            <span
+                              className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${routeStatusBadgeClass(service.hostname.routeStatus)}`}
+                            >
+                              {service.hostname.routeStatusLabel}
+                            </span>
+                          </td>
+                          <td className="px-4 py-2">{dnsStatusLabel(service.hostname.dnsStatus)}</td>
+                          <td className="px-4 py-2">
+                            <Button
+                              color="blue"
+                              size="sm"
+                              onClick={() => handleSyncPlatformService(service.id)}
+                              disabled={
+                                isBusy ||
+                                !service.hostname.hostname ||
+                                platformServicesData?.readiness !== 'ready'
+                              }
+                            >
+                              Sync route
+                            </Button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
           {selectedTunnelId && (
             <div>
               <h4 className="text-lg font-medium mb-3">Published applications</h4>
@@ -572,9 +760,7 @@ export default function CloudflareSettingsCard() {
                           <td className="px-4 py-2 font-mono">{route.hostname}</td>
                           <td className="px-4 py-2">{route.type}</td>
                           <td className="px-4 py-2 font-mono">{route.service}</td>
-                          <td className="px-4 py-2 capitalize">
-                            {route.managedBy === 'port-au-next' ? 'Port-Au-Next' : 'External'}
-                          </td>
+                          <td className="px-4 py-2">{formatManagedBy(route)}</td>
                           <td className="px-4 py-2">
                             {route.managedBy === 'port-au-next' && (
                               <Button
@@ -604,6 +790,7 @@ export default function CloudflareSettingsCard() {
               <li>Add domain to Cloudflare dashboard (manual)</li>
               <li>Point nameservers to Cloudflare (manual)</li>
               <li>Assign hostnames in app settings — routes + DNS are automated</li>
+              <li>Platform service routes sync from root <code>.env</code> *_HOST vars (including Umami when set)</li>
             </ol>
           </SettingsInstructionsToggleable>
         </>

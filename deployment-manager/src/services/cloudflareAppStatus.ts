@@ -54,7 +54,7 @@ const ROUTE_STATUS_LABELS: Record<HostnameRouteStatus, string> = {
   dns_wrong: 'Route exists — DNS points elsewhere',
 };
 
-async function buildHostnameStatus(
+export async function buildHostnameStatus(
   hostname: string | null | undefined,
   readiness: CloudflareReadiness,
   tunnelId: string | null,

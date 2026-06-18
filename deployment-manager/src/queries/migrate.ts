@@ -307,6 +307,12 @@ export async function migrate() {
       ON cloudflare_hostname_routes(tunnel_id)
     `);
 
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_cloudflare_hostname_routes_service
+      ON cloudflare_hostname_routes(source_type, source_id)
+      WHERE source_type = 'service'
+    `);
+
     await pool.query('COMMIT');
     console.log('Database migration completed successfully');
   } catch (error) {

@@ -113,6 +113,7 @@ Port-Au-Next integrates with your Cloudflare account to manage **tunnel publishe
 - List tunnels in your account (name, status, replicas, route count)
 - Select an existing tunnel or create a new one
 - Create or update published application routes when you assign an app domain
+- **Sync platform service routes** from root `.env` `*_HOST` variables (deployment manager, MinIO, imgproxy, port-schedule, Umami when set)
 - Create proxied CNAME records pointing hostnames at your tunnel
 - Wildcard preview routes when preview branches are enabled
 - Cache purge on deploy (when a zone is linked to the app)
@@ -149,6 +150,20 @@ Each app shows tunnel route status for its domain:
 Use **Sync route** to adopt existing apps without changing the domain string — useful when routes were created manually before connecting Cloudflare.
 
 Assigning or changing a domain in **App Settings** also triggers route + DNS sync automatically when Cloudflare is connected.
+
+### Platform services — Settings → Cloudflare
+
+Root `.env` public hostnames are synced to the selected tunnel automatically on deployment-manager startup (and when you select a tunnel):
+
+| Env var | Service |
+|---------|---------|
+| `DEPLOYMENT_MANAGER_HOST` | Deployment manager UI |
+| `IMGPROXY_HOST` | imgproxy CDN |
+| `MINIO_HOST` | MinIO object storage |
+| `PORT_SCHEDULE_HOST` | port-schedule (optional) |
+| `UMAMI_HOST` | Umami analytics (optional — synced when set) |
+
+Use **Sync all platform services** or per-service **Sync route** in Settings → Cloudflare. After changing any `*_HOST` value in `.env`, restart the deployment-manager container.
 
 ### Preview branches
 
