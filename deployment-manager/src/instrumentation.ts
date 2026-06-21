@@ -22,6 +22,10 @@ export async function register() {
       scheduleLogRetentionCleanup();
       console.log('Log retention cleanup scheduled');
 
+      const { ensureNginxConfigMount } = await import('./services/nginx');
+      await ensureNginxConfigMount();
+      console.log('Nginx config mount check completed');
+
       // Ensure admin user exists on startup
       await ensureAdminUser();
       console.log('Admin user setup completed');

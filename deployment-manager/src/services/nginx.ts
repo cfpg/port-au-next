@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { exec } from 'child_process';
+import { promisify } from 'util';
 import logger from '~/services/logger';
 import { getContainerIp, execCommand } from '~/utils/docker';
 import getAppsDir from '~/utils/getAppsDir';
@@ -11,6 +12,123 @@ import {
 import { ensureNginxDeploymentLogDir } from '~/lib/nginxLogs';
 
 const NGINX_CONFIG_DIR = path.join(getAppsDir(), '../nginx/conf.d');
+const COMPOSE_PROJECT = 'port-au-next';
+const execAsync = promisify(exec);
+
+function getComposeProjectRoot(): string {
+  return path.join(process.cwd(), './');
+}
+
+async function execCompose(command: string): Promise<string> {
+  const { stdout } = await execAsync(command, { cwd: getComposeProjectRoot() });
+  return stdout;
+}
+
+async function waitForNginxContainer(timeoutMs = 30000): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    try {
+      const containerId = (
+        await execCompose(`docker compose -p ${COMPOSE_PROJECT} ps -q nginx`)
+      ).trim();
+      if (containerId) {
+        return true;
+      }
+    } catch {
+      // nginx may not be up yet
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+
+  return false;
+}
+
+async function isNginxConfigMountBroken(): Promise<boolean> {
+  const hostConfigCount = fs
+    .readdirSync(NGINX_CONFIG_DIR)
+    .filter((file) => file.endsWith('.conf')).length;
+
+  if (hostConfigCount === 0) {
+    return false;
+  }
+
+  let nginxContainerId = '';
+  try {
+    nginxContainerId = (await execCompose(`docker compose -p ${COMPOSE_PROJECT} ps -q nginx`)).trim();
+  } catch {
+    return false;
+  }
+
+  if (!nginxContainerId) {
+    return false;
+  }
+
+  let mountInfo = '';
+  try {
+    mountInfo = await execCompose(
+      `docker compose -p ${COMPOSE_PROJECT} exec -T nginx sh -c "mount | grep ' /etc/nginx/conf.d '"`
+    );
+  } catch {
+    return true;
+  }
+
+  if (mountInfo.includes('type tmpfs')) {
+    return true;
+  }
+
+  let containerConfigCount = 0;
+  try {
+    const output = await execCompose(
+      `docker compose -p ${COMPOSE_PROJECT} exec -T nginx sh -c "ls -1 /etc/nginx/conf.d/*.conf 2>/dev/null | wc -l"`
+    );
+    containerConfigCount = Number.parseInt(output.trim(), 10);
+  } catch {
+    return true;
+  }
+
+  return !Number.isFinite(containerConfigCount) || containerConfigCount < hostConfigCount;
+}
+
+async function ensureNginxConfigMount(): Promise<void> {
+  const hostConfigCount = fs
+    .readdirSync(NGINX_CONFIG_DIR)
+    .filter((file) => file.endsWith('.conf')).length;
+
+  if (hostConfigCount === 0) {
+    await logger.debug('no nginx configs on host yet; skipping mount check');
+    return;
+  }
+
+  const nginxRunning = await waitForNginxContainer();
+  if (!nginxRunning) {
+    await logger.warn('nginx container not running yet; skipping config mount check');
+    return;
+  }
+
+  if (!(await isNginxConfigMountBroken())) {
+    await logger.debug('nginx config bind mount looks healthy');
+    return;
+  }
+
+  await logger.warn(
+    'nginx conf.d bind mount is missing or empty inside the container; recreating nginx'
+  );
+
+  await execCompose(`docker compose -p ${COMPOSE_PROJECT} up -d --force-recreate nginx`);
+
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    if (!(await isNginxConfigMountBroken())) {
+      await logger.info('nginx container recreated and config bind mount restored');
+      return;
+    }
+  }
+
+  throw new Error('nginx config bind mount is still broken after container recreate');
+}
 
 const getCommonNginxConfig = (
   domain: string,
@@ -168,12 +286,10 @@ async function updateNginxConfig(
 }
 
 async function reloadNginx() {
-  const projectRoot = path.join(process.cwd(), './');
-  
   return new Promise<void>((resolve, reject) => {
     exec(
-      'docker compose -p port-au-next exec -T nginx nginx -s reload',
-      { cwd: projectRoot },
+      `docker compose -p ${COMPOSE_PROJECT} exec -T nginx nginx -s reload`,
+      { cwd: getComposeProjectRoot() },
       (error: Error | null) => {
         if (error) {
           logger.error(`Error reloading nginx`, error);
@@ -319,6 +435,7 @@ ${locationBlocks}
 }
 
 export {
+  ensureNginxConfigMount,
   updateNginxConfig,
   reloadNginx,
   deleteAppConfig,
