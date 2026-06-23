@@ -81,6 +81,31 @@ services:
     networks:
       - port_au_next_network
 
+  # Shared Bugsink error tracking (dedicated DB on shared Postgres)
+  bugsink:
+    image: bugsink/bugsink:2
+    restart: always
+    environment:
+      SECRET_KEY: ${BUGSINK_SECRET_KEY:?Set BUGSINK_SECRET_KEY in .env (see .env.example)}
+      DATABASE_URL: postgresql://${BUGSINK_DB_USER}:${BUGSINK_DB_PASSWORD}@postgres:5432/${BUGSINK_DB_NAME:-bugsink}
+      CREATE_SUPERUSER: ${BUGSINK_ADMIN_EMAIL}:${BUGSINK_ADMIN_PASSWORD}
+      PORT: "8000"
+      BEHIND_HTTPS_PROXY: "true"
+      USE_X_FORWARDED_HOST: "true"
+      BASE_URL: https://${BUGSINK_HOST:-localhost}
+      # Public hostname + docker service name for deployment-manager → bugsink:8000
+      ALLOWED_HOSTS: ${BUGSINK_HOST:-localhost},localhost,127.0.0.1,bugsink
+    depends_on:
+      - postgres
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/')\""]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+    networks:
+      - port_au_next_network
+
   # Shared Umami analytics (dedicated DB on shared Postgres)
   umami:
     image: ghcr.io/umami-software/umami:postgresql-v2.18
@@ -168,6 +193,14 @@ services:
       - UMAMI_DB_NAME=${UMAMI_DB_NAME:-umami}
       - UMAMI_ADMIN_USERNAME=${UMAMI_ADMIN_USERNAME:-}
       - UMAMI_ADMIN_PASSWORD=${UMAMI_ADMIN_PASSWORD:-}
+      - BUGSINK_HOST=${BUGSINK_HOST:-}
+      - BUGSINK_SECRET_KEY=${BUGSINK_SECRET_KEY:-}
+      - BUGSINK_DB_USER=${BUGSINK_DB_USER:-bugsink}
+      - BUGSINK_DB_PASSWORD=${BUGSINK_DB_PASSWORD:-}
+      - BUGSINK_DB_NAME=${BUGSINK_DB_NAME:-bugsink}
+      - BUGSINK_ADMIN_EMAIL=${BUGSINK_ADMIN_EMAIL:-}
+      - BUGSINK_ADMIN_PASSWORD=${BUGSINK_ADMIN_PASSWORD:-}
+      - BUGSINK_API_TOKEN=${BUGSINK_API_TOKEN:-}
     ports:
       - "3000:3000"
     depends_on:

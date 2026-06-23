@@ -7,9 +7,12 @@ export async function register() {
     const { setupImgproxy } = await import('./lib/startup');
     const { setupPortSchedule } = await import('./lib/startup');
     const { setupUmami } = await import('./lib/startup');
+    const { setupBugsink } = await import('./lib/startup');
     const { syncPlatformServicesOnStartup } = await import('./services/cloudflarePlatformServices');
     const { ensureUmamiDatabase } = await import('./services/umamiDb');
+    const { ensureBugsinkDatabase } = await import('./services/bugsinkDb');
     const { ensureUmamiPlatformAdmin } = await import('./services/umami');
+    const { ensureBugsinkPlatformReady } = await import('./services/bugsink');
     const { migrate } = await import('./queries/migrate');
     const { scheduleLogRetentionCleanup } = await import('./lib/logRetention');
     const { ensureNginxAppsLogRoot } = await import('./lib/nginxLogs');
@@ -48,11 +51,20 @@ export async function register() {
       await ensureUmamiDatabase();
       console.log('Umami database bootstrap finished');
 
+      await ensureBugsinkDatabase();
+      console.log('Bugsink database bootstrap finished');
+
       await ensureUmamiPlatformAdmin();
       console.log('Umami platform admin bootstrap finished');
 
+      await ensureBugsinkPlatformReady();
+      console.log('Bugsink platform bootstrap finished');
+
       await setupUmami();
       console.log('Umami vhost step finished (no vhost if UMAMI_HOST unset)');
+
+      await setupBugsink();
+      console.log('Bugsink vhost step finished (no vhost if BUGSINK_HOST unset)');
 
       await ensureNginxAppsLogRoot();
       console.log('Nginx apps log directory permissions configured');

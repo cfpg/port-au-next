@@ -4,6 +4,7 @@ import PreviewBranchesCard from '~/components/settings/PreviewBranchesCard';
 import PrismaCard from '~/components/settings/PrismaCard';
 import ObjectStorageCard from '~/components/settings/ObjectStorageCard';
 import AnalyticsCard from '~/components/settings/AnalyticsCard';
+import ErrorTrackingCard from '~/components/settings/ErrorTrackingCard';
 import CloudflareAppCard from '~/components/settings/CloudflareAppCard';
 import { AppSettingsForm } from '~/components/AppSettingsForm';
 
@@ -59,6 +60,13 @@ export default async function AppSettingsPage({
         title="Analytics"
         padding="content"
         content={<AnalyticsCard app={app} />}
+      />
+
+      <Card
+        className="bg-white text-black mb-8"
+        title="Error tracking"
+        padding="content"
+        content={<ErrorTrackingCard app={app} />}
       />
 
       <Card

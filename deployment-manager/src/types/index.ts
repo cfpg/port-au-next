@@ -61,7 +61,7 @@ export interface AppSettings {
 } 
 
 
-export type Service = 'nginx' | 'postgres' | 'redis' | 'imgproxy' | 'minio' | 'umami';
+export type Service = 'nginx' | 'postgres' | 'redis' | 'imgproxy' | 'minio' | 'umami' | 'bugsink';
 export type ServiceStatus =
   | 'running'
   | 'stopped'

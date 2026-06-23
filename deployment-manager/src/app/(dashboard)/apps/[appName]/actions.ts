@@ -15,6 +15,7 @@ import { deleteAppDatabase, deleteAppRecord } from '~/services/database';
 import { withAuth } from '~/lib/auth-utils';
 import updateAppSettingsQuery from '~/queries/updateAppSettingsQuery';
 import { syncUmamiWebsiteDomain } from '~/services/umami';
+import { syncBugsinkProjectName } from '~/services/bugsink';
 import { AppSettings } from '~/types';
 import fetchActivePreviewBranchesQuery from '~/queries/fetchActivePreviewBranches';
 import { cloneRepository } from '~/services/git';
@@ -85,6 +86,14 @@ export const updateAppSettings = withAuth(async (
         await syncUmamiWebsiteDomain(appId, settings.domain, settings.name || appName);
       } catch (syncError) {
         await logger.error('Failed to sync Umami website domain', syncError as Error);
+      }
+    }
+
+    if (settings.name && settings.name !== appName) {
+      try {
+        await syncBugsinkProjectName(appId, settings.name || appName);
+      } catch (syncError) {
+        await logger.error('Failed to sync Bugsink project name', syncError as Error);
       }
     }
 

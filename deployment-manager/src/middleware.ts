@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionCookie } from "better-auth/cookies";
+import { AUTH_COOKIE_PREFIX } from "~/lib/auth-config";
 
 export async function middleware(request: NextRequest) {
-  const sessionCookie = getSessionCookie(request);
+  const sessionCookie = getSessionCookie(request, {
+    cookiePrefix: AUTH_COOKIE_PREFIX,
+  });
 
   if (
     !sessionCookie &&

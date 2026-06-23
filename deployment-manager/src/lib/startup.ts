@@ -194,3 +194,32 @@ export async function setupUmami(): Promise<void> {
     throw error;
   }
 }
+
+export async function setupBugsink(): Promise<void> {
+  const host = process.env.BUGSINK_HOST?.trim();
+  if (!host) {
+    console.log('BUGSINK_HOST not set; skipping nginx vhost for Bugsink');
+    return;
+  }
+
+  try {
+    const containerIp = await getServiceContainerIp('bugsink');
+
+    await createServiceVhostConfig(
+      'bugsink',
+      host,
+      [
+        {
+          path: '/',
+          proxyPass: `http://${containerIp}:8000`,
+        },
+      ],
+      { clientMaxBodySize: '5M' }
+    );
+
+    await logger.info('Bugsink nginx vhost created successfully');
+  } catch (error) {
+    await logger.error('Error setting up Bugsink nginx', error as Error);
+    throw error;
+  }
+}

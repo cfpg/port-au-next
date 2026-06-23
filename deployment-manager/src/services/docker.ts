@@ -7,6 +7,7 @@ import logger from '~/services/logger';
 import { modifyNextConfig } from '~/services/nextConfig';
 
 import { execCommand } from '~/utils/docker';
+import { getComposeServiceContainerId } from '~/utils/compose';
 import { formatDockerEnvString } from '~/utils/dockerEnv';
 import getAppsDir from '~/utils/getAppsDir';
 import { migratorImageTag } from '~/services/prismaMigrate';
@@ -585,7 +586,7 @@ async function getServicesHealth(): Promise<ServiceHealth[]> {
     };
   }).filter(status => 
     // Only include our core services
-    ['postgres', 'nginx', 'redis', 'minio', 'imgproxy', 'umami'].includes(status.service)
+    ['postgres', 'nginx', 'redis', 'minio', 'imgproxy', 'umami', 'bugsink'].includes(status.service)
   );
 
   return healthStatus;
@@ -593,12 +594,12 @@ async function getServicesHealth(): Promise<ServiceHealth[]> {
 
 async function getServiceContainerIp(serviceName: string): Promise<string> {
   try {
-    const containerId = await execCommand(`docker compose ps -q ${serviceName}`) as string;
-    if (!containerId.trim()) {
+    const containerId = await getComposeServiceContainerId(serviceName);
+    if (!containerId) {
       throw new Error(`Service ${serviceName} not found`);
     }
 
-    const ip = await execCommand(`docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' ${containerId.trim()}`) as string;
+    const ip = await execCommand(`docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' ${containerId}`) as string;
     if (!ip.trim()) {
       throw new Error(`Could not get IP for service ${serviceName}`);
     }
