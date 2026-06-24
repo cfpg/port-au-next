@@ -18,6 +18,28 @@ async function getApp(appId: number) {
   return fetchSingleAppQuery({ appId });
 }
 
+function toErrorTrackingResponse(creds: {
+  projectId: string;
+  projectSlug: string;
+  dsn: string;
+  dashboardUsername: string;
+  dashboardPassword: string;
+}) {
+  return {
+    enabled: true as const,
+    projectId: creds.projectId,
+    projectSlug: creds.projectSlug,
+    dsn: creds.dsn,
+    dsnMasked: maskDsn(creds.dsn),
+    dashboardUsername: creds.dashboardUsername || undefined,
+    dashboardPassword: creds.dashboardPassword || undefined,
+    dashboardUrl: getBugsinkDashboardUrl(),
+    projectDashboardUrl: creds.projectSlug
+      ? getBugsinkProjectDashboardUrl(creds.projectSlug)
+      : getBugsinkDashboardUrl(),
+  };
+}
+
 export const GET = withAuth(async (_request: Request, { params }: { params: Promise<{ appId: string }> }) => {
   try {
     const { appId: appIdParam } = await params;
@@ -49,7 +71,7 @@ export const GET = withAuth(async (_request: Request, { params }: { params: Prom
       return NextResponse.json({
         enabled: false,
         projectId: row.public_key || undefined,
-        projectSlug: row.username || undefined,
+        dashboardUsername: row.username || undefined,
       });
     }
 
@@ -58,17 +80,7 @@ export const GET = withAuth(async (_request: Request, { params }: { params: Prom
       return NextResponse.json({ enabled: false });
     }
 
-    return NextResponse.json({
-      enabled: true,
-      projectId: creds.projectId,
-      projectSlug: creds.projectSlug,
-      dsn: creds.dsn,
-      dsnMasked: maskDsn(creds.dsn),
-      dashboardUrl: getBugsinkDashboardUrl(),
-      projectDashboardUrl: creds.projectSlug
-        ? getBugsinkProjectDashboardUrl(creds.projectSlug)
-        : getBugsinkDashboardUrl(),
-    });
+    return NextResponse.json(toErrorTrackingResponse(creds));
   } catch (error) {
     console.error('Error fetching error tracking status:', error);
     return NextResponse.json({ error: 'Failed to fetch error tracking status' }, { status: 500 });
@@ -92,15 +104,7 @@ export const POST = withAuth(async (_request: Request, { params }: { params: Pro
     const creds = await provisionBugsinkForApp(app);
 
     return NextResponse.json({
-      enabled: true,
-      projectId: creds.projectId,
-      projectSlug: creds.projectSlug,
-      dsn: creds.dsn,
-      dsnMasked: maskDsn(creds.dsn),
-      dashboardUrl: getBugsinkDashboardUrl(),
-      projectDashboardUrl: creds.projectSlug
-        ? getBugsinkProjectDashboardUrl(creds.projectSlug)
-        : getBugsinkDashboardUrl(),
+      ...toErrorTrackingResponse(creds),
       redeployRequired: true,
     });
   } catch (error) {

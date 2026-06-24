@@ -20,6 +20,8 @@ interface ErrorTrackingStatus {
   projectSlug?: string;
   dsn?: string;
   dsnMasked?: string;
+  dashboardUsername?: string;
+  dashboardPassword?: string;
   dashboardUrl?: string;
   projectDashboardUrl?: string;
 }
@@ -83,6 +85,7 @@ export default function ErrorTrackingCard({ app }: ErrorTrackingCardProps) {
   };
 
   const enabled = data?.enabled === true;
+  const hasDashboardLogin = Boolean(data?.dashboardUsername && data?.dashboardPassword);
 
   return (
     <div className="space-y-6">
@@ -113,12 +116,29 @@ export default function ErrorTrackingCard({ app }: ErrorTrackingCardProps) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input label="DSN" value={data.dsnMasked || ''} disabled readOnly />
             <Input
-              label="Project dashboard URL"
-              value={data.projectDashboardUrl || data.dashboardUrl || ''}
+              label="Dashboard URL"
+              value={data.dashboardUrl || ''}
               disabled
               readOnly
             />
           </div>
+          {hasDashboardLogin ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Input
+                label="Dashboard username"
+                value={data.dashboardUsername || ''}
+                disabled
+                readOnly
+              />
+              <Input
+                label="Dashboard password"
+                value={data.dashboardPassword || ''}
+                disabled
+                readOnly
+                showToggle
+              />
+            </div>
+          ) : null}
 
           <SettingsInstructionsToggleable title="Add error tracking to your Next.js app">
             <p className="text-sm text-blue-700 mb-2">
@@ -166,23 +186,24 @@ Sentry.init({
               </code>
             </div>
             <p className="text-sm text-blue-700 mt-3">
-              Use the platform admin login at the dashboard URL to view this app&apos;s errors.
-              Per-app dashboard logins are not available via the Bugsink API yet.
+              {hasDashboardLogin
+                ? 'Use the dashboard username and password above to sign in at the dashboard URL and view this app\u2019s errors.'
+                : 'Use the platform admin login at the dashboard URL to view this app\u2019s errors.'}
             </p>
           </SettingsInstructionsToggleable>
         </div>
       ) : data && !enabled && data.projectId ? (
         <div className="bg-gray-50 p-4 rounded-md">
           <p className="text-sm text-gray-600">
-            Error tracking is disabled. Bugsink project and DSN are retained. Enable again to resume
-            env injection without reprovisioning.
+            Error tracking is disabled. Bugsink project, dashboard login, and DSN are retained.
+            Enable again to resume env injection without reprovisioning.
           </p>
         </div>
       ) : (
         <div className="bg-gray-50 p-4 rounded-md">
           <p className="text-sm text-gray-600">
             Error tracking is not enabled. Enable to provision an isolated Bugsink team, project,
-            and DSN for this app.
+            dashboard login, and DSN for this app.
           </p>
         </div>
       )}
