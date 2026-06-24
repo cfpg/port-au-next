@@ -1,10 +1,16 @@
-import { exec } from 'child_process';
-import path from 'path';
-import { promisify } from 'util';
-
 import logger from '~/services/logger';
+import { execCompose } from '~/utils/compose';
 
-const execAsync = promisify(exec);
+async function execInNginxContainer(shellScript: string): Promise<void> {
+  const command = `exec -T nginx sh -c ${shellQuote(shellScript)}`;
+
+  try {
+    await execCompose(command);
+  } catch (error) {
+    await logger.error('nginx container command failed', error as Error);
+    throw error;
+  }
+}
 
 /** deployment-manager container runs as node (Alpine node image). */
 const NODE_UID = 1000;
@@ -13,18 +19,6 @@ const NGINX_USER = 'nginx';
 
 function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`;
-}
-
-async function execInNginxContainer(shellScript: string): Promise<void> {
-  const projectRoot = path.join(process.cwd(), './');
-  const command = `docker compose -p port-au-next exec -T nginx sh -c ${shellQuote(shellScript)}`;
-
-  try {
-    await execAsync(command, { cwd: projectRoot });
-  } catch (error) {
-    await logger.error('nginx container command failed', error as Error);
-    throw error;
-  }
 }
 
 /**

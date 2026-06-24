@@ -313,6 +313,15 @@ export async function migrate() {
       WHERE source_type = 'service'
     `);
 
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS platform_service_secrets (
+        service_type VARCHAR(50) PRIMARY KEY,
+        secret_encrypted TEXT NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     await pool.query('COMMIT');
     console.log('Database migration completed successfully');
   } catch (error) {

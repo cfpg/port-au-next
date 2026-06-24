@@ -4,6 +4,7 @@ import fetchAppServiceCredentialsQuery from '~/queries/fetchAppServiceCredential
 import { getMinioEnvVars } from '~/services/minio';
 import { ensurePortScheduleForProductionApp } from '~/services/portSchedule';
 import { getUmamiEnvVarsForProductionApp } from '~/services/umami';
+import { getBugsinkEnvVarsForProductionApp } from '~/services/bugsink';
 
 interface EnvVar {
   key: string;
@@ -12,7 +13,7 @@ interface EnvVar {
 
 /**
  * Fetches user-defined env vars from the DB and merges platform-injected vars
- * (Minio, Imgproxy, port-schedule, Umami, site URL). Platform keys listed later win over
+ * (Minio, Imgproxy, port-schedule, Umami, Bugsink, site URL). Platform keys listed later win over
  * duplicate keys from the DB.
  */
 export async function getPlatformAppEnvVars(
@@ -50,9 +51,11 @@ export async function getPlatformAppEnvVars(
   if (isProduction) {
     const scheduleVars = await ensurePortScheduleForProductionApp(app);
     const umamiVars = await getUmamiEnvVarsForProductionApp(app);
+    const bugsinkVars = await getBugsinkEnvVarsForProductionApp(app);
     productionOnlyEnvVars = [
       ...Object.entries(scheduleVars).map(([key, value]) => ({ key, value })),
       ...Object.entries(umamiVars).map(([key, value]) => ({ key, value })),
+      ...Object.entries(bugsinkVars).map(([key, value]) => ({ key, value })),
     ];
   }
 

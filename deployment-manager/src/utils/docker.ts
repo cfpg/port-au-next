@@ -15,6 +15,10 @@ function getPlatformSecrets(): string[] {
     process.env.UMAMI_ADMIN_PASSWORD,
     process.env.UMAMI_APP_SECRET,
     process.env.UMAMI_DB_PASSWORD,
+    process.env.BUGSINK_ADMIN_PASSWORD,
+    process.env.BUGSINK_SECRET_KEY,
+    process.env.BUGSINK_DB_PASSWORD,
+    process.env.BUGSINK_API_TOKEN,
     process.env.BETTER_AUTH_SECRET,
   ].filter((value): value is string => Boolean(value));
 }

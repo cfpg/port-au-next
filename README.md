@@ -162,6 +162,7 @@ Root `.env` public hostnames are synced to the selected tunnel automatically on 
 | `MINIO_HOST` | MinIO object storage |
 | `PORT_SCHEDULE_HOST` | port-schedule (optional) |
 | `UMAMI_HOST` | Umami analytics (optional — synced when set) |
+| `BUGSINK_HOST` | Bugsink error tracking (optional — synced when set) |
 
 Use **Sync all platform services** or per-service **Sync route** in Settings → Cloudflare. After changing any `*_HOST` value in `.env`, restart the deployment-manager container.
 
@@ -456,6 +457,43 @@ The deployment manager creates the `umami` database on shared Postgres and write
 | **Domain change** | Updates the Umami website domain automatically when app settings change. |
 
 Preview deployments do not receive Umami env vars. Add the tracking snippet in your Next.js app yourself (see the Analytics card in the UI). Cookie/consent banners are the app owner’s responsibility.
+
+## Bugsink error tracking
+
+**Bugsink** is a shared, self-hosted error tracker (Sentry-SDK compatible). Each app can **opt in** from the deployment manager (App Settings → Error tracking). When enabled, the platform provisions an isolated Bugsink team and project with a DSN for that app.
+
+### Platform setup
+
+1. Generate `BUGSINK_SECRET_KEY`:
+
+```bash
+openssl rand -base64 50
+```
+
+Copy the output into `.env` as `BUGSINK_SECRET_KEY=…` (no `django-insecure` prefix).
+
+2. Set `BUGSINK_HOST`, `BUGSINK_SECRET_KEY`, `BUGSINK_DB_*`, and `BUGSINK_ADMIN_*` in the root `.env` (see `.env.example`). `BUGSINK_ADMIN_*` is used for `CREATE_SUPERUSER` on first boot only.
+
+3. `docker compose up -d bugsink deployment-manager` (or bring up the full stack).
+
+4. On startup, deployment-manager **bootstraps a Bugsink API token** automatically (`bugsink-manage create_auth_token`), encrypts it, and stores it in the `platform_service_secrets` table. No manual step required.
+
+   Optional: set `BUGSINK_API_TOKEN` in `.env` to override the stored token (useful for recovery or pinning a known token).
+
+5. Log in at `https://{BUGSINK_HOST}` with `BUGSINK_ADMIN_EMAIL` / `BUGSINK_ADMIN_PASSWORD`.
+
+The deployment manager creates the `bugsink` database on shared Postgres and writes an nginx vhost for `BUGSINK_HOST`. Image: `bugsink/bugsink:2`.
+
+### Per-app behavior
+
+| Action | Behavior |
+|--------|----------|
+| **Enable** | Creates Bugsink team + project; stores project ID, team ID, slug, and DSN in `app_services`. |
+| **Production deploy** | Injects `SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN`, and `SENTRY_ENVIRONMENT` when enabled. |
+| **Disable** | Stops env injection; Bugsink project and DSN are retained. **Redeploy** required. |
+| **App rename** | Updates the Bugsink project name when app settings change. |
+
+Preview deployments do not receive Bugsink env vars. Install `@sentry/nextjs` in your app (see the Error tracking card in the UI). Per-app Bugsink dashboard logins are not available via the API yet — use the platform admin to view errors.
 
 ## API Reference
 

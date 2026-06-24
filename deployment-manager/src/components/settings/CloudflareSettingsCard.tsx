@@ -660,6 +660,7 @@ export default function CloudflareSettingsCard() {
                     Hostnames from root <code className="text-gray-800">.env</code> (
                     <code className="text-gray-800">*_HOST</code>). Restart deployment-manager after
                     changing them. Umami syncs when <code className="text-gray-800">UMAMI_HOST</code>{' '}
+                    is set; Bugsink syncs when <code className="text-gray-800">BUGSINK_HOST</code>{' '}
                     is set.
                   </p>
                 </div>

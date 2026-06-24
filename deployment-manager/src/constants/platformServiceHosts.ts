@@ -3,7 +3,8 @@ export type PlatformServiceId =
   | 'imgproxy'
   | 'minio'
   | 'port-schedule'
-  | 'umami';
+  | 'umami'
+  | 'bugsink';
 
 export interface PlatformServiceDefinition {
   id: PlatformServiceId;
@@ -41,6 +42,12 @@ export const PLATFORM_SERVICE_HOSTS: PlatformServiceDefinition[] = [
     id: 'umami',
     label: 'Umami analytics',
     envKey: 'UMAMI_HOST',
+    required: false,
+  },
+  {
+    id: 'bugsink',
+    label: 'Bugsink error tracking',
+    envKey: 'BUGSINK_HOST',
     required: false,
   },
 ];
