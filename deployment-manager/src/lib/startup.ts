@@ -214,7 +214,7 @@ export async function setupBugsink(): Promise<void> {
           proxyPass: `http://${containerIp}:8000`,
         },
       ],
-      { clientMaxBodySize: '5M' }
+      { clientMaxBodySize: '5M', forwardedProto: 'honor-upstream' }
     );
 
     await logger.info('Bugsink nginx vhost created successfully');

@@ -364,6 +364,29 @@ interface LocationConfig {
 
 interface ServiceVhostOptions {
   clientMaxBodySize?: string;
+  /**
+   * How nginx sets X-Forwarded-Proto for the upstream app.
+   * - scheme: $scheme (default; http when nginx listens on :80)
+   * - https: always https (public HTTPS-only hostnames)
+   * - honor-upstream: $http_x_forwarded_proto, falling back to https
+   */
+  forwardedProto?: 'scheme' | 'https' | 'honor-upstream';
+}
+
+function getForwardedProtoLines(forwardedProto: ServiceVhostOptions['forwardedProto']): string {
+  switch (forwardedProto) {
+    case 'https':
+      return '        proxy_set_header X-Forwarded-Proto https;';
+    case 'honor-upstream':
+      return `        set $forwarded_proto $http_x_forwarded_proto;
+        if ($forwarded_proto = "") {
+            set $forwarded_proto "https";
+        }
+        proxy_set_header X-Forwarded-Proto $forwarded_proto;`;
+    case 'scheme':
+    default:
+      return '        proxy_set_header X-Forwarded-Proto $scheme;';
+  }
 }
 
 async function createServiceVhostConfig(
@@ -376,6 +399,7 @@ async function createServiceVhostConfig(
     const configPath = path.join(NGINX_CONFIG_DIR, `service-${serviceName}.conf`);
     
     const clientMaxBodySize = options.clientMaxBodySize || '5M';
+    const forwardedProtoLines = getForwardedProtoLines(options.forwardedProto);
     
     const locationBlocks = locations.map(loc => {
       const baseConfig = `
@@ -385,7 +409,7 @@ async function createServiceVhostConfig(
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+${forwardedProtoLines}
         proxy_connect_timeout 300;
         proxy_http_version 1.1;
         proxy_set_header Connection "";
