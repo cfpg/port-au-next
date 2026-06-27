@@ -1,4 +1,5 @@
 import logger from '~/services/logger';
+import pool from '~/services/database';
 import cloudflare from '~/services/cloudflare';
 import cloudflareTunnel from '~/services/cloudflareTunnel';
 import { isCloudflareConnected } from '~/services/cloudflareClient';
