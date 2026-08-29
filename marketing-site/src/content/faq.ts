@@ -40,6 +40,11 @@ export const faqItems: FaqItem[] = [
       "Deploy any feature branch to its own subdomain (e.g. feature-x.preview.yourdomain.dev) with an isolated database and branch-specific env vars. Point previews at dev services, test in a production-like environment, then clean them up automatically when the branch merges.",
   },
   {
+    question: "What is a test database?",
+    answer:
+      "An optional, persistent PostgreSQL database provisioned for an app with credentials separate from production. Enable it in the dashboard, redeploy, and Port-Au-Next injects TEST_DATABASE_URL and TEST_POSTGRES_* variables at build time and runtime. Disable it without losing its data, or delete the app to remove it.",
+  },
+  {
     question: "Does it auto-deploy from GitHub?",
     answer:
       "Yes. Push to a configured branch and Port-Au-Next deploys it via GitHub Actions integration. You can also trigger deployments programmatically through the REST API, or kick them off manually from the dashboard.",
