@@ -7,6 +7,7 @@ import fetcher from '~/utils/fetcher';
 import Button from '~/components/general/Button';
 import { showToast } from '~/components/general/Toaster';
 import { App } from '~/types';
+import TestDatabaseCard from '~/components/settings/TestDatabaseCard';
 
 interface PrismaCardProps {
   app: App;
@@ -144,6 +145,8 @@ export default function PrismaCard({ app }: PrismaCardProps) {
           </Button>
         </div>
       )}
+
+      <TestDatabaseCard app={app} />
     </div>
   );
 }

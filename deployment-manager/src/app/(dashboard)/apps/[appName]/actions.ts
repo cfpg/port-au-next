@@ -27,6 +27,7 @@ import {
   validateRootPathFormat,
 } from '~/utils/appPaths';
 import fs from 'fs';
+import { deleteTestDatabaseForApp } from '~/services/testDatabase';
 
 export const fetchApp = withAuth(async (appName: string) => {
   const app = await fetchSingleAppQuery({appName});
@@ -105,8 +106,13 @@ export const updateAppSettings = withAuth(async (
   }
 });
 
-export const updateAppEnvVars = withAuth(async (appId: number, branch: string, vars: Record<string, string>) => {
-  const result = await updateAppEnvVarsQuery(appId, branch, vars);
+export const updateAppEnvVars = withAuth(async (
+  appId: number,
+  branch: string | null,
+  isPreview: boolean,
+  vars: Record<string, string>
+) => {
+  const result = await updateAppEnvVarsQuery(appId, branch, isPreview, vars);
   return result;
 });
 
@@ -273,7 +279,20 @@ export const deleteApp = withAuth(async (appName: string): Promise<{ success: bo
 
       // 4. Remove database resources
       try {
-        await deleteAppDatabase(app.db_name, app.db_user);
+        const databaseErrors: string[] = [];
+        try {
+          await deleteTestDatabaseForApp(app.id);
+        } catch (error) {
+          databaseErrors.push(`test database: ${(error as Error).message}`);
+        }
+        try {
+          await deleteAppDatabase(app.db_name, app.db_user);
+        } catch (error) {
+          databaseErrors.push(`production database: ${(error as Error).message}`);
+        }
+        if (databaseErrors.length > 0) {
+          throw new Error(databaseErrors.join('; '));
+        }
         deletionStatus.database.success = true;
         await logger.info('Removed database resources');
       } catch (error) {

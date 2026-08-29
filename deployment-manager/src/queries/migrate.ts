@@ -100,6 +100,57 @@ export async function migrate() {
       COMMENT ON TABLE app_env_vars IS 'Environment variables for apps. When is_preview is true and branch is null, these vars are shared across all preview branches. When branch is specified, these vars override the shared preview vars for that specific branch.'
     `);
 
+    // Production environment variables are project-scoped. If historical rows
+    // exist for multiple branches, prefer the currently configured app branch,
+    // then an existing project-scoped row, then the newest remaining row.
+    await pool.query(`
+      WITH ranked_production_vars AS (
+        SELECT
+          env.id,
+          ROW_NUMBER() OVER (
+            PARTITION BY env.app_id, env.key
+            ORDER BY
+              (env.branch = app.branch) DESC NULLS LAST,
+              (env.branch IS NULL) DESC,
+              env.id DESC
+          ) AS row_rank
+        FROM app_env_vars env
+        JOIN apps app ON app.id = env.app_id
+        WHERE env.is_preview = false
+      )
+      DELETE FROM app_env_vars env
+      USING ranked_production_vars ranked
+      WHERE env.id = ranked.id
+        AND ranked.row_rank > 1;
+
+      UPDATE app_env_vars
+      SET branch = NULL
+      WHERE is_preview = false
+        AND branch IS NOT NULL;
+
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_app_env_vars_project_production_key
+      ON app_env_vars (app_id, key)
+      WHERE is_preview = false AND branch IS NULL;
+
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1
+          FROM pg_constraint
+          WHERE conname = 'app_env_vars_production_branch_null'
+            AND conrelid = 'app_env_vars'::regclass
+        ) THEN
+          ALTER TABLE app_env_vars
+          ADD CONSTRAINT app_env_vars_production_branch_null
+          CHECK (is_preview = true OR branch IS NULL);
+        END IF;
+      END $$;
+    `);
+
+    await pool.query(`
+      COMMENT ON TABLE app_env_vars IS 'Project-scoped production variables use is_preview=false and branch=NULL. Preview variables use is_preview=true; branch=NULL is shared across previews and a branch value is a branch-specific override.'
+    `);
+
     await pool.query(`
       CREATE TABLE IF NOT EXISTS deployment_logs (
         id SERIAL PRIMARY KEY,

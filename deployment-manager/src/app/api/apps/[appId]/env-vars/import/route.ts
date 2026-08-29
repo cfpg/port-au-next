@@ -12,8 +12,9 @@ export const POST = withAuth(async (request: Request, { params }: { params: { ap
 
   try {
     const body = await request.json();
-    const { branch = null, envVars } = body as {
+    const { branch = null, isPreview = false, envVars } = body as {
       branch?: string | null;
+      isPreview?: boolean;
       envVars?: Record<string, string>;
     };
 
@@ -21,7 +22,11 @@ export const POST = withAuth(async (request: Request, { params }: { params: { ap
       return NextResponse.json({ error: 'envVars object is required' }, { status: 400 });
     }
 
-    const result = await importAppEnvVarsQuery(appId, branch, envVars);
+    if (typeof isPreview !== 'boolean') {
+      return NextResponse.json({ error: 'isPreview must be a boolean' }, { status: 400 });
+    }
+
+    const result = await importAppEnvVarsQuery(appId, branch, isPreview, envVars);
 
     if (!result.success) {
       return NextResponse.json({ error: result.error ?? 'Import failed' }, { status: 500 });
