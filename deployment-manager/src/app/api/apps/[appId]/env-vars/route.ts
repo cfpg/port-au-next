@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import fetchAppEnvVars from '~/queries/fetchAppEnvVars';
 import { withAuth } from '~/lib/auth-utils';
-import pool from '~/services/database';
+import { withTransaction } from '~/services/database';
 
 export const GET = withAuth(async (request: Request, { params }: { params: { appId: string } }) => {
   const { searchParams } = new URL(request.url);
@@ -44,27 +44,34 @@ export const POST = withAuth(async (request: Request, { params }: { params: { ap
 
   try {
     const body = await request.json();
-    const { branch, envVars } = body;
+    const { branch = null, isPreview, envVars } = body as {
+      branch?: string | null;
+      isPreview?: boolean;
+      envVars?: Record<string, string>;
+    };
 
-    // Determine if this is a preview environment based on the branch
-    const isPreview = branch === null || branch !== (await getAppBranch(appId));
-
-    // Delete existing env vars for this app and environment
-    await pool.query(
-      `DELETE FROM app_env_vars WHERE app_id = $1 AND is_preview = $2`,
-      [appId, isPreview]
-    );
-
-    // Insert new env vars
-    if (Object.keys(envVars).length > 0) {
-      const values = Object.entries(envVars).map(([key, value]) => {
-        return `(${appId}, '${key}', '${value}', ${isPreview ? 'true' : 'false'}, ${branch ? `'${branch}'` : 'NULL'})`;
-      }).join(', ');
-
-      await pool.query(
-        `INSERT INTO app_env_vars (app_id, key, value, is_preview, branch) VALUES ${values}`
+    if (typeof isPreview !== 'boolean' || !envVars || typeof envVars !== 'object' || Array.isArray(envVars)) {
+      return NextResponse.json(
+        { error: 'isPreview boolean and envVars object are required' },
+        { status: 400 }
       );
     }
+
+    const branchForRow = isPreview ? branch : null;
+    await withTransaction(async (client) => {
+      await client.query(
+        `DELETE FROM app_env_vars WHERE app_id = $1 AND is_preview = $2`,
+        [appId, isPreview]
+      );
+
+      for (const [key, value] of Object.entries(envVars)) {
+        await client.query(
+          `INSERT INTO app_env_vars (app_id, key, value, is_preview, branch)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [appId, key, value, isPreview, branchForRow]
+        );
+      }
+    });
 
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -75,17 +82,3 @@ export const POST = withAuth(async (request: Request, { params }: { params: { ap
     );
   }
 });
-
-// Helper function to get the app's production branch
-async function getAppBranch(appId: number): Promise<string> {
-  const result = await pool.query(
-    `SELECT branch FROM apps WHERE id = $1`,
-    [appId]
-  );
-  
-  if (result.rows.length === 0) {
-    throw new Error('App not found');
-  }
-  
-  return result.rows[0].branch;
-} 

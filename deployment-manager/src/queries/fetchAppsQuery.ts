@@ -50,7 +50,8 @@ export default async function fetchAppsQuery({ where: { appId, appName } = {} }:
       ) d ON true
       LEFT JOIN app_env_vars env 
         ON env.app_id = a.id 
-        AND env.branch = a.branch
+        AND env.is_preview = false
+        AND env.branch IS NULL
       GROUP BY 
         a.id,
         a.name, 

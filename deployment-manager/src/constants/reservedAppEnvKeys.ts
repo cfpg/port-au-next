@@ -25,6 +25,11 @@ export const RESERVED_APP_ENV_KEYS = new Set([
   'POSTGRES_HOST',
   'POSTGRES_PASSWORD',
   'POSTGRES_USER',
+  'TEST_DATABASE_URL',
+  'TEST_POSTGRES_DB',
+  'TEST_POSTGRES_HOST',
+  'TEST_POSTGRES_PASSWORD',
+  'TEST_POSTGRES_USER',
 ]);
 
 export function isReservedAppEnvKey(key: string): boolean {
