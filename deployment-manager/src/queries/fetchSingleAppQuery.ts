@@ -46,7 +46,8 @@ export default async function fetchSingleAppQuery({ appName, appId }: { appName?
       ) d ON true
       LEFT JOIN app_env_vars env 
         ON env.app_id = a.id 
-        AND env.branch = a.branch
+        AND env.is_preview = false
+        AND env.branch IS NULL
       ${appName ? `WHERE a.name = $1` : 'WHERE a.id = $1'}
       GROUP BY 
         a.id,
@@ -72,4 +73,4 @@ export default async function fetchSingleAppQuery({ appName, appId }: { appName?
     console.error('Error fetching app:', error);
     throw new Error('Failed to fetch app');
   }
-} 
+}

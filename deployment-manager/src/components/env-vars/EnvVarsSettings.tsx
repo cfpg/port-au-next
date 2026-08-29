@@ -65,7 +65,7 @@ export default function EnvVarsSettings({ app }: EnvVarsSettingsProps) {
     setEnvVars([...envVars, { 
       key: '', 
       value: '', 
-      branch: isPreview ? null : app.branch, 
+      branch: null,
       is_preview: isPreview 
     }]);
     setUnsavedChanges(true);
@@ -102,7 +102,7 @@ export default function EnvVarsSettings({ app }: EnvVarsSettingsProps) {
     }, {} as Record<string, string>);
 
     try {
-      const branch = isPreview ? null : app.branch;
+      const branch = null;
       const response = await fetch(`/api/apps/${app.id}/env-vars`, {
         method: 'POST',
         headers: {
@@ -110,6 +110,7 @@ export default function EnvVarsSettings({ app }: EnvVarsSettingsProps) {
         },
         body: JSON.stringify({
           branch,
+          isPreview,
           envVars: envVarsMap,
         }),
       });
@@ -202,7 +203,7 @@ export default function EnvVarsSettings({ app }: EnvVarsSettingsProps) {
         isOpen={importModalOpen}
         onClose={() => setImportModalOpen(false)}
         appId={app.id}
-        branch={isPreview ? null : app.branch}
+        branch={null}
         isPreview={isPreview}
         existingEnvVars={envVars}
         onImported={handleImported}
@@ -306,4 +307,4 @@ export default function EnvVarsSettings({ app }: EnvVarsSettingsProps) {
       </div>
     </div>
   );
-} 
+}

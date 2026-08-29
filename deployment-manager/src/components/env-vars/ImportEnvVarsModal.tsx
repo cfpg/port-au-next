@@ -103,7 +103,7 @@ export default function ImportEnvVarsModal({
       const response = await fetch(`/api/apps/${appId}/env-vars/import`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ branch, envVars }),
+        body: JSON.stringify({ branch, isPreview, envVars }),
       });
       const result = await response.json();
 

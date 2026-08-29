@@ -279,12 +279,23 @@ Migrations run against the **live** database for that app (or preview branch). W
 
 **Local workflow:** `npx prisma migrate dev` → commit migration SQL → deploy with auto-migrate enabled.
 
+### Test database
+
+In **Settings → Database**, enable **Test Database** to provision a persistent, empty PostgreSQL
+database with credentials separate from the production database. The next production deployment
+receives `TEST_DATABASE_URL`, `TEST_POSTGRES_HOST`, `TEST_POSTGRES_DB`, `TEST_POSTGRES_USER`, and
+`TEST_POSTGRES_PASSWORD` during both build and runtime. Preview deployments do not receive these
+variables.
+
+Disabling the feature stops environment injection after the next deploy but retains the database
+and its data. Deleting the app also deletes its test database. Prisma auto-migrate continues to use
+`DATABASE_URL` only and does not migrate the test database automatically.
+
 ### Environment Variables
 
 Environment variables can be configured:
 
-- Per application (base configuration)
-- Per branch within an application (branch-specific overrides)
+- Per application for production (project-scoped and preserved when the production branch changes)
 - Per preview deployment (preview-specific settings)
 
 This flexibility enables managing multiple environments (development, staging, production) within the same Port-Au-Next instance.

@@ -5,6 +5,7 @@ import { getMinioEnvVars } from '~/services/minio';
 import { ensurePortScheduleForProductionApp } from '~/services/portSchedule';
 import { getUmamiEnvVarsForProductionApp } from '~/services/umami';
 import { getBugsinkEnvVarsForProductionApp } from '~/services/bugsink';
+import { getTestDatabaseEnvVarsForProductionApp } from '~/services/testDatabase';
 
 interface EnvVar {
   key: string;
@@ -13,8 +14,8 @@ interface EnvVar {
 
 /**
  * Fetches user-defined env vars from the DB and merges platform-injected vars
- * (Minio, Imgproxy, port-schedule, Umami, Bugsink, site URL). Platform keys listed later win over
- * duplicate keys from the DB.
+ * (Minio, Imgproxy, port-schedule, Umami, Bugsink, test database, site URL). Platform keys listed
+ * later win over duplicate keys from the DB.
  */
 export async function getPlatformAppEnvVars(
   app: App,
@@ -29,7 +30,10 @@ export async function getPlatformAppEnvVars(
      JOIN apps a ON a.id = av.app_id
      WHERE a.id = $1
      AND av.is_preview = $2
-     AND (av.branch = $3 OR av.branch IS NULL)`,
+     AND (
+       ($2 = false AND av.branch IS NULL)
+       OR ($2 = true AND (av.branch = $3 OR av.branch IS NULL))
+     )`,
     [app.id, isPreview, branch]
   );
   const envVars = envResult.rows;
@@ -52,10 +56,12 @@ export async function getPlatformAppEnvVars(
     const scheduleVars = await ensurePortScheduleForProductionApp(app);
     const umamiVars = await getUmamiEnvVarsForProductionApp(app);
     const bugsinkVars = await getBugsinkEnvVarsForProductionApp(app);
+    const testDatabaseVars = await getTestDatabaseEnvVarsForProductionApp(app);
     productionOnlyEnvVars = [
       ...Object.entries(scheduleVars).map(([key, value]) => ({ key, value })),
       ...Object.entries(umamiVars).map(([key, value]) => ({ key, value })),
       ...Object.entries(bugsinkVars).map(([key, value]) => ({ key, value })),
+      ...Object.entries(testDatabaseVars).map(([key, value]) => ({ key, value })),
     ];
   }
 
@@ -127,6 +133,10 @@ const DB_BLOCK_ORDER = [
   'POSTGRES_USER',
   'POSTGRES_PASSWORD',
   'POSTGRES_DB',
+  'TEST_POSTGRES_HOST',
+  'TEST_POSTGRES_USER',
+  'TEST_POSTGRES_PASSWORD',
+  'TEST_POSTGRES_DB',
 ];
 
 /**
@@ -143,6 +153,9 @@ export function applyExportPostgresHost(
   if (next.POSTGRES_HOST) {
     next.POSTGRES_HOST = host;
   }
+  if (next.TEST_POSTGRES_HOST) {
+    next.TEST_POSTGRES_HOST = host;
+  }
 
   const hasDbCredentials =
     next.POSTGRES_USER && next.POSTGRES_PASSWORD && next.POSTGRES_DB;
@@ -156,6 +169,17 @@ export function applyExportPostgresHost(
       `@\${POSTGRES_HOST}:${port}/\${POSTGRES_DB}`;
   }
 
+  const hasTestDbCredentials =
+    next.TEST_POSTGRES_USER && next.TEST_POSTGRES_PASSWORD && next.TEST_POSTGRES_DB;
+  if (next.TEST_DATABASE_URL && hasTestDbCredentials) {
+    const scheme = next.TEST_DATABASE_URL.split('://')[0] || 'postgres';
+    const portMatch = next.TEST_DATABASE_URL.match(/@[^:/]+:(\d+)(?:\/|$)/);
+    const port = portMatch ? portMatch[1] : '5432';
+    next.TEST_DATABASE_URL =
+      `${scheme}://\${TEST_POSTGRES_USER}:\${TEST_POSTGRES_PASSWORD}` +
+      `@\${TEST_POSTGRES_HOST}:${port}/\${TEST_POSTGRES_DB}`;
+  }
+
   return next;
 }
 
@@ -166,8 +190,8 @@ export function applyExportPostgresHost(
  */
 export function formatEnvAsDotEnv(env: Record<string, string>): string {
   const dbKeys = DB_BLOCK_ORDER.filter((key) => key in env);
-  const hasDbUrl = 'DATABASE_URL' in env;
-  const grouped = new Set([...dbKeys, ...(hasDbUrl ? ['DATABASE_URL'] : [])]);
+  const urlKeys = ['DATABASE_URL', 'TEST_DATABASE_URL'].filter((key) => key in env);
+  const grouped = new Set([...dbKeys, ...urlKeys]);
 
   const restKeys = Object.keys(env)
     .filter((key) => !grouped.has(key))
@@ -178,8 +202,8 @@ export function formatEnvAsDotEnv(env: Record<string, string>): string {
   for (const key of dbKeys) {
     lines.push(`${key}=${quoteLiteralValue(env[key] ?? '')}`);
   }
-  if (hasDbUrl) {
-    lines.push(`DATABASE_URL=${quoteInterpolatedValue(env.DATABASE_URL ?? '')}`);
+  for (const key of urlKeys) {
+    lines.push(`${key}=${quoteInterpolatedValue(env[key] ?? '')}`);
   }
   if (grouped.size > 0 && restKeys.length > 0) {
     lines.push('');
