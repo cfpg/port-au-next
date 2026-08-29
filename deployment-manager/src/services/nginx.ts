@@ -204,6 +204,38 @@ ${markers.end}
 `;
 };
 
+function isValidUpstreamServer(upstreamServer: string): boolean {
+  const host = upstreamServer.replace(/:\d+$/, '');
+  return host.length > 0 && !upstreamServer.startsWith(':');
+}
+
+async function removeVhostWhenUpstreamUnavailable(
+  appName: string,
+  domain: string,
+  previewBranch: string | undefined,
+  context: { containerId?: string; deploymentId?: number; reason: string }
+): Promise<void> {
+  await logger.warning(
+    'Removing nginx vhost so domain is not routed to a missing or stale upstream',
+    { appName, domain, previewBranch, ...context }
+  );
+
+  try {
+    if (previewBranch) {
+      await deletePreviewBranchConfig(appName, previewBranch);
+    } else {
+      await deleteAppConfig(domain);
+    }
+  } catch (error) {
+    await logger.warning('Failed to remove nginx vhost after upstream became unavailable', {
+      appName,
+      domain,
+      previewBranch,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
 async function updateNginxConfig(
   appName: string, 
   domain: string, 
@@ -228,9 +260,28 @@ async function updateNginxConfig(
 
     if (containerId) {
       await logger.debug('Getting container IP', { containerId });
-      const containerIp = await getContainerIp(containerId);
+      const containerIp = (await getContainerIp(containerId)).trim();
+
+      if (!containerIp) {
+        await removeVhostWhenUpstreamUnavailable(appName, domain, previewBranch, {
+          containerId,
+          deploymentId,
+          reason: 'empty container IP',
+        });
+        return;
+      }
+
       upstreamServer = `${containerIp}:3000`;
       await logger.debug('Using container IP for upstream', { containerIp });
+    }
+
+    if (!isValidUpstreamServer(upstreamServer)) {
+      await removeVhostWhenUpstreamUnavailable(appName, domain, previewBranch, {
+        containerId: containerId ?? undefined,
+        deploymentId,
+        reason: 'invalid upstream server',
+      });
+      return;
     }
 
     if (previewBranch) {
@@ -283,12 +334,20 @@ async function updateNginxConfig(
 }
 
 async function reloadNginx() {
+  const nginxContainerId = await getComposeServiceContainerId('nginx');
+  if (!nginxContainerId) {
+    await logger.warning('nginx container not running; skipping reload');
+    return;
+  }
+
   try {
+    await execCompose('exec -T nginx nginx -t');
     await execCompose('exec -T nginx nginx -s reload');
     await logger.info('Nginx configuration reloaded successfully');
   } catch (error) {
-    await logger.error('Error reloading nginx', error as Error);
-    throw error;
+    await logger.warning('Error reloading nginx', {
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 }
 
@@ -308,13 +367,7 @@ async function deleteAppConfig(domain: string) {
       await logger.info(`Found nginx config at ${configPath}, deleting...`);
       await fs.promises.unlink(configPath);
       
-      try {
-        await execCommand('nginx -t');
-        await reloadNginx();
-        await logger.info('Nginx configuration reloaded successfully');
-      } catch (nginxError) {
-        await logger.error('Failed to reload nginx after config deletion', nginxError as Error);
-      }
+      await reloadNginx();
     } else {
       await logger.info(`No nginx config found at ${configPath}, skipping deletion`);
     }
