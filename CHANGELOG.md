@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Changed
+
+### Fixed
+
+## [0.6.0] - 2026-08-29
+
+### Added
+
 - **Optional test databases:** Apps can provision a persistent, empty PostgreSQL test database with separate credentials. Production builds and containers receive `TEST_DATABASE_URL` and `TEST_POSTGRES_*`; disabling retains data and deleting the app removes the database.
 - **Bugsink error tracking:** Shared Sentry-compatible Bugsink service with per-app opt-in team/project provisioning, encrypted platform API-token bootstrap, production DSN injection, and dashboard configuration.
 - **Umami analytics:** Shared Umami instance with per-app opt-in provisioning (team, website, dashboard login), production-only `NEXT_PUBLIC_UMAMI_*` env injection, domain sync on app settings change, and Analytics settings UI.
