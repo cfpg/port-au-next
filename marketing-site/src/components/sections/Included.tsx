@@ -20,7 +20,7 @@ const services: {
   {
     icon: Database,
     title: "PostgreSQL",
-    text: "A dedicated database and user per app, with isolated credentials. Optional Prisma support with managed migrations.",
+    text: "A dedicated database and user per app, plus an optional persistent test database with separate credentials. Prisma support includes managed migrations.",
     color: "#F0A53C",
   },
   {
@@ -95,6 +95,11 @@ export default function Included() {
           </div>
           <div>
             POSTGRES_HOST=<span className={styles.envGreen}>postgres</span>
+          </div>
+          <div>
+            TEST_DATABASE_URL=
+            <span className={styles.envGreen}>postgres://app_test:••••@postgres:5432/app_test</span>
+            <span className={styles.envComment}> # when test database enabled</span>
           </div>
           <div>
             REDIS_URL=<span className={styles.envGreen}>redis://redis:6379</span>

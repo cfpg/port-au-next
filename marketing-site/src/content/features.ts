@@ -72,7 +72,7 @@ export const features: FeatureItem[] = [
     icon: SlidersHorizontal,
     title: "Environment isolation",
     description:
-      "Set env vars per app, per branch, or per preview. Run dev, staging and prod from one Port-Au-Next instance.",
+      "Keep production env vars scoped to each app, with shared or branch-specific variables for previews. Run dev, staging and prod from one Port-Au-Next instance.",
     iconBg: "#E4EFF1",
     iconColor: "#2A5663",
   },
