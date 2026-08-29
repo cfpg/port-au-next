@@ -8,17 +8,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Optional test databases:** Apps can provision a persistent, empty PostgreSQL test database with separate credentials. Production builds and containers receive `TEST_DATABASE_URL` and `TEST_POSTGRES_*`; disabling retains data and deleting the app removes the database.
+- **Bugsink error tracking:** Shared Sentry-compatible Bugsink service with per-app opt-in team/project provisioning, encrypted platform API-token bootstrap, production DSN injection, and dashboard configuration.
 - **Umami analytics:** Shared Umami instance with per-app opt-in provisioning (team, website, dashboard login), production-only `NEXT_PUBLIC_UMAMI_*` env injection, domain sync on app settings change, and Analytics settings UI.
 - **Umami admin bootstrap:** Deployment manager syncs `UMAMI_ADMIN_*` from `.env` to Umami on startup (replaces default `admin`/`umami` on first boot).
+- **Cloudflare tunnel management:** Connect Cloudflare with a scoped API token, select or create tunnels, and manage app routes and proxied DNS from the deployment manager.
+- **Platform service route sync:** Synchronize deployment-manager, MinIO, imgproxy, port-schedule, Umami, and Bugsink hostnames with the selected Cloudflare tunnel.
+- **Environment export:** Export the effective production environment for deployed, localhost, or Docker/WSL Postgres hosts, including platform-managed service credentials.
+- **Monorepo project paths:** Configure an app root path so Next.js projects can be deployed from repository subdirectories.
+- **Marketing site:** New standalone product site covering features, shared infrastructure, installation, and FAQs.
 
 ### Changed
 
-- Deploy env assembly is centralized in `mergeAppEnv()` so production, preview, recovery, and the release pipeline all inject the same platform-managed variables (Minio, Imgproxy, port-schedule, Umami, site URL).
+- **Project-scoped production environment:** Production variables now use `branch = NULL` and remain available when the configured production branch changes. Existing rows are migrated automatically; preview variables remain separately classified and may be shared or branch-specific.
+- Deploy env assembly is centralized in `mergeAppEnv()` so production, preview, recovery, and the release pipeline inject the same platform-managed variables (MinIO, imgproxy, port-schedule, Umami, Bugsink, test database, and site URL).
+- Nginx configuration storage is verified and initialized when the deployment manager starts.
+- Release automation now validates the changelog and branch state, creates the release commit and annotated tag, pushes `main`, and synchronizes `dev` after release.
 
 ### Fixed
 
 - **Release pipeline env vars:** Redeploys no longer omit platform-injected reserved keys (`MINIO_HOST`, `IMGPROXY_HOST`, etc.) from the build `.env`, fixing Next.js build failures for apps that validate those variables at build time.
 - **Nginx deployment logs:** Per-deployment log directories are created via the nginx container with correct ownership, fixing `EACCES` errors during startup container recovery after 0.5.0 logging was enabled.
+- **Nginx upstream validation:** Empty or invalid container upstreams no longer produce stale vhosts; reloads validate configuration inside the nginx container and safely handle an unavailable nginx service.
+- **Cloudflare database usage:** Route synchronization uses the shared database pool safely.
+- **Bugsink provisioning:** Corrected CSRF handling and per-app project provisioning behavior.
 
 ## [0.5.0] - 2026-05-30
 
@@ -149,4 +162,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Docker build logging improvements
 
 ### Security
-- Updated axios to 1.8.2 for security patches 
+- Updated axios to 1.8.2 for security patches
