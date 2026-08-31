@@ -15,6 +15,7 @@ import {
 import { ensureNginxDeploymentLogDir } from '~/lib/nginxLogs';
 
 const NGINX_CONFIG_DIR = path.join(getAppsDir(), '../nginx/conf.d');
+const DEFAULT_APP_CLIENT_MAX_BODY_SIZE = '10M';
 
 async function waitForNginxContainer(): Promise<boolean> {
   const containerId = await waitForComposeService('nginx');
@@ -142,10 +143,12 @@ server {
     listen [::]:80;
     server_name ${domain};
 
+    client_max_body_size ${DEFAULT_APP_CLIENT_MAX_BODY_SIZE};
+
     access_log ${accessLog} combined;
     error_log ${errorLog} warn;
     
-    # Increase buffer size settings
+    # Increase proxy response buffer sizes
     proxy_buffer_size 128k;
     proxy_buffers 4 256k;
     proxy_busy_buffers_size 256k;

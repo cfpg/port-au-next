@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Generated production and preview app Nginx vhosts now accept request bodies up to 10 MB, allowing image and file uploads larger than Nginx's 1 MB default.
+
 ### Fixed
 
 ## [0.6.0] - 2026-08-29
