@@ -68,6 +68,7 @@ async function runOutboundJob(pool: DbPool, job: JobRow, runId: string) {
       headersJson: job.headers_json,
       body: job.body,
       webhookSecret: job.webhook_secret,
+      authScheme: job.auth_scheme,
     },
     validateWebhookUrl
   );

@@ -10,6 +10,8 @@ export type JobRow = {
   headers_json: unknown | null;
   body: string | null;
   webhook_secret: string | null;
+  auth_scheme: 'x-portaunext-schedule' | 'bearer';
+  source: 'api' | 'vercel';
   deleted_at: Date | null;
   last_fired_scheduled_for: Date | null;
   created_at: Date;

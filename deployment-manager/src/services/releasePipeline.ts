@@ -18,6 +18,7 @@ import {
   getNginxContainerErrorLogPath,
 } from '~/lib/logPaths';
 import { mergeAppEnv } from '~/services/appEnv';
+import { syncVercelCronsForApp } from '~/services/vercelCron';
 import {
   ensureDockerfile,
   buildReleaseImages,
@@ -115,6 +116,10 @@ export async function runReleasePipeline(
     accessLogPath,
     errorLogPath,
   });
+
+  if (!isPreview) {
+    await syncVercelCronsForApp(app, appEnv, projectDir);
+  }
 
   return { containerId };
 }

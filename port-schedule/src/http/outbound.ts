@@ -8,7 +8,7 @@ import {
 } from '../constants.js';
 
 const BLOCKED_REQUEST_HEADER_NAMES = new Set(
-  ['host', 'connection', 'content-length', WEBHOOK_SIGNATURE_HEADER.toLowerCase()]
+  ['host', 'connection', 'content-length', 'authorization', WEBHOOK_SIGNATURE_HEADER.toLowerCase()]
 );
 
 export type OutboundResult =
@@ -62,6 +62,7 @@ export async function executeOutboundWebhook(
     headersJson: unknown;
     body: string | null;
     webhookSecret: string | null;
+    authScheme: 'x-portaunext-schedule' | 'bearer';
   },
   validateUrl: UrlValidator
 ): Promise<OutboundResult> {
@@ -71,7 +72,11 @@ export async function executeOutboundWebhook(
     accept: '*/*',
   };
   if (input.webhookSecret) {
-    baseHeaders[WEBHOOK_SIGNATURE_HEADER] = input.webhookSecret;
+    if (input.authScheme === 'bearer') {
+      baseHeaders['Authorization'] = `Bearer ${input.webhookSecret}`;
+    } else {
+      baseHeaders[WEBHOOK_SIGNATURE_HEADER] = input.webhookSecret;
+    }
   }
   const headers = mergeHeaders(baseHeaders, input.headersJson as Record<string, unknown> | undefined);
 

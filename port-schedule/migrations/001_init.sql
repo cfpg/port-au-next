@@ -21,11 +21,27 @@ CREATE TABLE IF NOT EXISTS port_schedule.jobs (
   headers_json JSONB,
   body TEXT,
   webhook_secret TEXT,
+  auth_scheme TEXT NOT NULL DEFAULT 'x-portaunext-schedule'
+    CHECK (auth_scheme IN ('x-portaunext-schedule', 'bearer')),
+  source TEXT NOT NULL DEFAULT 'api'
+    CHECK (source IN ('api', 'vercel')),
   deleted_at TIMESTAMPTZ,
   last_fired_scheduled_for TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Idempotent for pre-existing tables created before these columns existed.
+ALTER TABLE port_schedule.jobs ADD COLUMN IF NOT EXISTS auth_scheme TEXT NOT NULL DEFAULT 'x-portaunext-schedule';
+ALTER TABLE port_schedule.jobs ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'api';
+DO $$ BEGIN
+  ALTER TABLE port_schedule.jobs ADD CONSTRAINT jobs_auth_scheme_check CHECK (auth_scheme IN ('x-portaunext-schedule', 'bearer'));
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+DO $$ BEGIN
+  ALTER TABLE port_schedule.jobs ADD CONSTRAINT jobs_source_check CHECK (source IN ('api', 'vercel'));
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 CREATE UNIQUE INDEX IF NOT EXISTS jobs_app_id_name_undeleted
   ON port_schedule.jobs (app_id, name)

@@ -3,6 +3,7 @@ import type { DbPool } from '../db/pool.js';
 import type { JobRow } from '../types.js';
 import { validateCronExpression } from '../cron/validateAndParse.js';
 import { validateWebhookUrl } from '../url/validateWebhookUrl.js';
+import { AUTH_SCHEMES, JOB_SOURCES } from '../constants.js';
 
 function parseLimit(raw: string | undefined, def: number, max: number): number {
   const n = parseInt(raw ?? '', 10);
@@ -14,6 +15,14 @@ function parseOffset(raw: string | undefined): number {
   const n = parseInt(raw ?? '', 10);
   if (Number.isNaN(n) || n < 0) return 0;
   return n;
+}
+
+function isValidAuthScheme(v: unknown): v is (typeof AUTH_SCHEMES)[number] {
+  return typeof v === 'string' && (AUTH_SCHEMES as readonly string[]).includes(v);
+}
+
+function isValidSource(v: unknown): v is (typeof JOB_SOURCES)[number] {
+  return typeof v === 'string' && (JOB_SOURCES as readonly string[]).includes(v);
 }
 
 function isValidTimezone(tz: string): boolean {
@@ -38,6 +47,8 @@ function jobToJson(row: JobRow) {
     headers_json: row.headers_json,
     body: row.body,
     has_webhook_secret: Boolean(row.webhook_secret),
+    auth_scheme: row.auth_scheme,
+    source: row.source,
     deleted_at: row.deleted_at?.toISOString() ?? null,
     created_at: row.created_at.toISOString(),
     updated_at: row.updated_at.toISOString(),
@@ -103,12 +114,20 @@ export async function registerJobsRoutes(app: FastifyInstance, pool: DbPool) {
     const headers_json = b.headers_json ?? null;
     const body = typeof b.body === 'string' ? b.body : null;
     const webhook_secret = typeof b.webhook_secret === 'string' ? b.webhook_secret : null;
+    const auth_scheme = b.auth_scheme === undefined ? 'x-portaunext-schedule' : b.auth_scheme;
+    const source = b.source === undefined ? 'api' : b.source;
 
     if (!name || !cron_expression || !timezone || !http_method || !url) {
       return reply.code(400).send({ error: 'name, cron_expression, timezone, http_method, url are required' });
     }
     if (!isValidTimezone(timezone)) {
       return reply.code(400).send({ error: 'Invalid IANA timezone' });
+    }
+    if (!isValidAuthScheme(auth_scheme)) {
+      return reply.code(400).send({ error: `auth_scheme must be one of: ${AUTH_SCHEMES.join(', ')}` });
+    }
+    if (!isValidSource(source)) {
+      return reply.code(400).send({ error: `source must be one of: ${JOB_SOURCES.join(', ')}` });
     }
     const cronCheck = validateCronExpression(cron_expression, timezone);
     if (!cronCheck.ok) return reply.code(400).send({ error: cronCheck.reason });
@@ -118,8 +137,8 @@ export async function registerJobsRoutes(app: FastifyInstance, pool: DbPool) {
     try {
       const ins = await pool.query<JobRow>(
         `INSERT INTO port_schedule.jobs
-         (app_id, name, cron_expression, timezone, enabled, http_method, url, headers_json, body, webhook_secret)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10)
+         (app_id, name, cron_expression, timezone, enabled, http_method, url, headers_json, body, webhook_secret, auth_scheme, source)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10,$11,$12)
          RETURNING *`,
         [
           appId,
@@ -132,6 +151,8 @@ export async function registerJobsRoutes(app: FastifyInstance, pool: DbPool) {
           headers_json != null ? JSON.stringify(headers_json) : null,
           body,
           webhook_secret,
+          auth_scheme,
+          source,
         ]
       );
       return reply.code(201).send(jobToJson(ins.rows[0]!));
@@ -236,9 +257,17 @@ export async function registerJobsRoutes(app: FastifyInstance, pool: DbPool) {
             : typeof b.webhook_secret === 'string'
               ? b.webhook_secret
               : cur.webhook_secret;
+      const auth_scheme = b.auth_scheme === undefined ? cur.auth_scheme : b.auth_scheme;
+      const source = b.source === undefined ? cur.source : b.source;
 
       if (!isValidTimezone(timezone)) {
         return reply.code(400).send({ error: 'Invalid IANA timezone' });
+      }
+      if (!isValidAuthScheme(auth_scheme)) {
+        return reply.code(400).send({ error: `auth_scheme must be one of: ${AUTH_SCHEMES.join(', ')}` });
+      }
+      if (!isValidSource(source)) {
+        return reply.code(400).send({ error: `source must be one of: ${JOB_SOURCES.join(', ')}` });
       }
       const cronCheck = validateCronExpression(cron_expression, timezone);
       if (!cronCheck.ok) return reply.code(400).send({ error: cronCheck.reason });
@@ -257,6 +286,8 @@ export async function registerJobsRoutes(app: FastifyInstance, pool: DbPool) {
              headers_json = $9::jsonb,
              body = $10,
              webhook_secret = $11,
+             auth_scheme = $12,
+             source = $13,
              updated_at = now()
            WHERE id = $1::uuid AND app_id = $2 AND deleted_at IS NULL
            RETURNING *`,
@@ -272,6 +303,8 @@ export async function registerJobsRoutes(app: FastifyInstance, pool: DbPool) {
             headers_json != null ? JSON.stringify(headers_json) : null,
             body,
             webhook_secret,
+            auth_scheme,
+            source,
           ]
         );
         return jobToJson(upd.rows[0]!);
