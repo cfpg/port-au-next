@@ -8,11 +8,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Deployment readiness:** Deployment manager now exposes an explicit readiness endpoint used by Docker Compose to sequence nginx startup without making nginx part of the manager's critical startup path.
+- **Health-gated application cutovers:** New production and preview containers must pass Docker and HTTP readiness checks before nginx switches traffic to them.
+
 ### Changed
 
+- **Docker DNS routing:** Application vhosts now route through immutable per-deployment network aliases, while platform-service vhosts use stable Compose service names. Existing deployments use their unique container names until their next deployment.
+- **Resilient nginx reconciliation:** Generated configurations are written atomically, validated before reload, serialized, retried when nginx is temporarily unavailable, and rolled back when a cutover cannot be applied safely.
+- **Startup recovery:** Container recovery now reconciles active production and preview routes through Docker DNS and cleans up duplicate active deployment records without blocking deployment-manager readiness.
 - Generated production and preview app Nginx vhosts now accept request bodies up to 10 MB, allowing image and file uploads larger than Nginx's 1 MB default.
 
 ### Fixed
+
+- **Deployment-manager/nginx restart loop:** Rebuilding or simultaneously restarting the services no longer leaves each waiting for the other to become ready.
+- **Cross-domain routing after container recreation:** Nginx no longer retains recycled container IPs that can later belong to a different application or platform service.
+- **Failed deployment cutovers:** Unhealthy candidates and nginx reload failures leave the previous active route in place instead of publishing an unavailable upstream.
 
 ## [0.6.0] - 2026-08-29
 

@@ -195,18 +195,36 @@ export async function deployPreviewBranch(
       DATABASE_URL: `postgres://${previewBranch.db_user}:${previewBranch.db_password}@postgres:5432/${previewBranch.db_name}`,
     };
 
+    const oldContainerId = previewBranch.container_id;
     const { containerId } = await runReleasePipeline({
       app,
       version: releaseVersion,
       branch,
       appEnv,
       deploymentId,
-      switchTraffic: async (id, depId) => {
-        await updateNginxConfig(app.name, app.preview_domain, id, branch, depId);
-      },
+      switchTraffic: async (_id, depId, routingHostname) =>
+        updateNginxConfig(
+          app.name,
+          previewBranch.subdomain,
+          routingHostname,
+          branch,
+          depId,
+          { requireApplied: true }
+        ),
     });
 
     await updatePreviewBranchStatus(previewBranch.id, 'active', containerId);
+
+    if (oldContainerId && oldContainerId !== containerId) {
+      try {
+        await stopContainer(oldContainerId);
+      } catch (error) {
+        await logger.warning('Failed to stop old preview container', {
+          oldContainerId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
 
     await logger.info('Preview branch deployed successfully', {
       appName: app.name,
@@ -224,4 +242,4 @@ export async function deployPreviewBranch(
     await logger.error('Preview branch deployment failed', error as Error);
     throw error;
   }
-} 
+}

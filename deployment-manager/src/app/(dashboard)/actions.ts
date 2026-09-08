@@ -142,8 +142,12 @@ export const triggerDeployment = withAuth(async (appName: string, { pathname, br
 
           const oldDeployment = await pool.query(
             `SELECT container_id, commit_id FROM deployments 
-             WHERE app_id = $1 AND status = 'active' AND branch = $2`,
-            [app.id, targetBranch]
+             WHERE app_id = $1
+               AND status = 'active'
+               AND COALESCE(is_preview, FALSE) = FALSE
+             ORDER BY id DESC
+             LIMIT 1`,
+            [app.id]
           );
           const oldContainerId = oldDeployment.rows[0]?.container_id;
           const oldCommitId = oldDeployment.rows[0]?.commit_id;
@@ -163,9 +167,15 @@ export const triggerDeployment = withAuth(async (appName: string, { pathname, br
             branch: targetBranch,
             appEnv,
             deploymentId,
-            switchTraffic: async (id, depId) => {
-              await updateNginxConfig(appName, app.domain, id, undefined, depId);
-            },
+            switchTraffic: async (_id, depId, routingHostname) =>
+              updateNginxConfig(
+                appName,
+                app.domain,
+                routingHostname,
+                undefined,
+                depId,
+                { requireApplied: true }
+              ),
           });
 
           await logger.info('Marking deployment as active');

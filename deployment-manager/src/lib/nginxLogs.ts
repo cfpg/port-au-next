@@ -1,34 +1,18 @@
-import logger from '~/services/logger';
-import { execCompose } from '~/utils/compose';
+import fs from 'fs';
+import path from 'path';
 
-async function execInNginxContainer(shellScript: string): Promise<void> {
-  const command = `exec -T nginx sh -c ${shellQuote(shellScript)}`;
+import {
+  getNginxDeploymentLogDir,
+  getNginxLogsRoot,
+} from '~/lib/logPaths';
 
-  try {
-    await execCompose(command);
-  } catch (error) {
-    await logger.error('nginx container command failed', error as Error);
-    throw error;
+const DIRECTORY_MODE = 0o2775;
+
+function assertPathInsideRoot(root: string, candidate: string): void {
+  const relative = path.relative(root, candidate);
+  if (relative.startsWith('..') || path.isAbsolute(relative)) {
+    throw new Error('Invalid nginx log path');
   }
-}
-
-/** deployment-manager container runs as node (Alpine node image). */
-const NODE_UID = 1000;
-/** nginx worker user/group in nginx:alpine. */
-const NGINX_USER = 'nginx';
-
-function shellQuote(value: string): string {
-  return `'${value.replace(/'/g, `'\\''`)}'`;
-}
-
-/**
- * Ensures /var/log/nginx/apps exists and is writable by deployment-manager (node)
- * while allowing nginx to write log files in per-deployment subdirectories.
- */
-export async function ensureNginxAppsLogRoot(): Promise<void> {
-  await execInNginxContainer(
-    `mkdir -p /var/log/nginx/apps && chown ${NODE_UID}:${NGINX_USER} /var/log/nginx/apps && chmod 2775 /var/log/nginx/apps`
-  );
 }
 
 export async function ensureNginxDeploymentLogDir(
@@ -42,8 +26,10 @@ export async function ensureNginxDeploymentLogDir(
     throw new Error(`Invalid deployment id for nginx log path: ${deploymentId}`);
   }
 
-  const logDir = `/var/log/nginx/apps/${appName}/${deploymentId}`;
-  await execInNginxContainer(
-    `mkdir -p ${logDir} && chown -R ${NGINX_USER}:${NGINX_USER} ${logDir} && chmod 775 ${logDir}`
-  );
+  const logsRoot = path.resolve(getNginxLogsRoot(), 'apps');
+  const logDir = path.resolve(getNginxDeploymentLogDir(appName, deploymentId));
+  assertPathInsideRoot(logsRoot, logDir);
+
+  fs.mkdirSync(logDir, { recursive: true, mode: DIRECTORY_MODE });
+  fs.chmodSync(logDir, DIRECTORY_MODE);
 }
