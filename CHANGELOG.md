@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Changed
+
+### Fixed
+
+## [0.6.1] - 2026-09-08
+
+### Added
+
 - **Deployment readiness:** Deployment manager now exposes an explicit readiness endpoint used by Docker Compose to sequence nginx startup without making nginx part of the manager's critical startup path.
 - **Health-gated application cutovers:** New production and preview containers must pass Docker and HTTP readiness checks before nginx switches traffic to them.
 
