@@ -8,3 +8,5 @@ export const MIN_CRON_INTERVAL_MS = 10_000;
 export const SERVICE_NAME = 'port-schedule';
 export const SERVICE_VERSION = '0.1.0';
 export const WEBHOOK_SIGNATURE_HEADER = 'X-PortAuNext-Schedule';
+export const AUTH_SCHEMES = ['x-portaunext-schedule', 'bearer'] as const;
+export const JOB_SOURCES = ['api', 'vercel'] as const;

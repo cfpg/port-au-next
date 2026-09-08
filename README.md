@@ -438,6 +438,27 @@ If you set **`PORT_SCHEDULE_HOST`** in the root `.env`, the deployment manager w
 
 For the full contract (soft delete, undelete routes, admin API, URL policy), see the statement of work in `.plans/CUSTOM_HTTP_SCHEDULER_PLAN.md` in this repository (if present in your checkout).
 
+### Vercel-compatible cron jobs (`vercel.json`)
+
+Apps that declare a [`crons` array in `vercel.json`](https://vercel.com/docs/cron-jobs) get matching `port-schedule` jobs automatically — **no app code required**, and no manual API calls. This is meant to make an app portable between Vercel and Port-Au-Next with zero changes to its source.
+
+```json
+{
+  "crons": [
+    { "path": "/api/cron/nightly", "schedule": "0 2 * * *" }
+  ]
+}
+```
+
+On every **production** deploy (preview branches are skipped), the deployment manager:
+
+1. Reads `vercel.json` from the app's project root. A missing file, missing/malformed `crons`, or an invalid entry is logged as a warning and never fails the deploy.
+2. Translates each entry the same way Vercel invokes it: `GET` request, **UTC** timezone, full URL built from the app's production domain + `path`, six-field cron expression (`0 <schedule>`, since `port-schedule` cron includes seconds).
+3. If the app defines a `CRON_SECRET` environment variable (the same one Vercel reads for this purpose), the job is created with `Authorization: Bearer <CRON_SECRET>` as its auth header — matching Vercel's own convention exactly, so a cron route handler written against Vercel's docs needs no changes here. If `CRON_SECRET` is unset, the job fires with no auth header, same as an unprotected Vercel cron.
+4. Reconciles: jobs are tagged `source: "vercel"` in `port-schedule`, so edits or removals in `vercel.json` update or soft-delete the matching job on the next deploy. Jobs created any other way (`source: "api"` — manually, or through `instrumentation.ts`-style self-registration) are never read or touched by this process.
+
+Only `crons` is read from `vercel.json`; every other field (`redirects`, `headers`, `functions`, etc.) is ignored.
+
 ## Umami analytics
 
 **Umami** is a shared, privacy-focused analytics instance. Each app can **opt in** from the deployment manager (App Settings → Analytics). When enabled, the platform provisions an isolated Umami team, website, and dashboard login for that app.
