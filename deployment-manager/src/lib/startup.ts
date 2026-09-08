@@ -4,7 +4,6 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs';
 import path from 'path';
-import { getServiceContainerIp } from '~/services/docker';
 import { createServiceVhostConfig } from '~/services/nginx';
 import logger from '~/services/logger';
 
@@ -50,15 +49,14 @@ export async function setupDeploymentManager(): Promise<void> {
   }
 
   try {
-    const containerIp = await getServiceContainerIp('deployment-manager');
-
     await createServiceVhostConfig(
       'deployment-manager',
       host,
       [
         {
           path: '/',
-          proxyPass: `http://${containerIp}:3000`,
+          proxyPass: 'http://deployment-manager:3000',
+          resolveAtRuntime: true,
         },
       ],
       { clientMaxBodySize: '50M' }
@@ -78,17 +76,14 @@ export async function setupImgproxy(): Promise<void> {
   }
 
   try {
-    // Get Imgproxy container IP
-    const containerIp = await getServiceContainerIp('imgproxy');
-    
-    // Create nginx config for Imgproxy
     await createServiceVhostConfig(
       'imgproxy',
       imgproxyHost,
       [
         {
           path: '/',
-          proxyPass: `http://${containerIp}:80`
+          proxyPass: 'http://imgproxy:80',
+          resolveAtRuntime: true,
         }
       ],
       {
@@ -110,17 +105,14 @@ export async function setupMinio(): Promise<void> {
   }
 
   try {
-    // Get Minio container IP
-    const containerIp = await getServiceContainerIp('minio');
-    
-    // Create nginx config for Minio API only
     await createServiceVhostConfig(
       'minio',
       minioHost,
       [
         {
           path: '/',
-          proxyPass: `http://${containerIp}:80`
+          proxyPass: 'http://minio:80',
+          resolveAtRuntime: true,
         }
       ],
       {
@@ -145,15 +137,14 @@ export async function setupPortSchedule(): Promise<void> {
   }
 
   try {
-    const containerIp = await getServiceContainerIp('port-schedule');
-
     await createServiceVhostConfig(
       'port-schedule',
       host,
       [
         {
           path: '/',
-          proxyPass: `http://${containerIp}:8080`,
+          proxyPass: 'http://port-schedule:8080',
+          resolveAtRuntime: true,
         },
       ],
       { clientMaxBodySize: '5M' }
@@ -174,15 +165,14 @@ export async function setupUmami(): Promise<void> {
   }
 
   try {
-    const containerIp = await getServiceContainerIp('umami');
-
     await createServiceVhostConfig(
       'umami',
       host,
       [
         {
           path: '/',
-          proxyPass: `http://${containerIp}:3000`,
+          proxyPass: 'http://umami:3000',
+          resolveAtRuntime: true,
         },
       ],
       { clientMaxBodySize: '5M' }
@@ -203,15 +193,14 @@ export async function setupBugsink(): Promise<void> {
   }
 
   try {
-    const containerIp = await getServiceContainerIp('bugsink');
-
     await createServiceVhostConfig(
       'bugsink',
       host,
       [
         {
           path: '/',
-          proxyPass: `http://${containerIp}:8000`,
+          proxyPass: 'http://bugsink:8000',
+          resolveAtRuntime: true,
         },
       ],
       { clientMaxBodySize: '5M', forwardedProto: 'honor-upstream' }

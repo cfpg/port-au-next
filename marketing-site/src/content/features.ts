@@ -80,7 +80,7 @@ export const features: FeatureItem[] = [
     icon: CalendarClock,
     title: "HTTP scheduling",
     description:
-      "port-schedule gives every app cron-like jobs that call your public routes. No crontab inside containers.",
+      "Drop in a vercel.json and its crons just work, unmodified, no app code required. Or register jobs directly via the port-schedule API. No crontab inside containers.",
     iconBg: "#FCEFD9",
     iconColor: "#B07A1E",
   },

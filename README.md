@@ -104,6 +104,49 @@ docker compose up --build -d
 
 4. Access the deployment manager UI at `http://localhost:80` or using the `DEPLOYMENT_MANAGER_HOST` you configured in the `.env` file and log in with the configured admin credentials
 
+### Startup and reverse-proxy recovery
+
+Deployment-manager exposes unauthenticated container health endpoints at
+`/api/health/live` and `/api/health/ready`. The readiness endpoint returns `200`
+after critical database and admin initialization; Compose waits for it before
+starting nginx.
+
+nginx and deployment-manager recover independently:
+
+- If nginx is unavailable, deployment-manager remains healthy and records nginx
+  configuration as deferred until a later validation/reload succeeds.
+- If deployment-manager is unavailable, nginx remains running and returns `502`
+  for management routes until Docker DNS resolves the service again.
+- nginx initializes the shared application-log directory on every container
+  start. Deployment-manager creates per-deployment directories through the
+  shared `nginx/logs` bind mount.
+
+Application traffic also uses Docker DNS rather than container IP addresses.
+Each new deployment receives an immutable alias such as `pan-deployment-271`.
+The green container must accept HTTP traffic (and pass its Docker healthcheck,
+when configured) before nginx atomically switches to that alias. The previous
+container remains routed if readiness, nginx validation, or reload fails.
+Containers created before alias support use their unique Docker container name
+until their next deployment. Platform vhosts use their stable Compose service
+names. This prevents a recycled Docker IP from serving one application's site
+under another application's domain.
+
+Useful checks:
+
+```bash
+docker compose ps
+curl -fsS http://localhost:3000/api/health/ready
+docker compose exec nginx nginx -t
+docker compose logs deployment-manager nginx
+```
+
+An `nginx config apply deferred` log is recoverable and will be retried. An
+`nginx configuration rejected` log indicates that `nginx -t` rejected desired
+configuration; the previous file is restored before the operation fails.
+If nginx cannot start because a tracked or manually edited config is invalid,
+run `docker compose run --rm --no-deps nginx nginx -t`, correct or restore the
+reported file under `nginx/conf.d`, and then run `docker compose up -d nginx`.
+
 ## Cloudflare Tunnels
 
 Port-Au-Next integrates with your Cloudflare account to manage **tunnel published applications** and **proxied CNAME DNS** from the dashboard. You still add domains to Cloudflare and run `cloudflared` on your machine — those steps stay manual.
@@ -437,6 +480,27 @@ If you set **`PORT_SCHEDULE_HOST`** in the root `.env`, the deployment manager w
 ### Further detail
 
 For the full contract (soft delete, undelete routes, admin API, URL policy), see the statement of work in `.plans/CUSTOM_HTTP_SCHEDULER_PLAN.md` in this repository (if present in your checkout).
+
+### Vercel-compatible cron jobs (`vercel.json`)
+
+Apps that declare a [`crons` array in `vercel.json`](https://vercel.com/docs/cron-jobs) get matching `port-schedule` jobs automatically — **no app code required**, and no manual API calls. This is meant to make an app portable between Vercel and Port-Au-Next with zero changes to its source.
+
+```json
+{
+  "crons": [
+    { "path": "/api/cron/nightly", "schedule": "0 2 * * *" }
+  ]
+}
+```
+
+On every **production** deploy (preview branches are skipped), the deployment manager:
+
+1. Reads `vercel.json` from the app's project root. A missing file, missing/malformed `crons`, or an invalid entry is logged as a warning and never fails the deploy.
+2. Translates each entry the same way Vercel invokes it: `GET` request, **UTC** timezone, full URL built from the app's production domain + `path`, six-field cron expression (`0 <schedule>`, since `port-schedule` cron includes seconds).
+3. If the app defines a `CRON_SECRET` environment variable (the same one Vercel reads for this purpose), the job is created with `Authorization: Bearer <CRON_SECRET>` as its auth header — matching Vercel's own convention exactly, so a cron route handler written against Vercel's docs needs no changes here. If `CRON_SECRET` is unset, the job fires with no auth header, same as an unprotected Vercel cron.
+4. Reconciles: jobs are tagged `source: "vercel"` in `port-schedule`, so edits or removals in `vercel.json` update or soft-delete the matching job on the next deploy. Jobs created any other way (`source: "api"` — manually, or through `instrumentation.ts`-style self-registration) are never read or touched by this process.
+
+Only `crons` is read from `vercel.json`; every other field (`redirects`, `headers`, `functions`, etc.) is ignored.
 
 ## Umami analytics
 

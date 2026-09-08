@@ -55,6 +55,11 @@ export const faqItems: FaqItem[] = [
       "A first-party HTTP scheduler. Instead of a crontab inside your container, each app registers cron-like jobs via an API, and port-schedule fires signed webhook requests to your app's public routes on schedule. Perfect for nightly syncs, cleanups, and recurring tasks in a stateless deploy model.",
   },
   {
+    question: "Does it support vercel.json crons?",
+    answer:
+      "Yes. If your app's repo has a vercel.json with a crons array, Port-Au-Next reads it on every production deploy and creates matching port-schedule jobs automatically, no app code or manual API calls needed. Jobs are invoked the same way Vercel invokes them: GET requests, UTC schedules, and an Authorization: Bearer header if your app sets CRON_SECRET. Edit or remove an entry and redeploy to update or retire the matching job. This makes an app portable between Vercel and Port-Au-Next with zero changes to its source.",
+  },
+  {
     question: "What is Umami analytics?",
     answer:
       "A shared, privacy-focused analytics instance. Opt in per app from the dashboard to get an isolated website, tracking env vars on production deploy, and your own Umami login. You add the Next.js snippet yourself; cookie and consent banners stay your responsibility.",

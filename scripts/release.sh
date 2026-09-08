@@ -1,193 +1,94 @@
 #!/usr/bin/env bash
 #
-# Cut a Port-Au-Next release on main from CHANGELOG [Unreleased].
+# Prepare and publish a Port-Au-Next release from dev.
 #
-# Prerequisites:
-#   - Merge dev into main yourself (merge commits are fine).
-#   - Fill in CHANGELOG.md [Unreleased] before running.
+# Usage: ./scripts/release.sh X.Y.Z
 #
-# Usage: ./scripts/release.sh [--major|--minor|--patch] [--yes]
-#
+# The script pauses before committing release files to dev and again before
+# merging, tagging, and pushing main. GitHub release publication stays manual.
+
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-VERSION_TYPE=""
-SKIP_CONFIRM=0
+usage() {
+  echo "Usage: ./scripts/release.sh X.Y.Z"
+}
 
-for flag in "$@"; do
-  case "$flag" in
-    --major | --minor | --patch)
-      if [ -n "$VERSION_TYPE" ]; then
-        echo "Error: Specify only one of --major, --minor, or --patch"
-        exit 1
-      fi
-      VERSION_TYPE="${flag#--}"
-      ;;
-    --yes)
-      SKIP_CONFIRM=1
-      ;;
-    -h | --help)
-      sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'
-      exit 0
-      ;;
-    *)
-      echo "Error: Unknown flag: $flag"
-      echo "Usage: ./scripts/release.sh [--major|--minor|--patch] [--yes]"
-      exit 1
-      ;;
-  esac
-done
+confirm() {
+  local prompt="$1"
+  local answer
 
-if [ -z "$VERSION_TYPE" ]; then
-  echo "Error: Exactly one of --major, --minor, or --patch is required"
-  echo "Usage: ./scripts/release.sh [--major|--minor|--patch] [--yes]"
+  if ! read -r -p "$prompt [y/N] " answer; then
+    return 1
+  fi
+
+  [[ "$answer" =~ ^[yY]$ ]]
+}
+
+print_publish_steps() {
+  echo "To publish the prepared release manually:"
+  echo "  git checkout main"
+  echo "  git pull --ff-only origin main"
+  echo "  git merge --no-ff origin/dev -m \"chore: merge dev for release $VERSION\""
+  echo "  git tag -a $TAG -m \"Release $TAG\""
+  echo "  git push --atomic origin main $TAG"
+}
+
+if [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then
+  usage
+  exit 0
+fi
+
+if [ "$#" -ne 1 ]; then
+  usage
   exit 1
 fi
 
-increment_version() {
-  local version=$1
-  local bump=$2
-  local major minor patch
-
-  if [[ $version =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
-    major="${BASH_REMATCH[1]}"
-    minor="${BASH_REMATCH[2]}"
-    patch="${BASH_REMATCH[3]}"
-  else
-    echo "Error: Current version '$version' is not semver (X.Y.Z)"
-    exit 1
-  fi
-
-  case "$bump" in
-    major)
-      echo "$((major + 1)).0.0"
-      ;;
-    minor)
-      echo "${major}.$((minor + 1)).0"
-      ;;
-    patch)
-      echo "${major}.${minor}.$((patch + 1))"
-      ;;
-    *)
-      echo "Error: Invalid bump type: $bump"
-      exit 1
-      ;;
-  esac
-}
-
-CURRENT_VERSION=""
-if [ -f VERSION ]; then
-  CURRENT_VERSION="$(tr -d '[:space:]' < VERSION)"
-else
-  CURRENT_VERSION="$(node -p "require('./deployment-manager/package.json').version")"
-fi
-
-VERSION="$(increment_version "$CURRENT_VERSION" "$VERSION_TYPE")"
+VERSION="$1"
 RELEASE_DATE="$(date +%Y-%m-%d)"
 TAG="v$VERSION"
 
-START_SHA=""
-CHANGELOG_BACKUP=""
-
-cleanup() {
-  echo "Error occurred. Rolling back local changes..."
-  rm -f CHANGELOG.md.bak
-
-  if [ -n "$START_SHA" ]; then
-    git checkout main 2>/dev/null || true
-    git reset --hard "$START_SHA" 2>/dev/null || true
-  fi
-
-  if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null 2>&1; then
-    git tag -d "$TAG" 2>/dev/null || true
-  fi
-
-  echo "Rollback complete. Run 'git status' to verify."
-  exit 1
-}
-
-trap cleanup ERR
-
-unreleased_has_content() {
-  awk '
-    BEGIN { in_unreleased = 0; found = 0 }
-    /^## \[Unreleased\]/ { in_unreleased = 1; next }
-    in_unreleased && /^## \[/ { exit }
-    in_unreleased && /^[[:space:]]*-/ { found = 1 }
-    END { exit found ? 0 : 1 }
-  ' CHANGELOG.md
-}
-
-promote_changelog() {
-  local version=$1
-  local release_date=$2
-
-  awk -v version="$version" -v release_date="$release_date" '
-    BEGIN { in_unreleased = 0 }
-    /^## \[Unreleased\]/ {
-      print "## [Unreleased]"
-      print ""
-      print "### Added"
-      print ""
-      print "### Changed"
-      print ""
-      print "### Fixed"
-      print ""
-      print "## [" version "] - " release_date
-      in_unreleased = 1
-      next
-    }
-    in_unreleased && /^## \[/ {
-      in_unreleased = 0
-    }
-    { print }
-  ' CHANGELOG.md > CHANGELOG.md.promoted
-
-  mv CHANGELOG.md.promoted CHANGELOG.md
-}
-
-update_version_files() {
-  echo "$VERSION" > VERSION
-  if [[ "${OSTYPE:-}" == darwin* ]]; then
-    sed -i '' "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" deployment-manager/package.json
-  else
-    sed -i "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" deployment-manager/package.json
-  fi
-}
-
-echo "Checking git status..."
-if ! git diff-index --quiet HEAD --; then
-  echo "Error: Working directory is not clean. Commit or stash changes first."
+if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  echo "Error: Version must use semantic version format X.Y.Z"
   exit 1
 fi
 
-if ! git show-ref --verify --quiet refs/heads/main; then
-  echo "Error: main branch not found"
+if [ "$(git branch --show-current)" != "dev" ]; then
+  echo "Error: Release preparation must run from the dev branch"
   exit 1
 fi
 
-git checkout main
-git pull origin main || {
-  echo "Error: Failed to pull origin main"
+if [ -n "$(git status --porcelain)" ]; then
+  echo "Error: Working directory must be clean before preparing a release"
   exit 1
-}
+fi
 
-START_SHA="$(git rev-parse HEAD)"
+echo "Fetching release branches..."
+git fetch origin --prune
 
-git fetch origin dev 2>/dev/null || true
-if git show-ref --verify --quiet refs/remotes/origin/dev; then
-  BEHIND_DEV="$(git rev-list --count HEAD..origin/dev 2>/dev/null || echo 0)"
-  if [ "${BEHIND_DEV:-0}" -gt 0 ]; then
-    echo "Error: main is ${BEHIND_DEV} commit(s) behind origin/dev."
-    echo "Merge dev into main first, then run this script again."
+if [ "$(git rev-parse dev)" != "$(git rev-parse origin/dev)" ]; then
+  echo "Error: Local dev must match origin/dev before preparing a release"
+  exit 1
+fi
+
+if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null ||
+   git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+  echo "Error: Tag $TAG already exists"
+  exit 1
+fi
+
+for file in CHANGELOG.md VERSION deployment-manager/package.json deployment-manager/package-lock.json marketing-site/src/content/site.ts; do
+  if [ ! -f "$file" ]; then
+    echo "Error: Required release file is missing: $file"
     exit 1
   fi
-fi
+done
 
-if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
-  echo "Error: Tag $TAG already exists locally"
+CURRENT_VERSION="$(tr -d '[:space:]' < VERSION)"
+if [ "$VERSION" = "$CURRENT_VERSION" ]; then
+  echo "Error: Version is already $VERSION"
   exit 1
 fi
 
@@ -196,84 +97,132 @@ if ! grep -q '^## \[Unreleased\]' CHANGELOG.md; then
   exit 1
 fi
 
-if ! unreleased_has_content; then
-  echo "Error: ## [Unreleased] has no bullet entries."
-  echo "Add release notes under Added / Changed / Fixed before releasing."
+if ! awk '
+  BEGIN { in_unreleased = 0; found = 0 }
+  /^## \[Unreleased\]/ { in_unreleased = 1; next }
+  in_unreleased && /^## \[/ { exit }
+  in_unreleased && /^[[:space:]]*-/ { found = 1 }
+  END { exit found ? 0 : 1 }
+' CHANGELOG.md; then
+  echo "Error: CHANGELOG.md [Unreleased] has no release notes"
   exit 1
 fi
 
-echo "Current version: $CURRENT_VERSION"
-echo "New version:     $VERSION"
-echo "Release date:    $RELEASE_DATE"
-echo ""
-echo "Preview of promoted changelog section:"
+if ! grep -Eq '^[[:space:]]*version: "[0-9]+\.[0-9]+\.[0-9]+",$' marketing-site/src/content/site.ts; then
+  echo "Error: Could not find the marketing-site product version"
+  exit 1
+fi
+
+echo "Preparing Port-Au-Next $CURRENT_VERSION -> $VERSION"
+
+CHANGELOG_TEMP="$(mktemp)"
+trap 'rm -f "$CHANGELOG_TEMP"' EXIT
+
 awk -v version="$VERSION" -v release_date="$RELEASE_DATE" '
-  BEGIN { in_unreleased = 0; printing = 0 }
+  BEGIN { in_unreleased = 0 }
   /^## \[Unreleased\]/ {
+    print "## [Unreleased]"
+    print ""
+    print "### Added"
+    print ""
+    print "### Changed"
+    print ""
+    print "### Fixed"
+    print ""
     print "## [" version "] - " release_date
     in_unreleased = 1
     next
   }
-  in_unreleased && /^## \[/ { exit }
-  in_unreleased { print }
-' CHANGELOG.md
-echo ""
+  in_unreleased && /^## \[/ {
+    in_unreleased = 0
+  }
+  { print }
+' CHANGELOG.md > "$CHANGELOG_TEMP"
+mv "$CHANGELOG_TEMP" CHANGELOG.md
 
-if [ "$SKIP_CONFIRM" -eq 0 ]; then
-  read -r -p "Continue with release $VERSION on main? (y/N) " confirm
-  if [[ ! "$confirm" =~ ^[yY]$ ]]; then
-    echo "Release cancelled"
-    exit 0
-  fi
+echo "$VERSION" > VERSION
+
+(
+  cd deployment-manager
+  npm version "$VERSION" --no-git-tag-version --allow-same-version >/dev/null
+)
+
+if [[ "${OSTYPE:-}" == darwin* ]]; then
+  sed -i '' -E "s|^([[:space:]]*)version: \"[0-9]+\.[0-9]+\.[0-9]+\",$|\1version: \"$VERSION\",|" marketing-site/src/content/site.ts
+else
+  sed -i -E "s|^([[:space:]]*)version: \"[0-9]+\.[0-9]+\.[0-9]+\",$|\1version: \"$VERSION\",|" marketing-site/src/content/site.ts
 fi
 
-echo "Promoting CHANGELOG [Unreleased] → [$VERSION]..."
-CHANGELOG_BACKUP="$(mktemp)"
-cp CHANGELOG.md "$CHANGELOG_BACKUP"
-promote_changelog "$VERSION" "$RELEASE_DATE"
+echo
+echo "Release files prepared. Review this diff:"
+git --no-pager diff --color=always -- CHANGELOG.md VERSION deployment-manager/package.json deployment-manager/package-lock.json marketing-site/src/content/site.ts
 
-echo "Updating version files..."
-update_version_files
+echo
+if ! confirm "Commit these release files and push them to origin/dev?"; then
+  echo "Release preparation stopped. The generated file changes were left in place."
+  exit 0
+fi
 
-echo "Creating release commit on main..."
-git add CHANGELOG.md VERSION deployment-manager/package.json
+git add CHANGELOG.md VERSION deployment-manager/package.json deployment-manager/package-lock.json marketing-site/src/content/site.ts
 git commit -m "chore: release version $VERSION"
+git push origin dev
 
-echo "Creating tag $TAG..."
-git tag -a "$TAG" -m "Release $TAG"
+RELEASE_COMMIT="$(git rev-parse HEAD)"
 
-echo "Pushing main and tags..."
-git push origin main --tags || {
-  echo "Error: Failed to push origin main --tags"
-  cleanup
-}
+echo
+echo "Preparing the main merge..."
+git fetch origin --prune
 
-echo "Syncing dev with main..."
-git checkout dev
-git pull origin dev || {
-  echo "Error: Failed to pull origin dev"
-  cleanup
-}
-
-if ! git merge main -m "chore: sync dev with main after release $VERSION"; then
-  echo "Error: Failed to merge main into dev. Resolve conflicts manually."
+if [ "$(git rev-parse origin/dev)" != "$RELEASE_COMMIT" ]; then
+  echo "Error: origin/dev changed after the release commit was created"
+  print_publish_steps
   exit 1
 fi
-
-git push origin dev || {
-  echo "Error: Failed to push origin dev"
-  exit 1
-}
 
 git checkout main
-rm -f "$CHANGELOG_BACKUP"
+git pull --ff-only origin main
 
-trap - ERR
+echo
+echo "Commits included in this release:"
+git --no-pager log --oneline --decorate HEAD..origin/dev
 
-echo ""
-echo "Release $TAG completed successfully."
-echo ""
-echo "Next steps:"
-echo "  1. Publish GitHub release: https://github.com/cfpg/port-au-next/releases/new?tag=$TAG"
-echo "  2. Or run: gh release create $TAG --title \"$TAG\" --notes-file <(awk '/^## \\[$VERSION\\]/,/^## \\[/ { if (/^## \\[/ && !/^## \\[$VERSION\\]/) exit; print }' CHANGELOG.md)"
-echo "  3. Rebuild/restart deployment-manager from $TAG when deploying."
+if ! git merge --no-ff --no-commit origin/dev; then
+  echo "Error: dev could not be merged into main cleanly"
+  git merge --abort >/dev/null 2>&1 || true
+  git checkout dev
+  print_publish_steps
+  exit 1
+fi
+
+if [ ! -f "$(git rev-parse --git-path MERGE_HEAD)" ]; then
+  echo "Error: The release produced no merge commit"
+  git checkout dev
+  exit 1
+fi
+
+echo
+echo "Proposed main merge diff:"
+git --no-pager diff --cached --color=always
+
+echo
+if ! confirm "Commit this merge, tag $TAG, and atomically push main with the tag?"; then
+  git merge --abort
+  git checkout dev
+  echo "Publishing stopped. origin/main and $TAG were not changed."
+  print_publish_steps
+  exit 0
+fi
+
+git commit -m "chore: merge dev for release $VERSION"
+git tag -a "$TAG" -m "Release $TAG"
+
+if ! git push --atomic origin main "$TAG"; then
+  echo "Error: Atomic push failed. Local main and $TAG were left in place for inspection."
+  echo "Retry with: git push --atomic origin main $TAG"
+  exit 1
+fi
+
+echo
+echo "Release $TAG was pushed successfully."
+echo "Publish the GitHub release with:"
+echo "  gh release create $TAG --title \"$TAG\" --generate-notes"

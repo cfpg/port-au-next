@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import logger from '~/services/logger';
-import { getContainerIp, execCommand } from '~/utils/docker';
+import { execCommand } from '~/utils/docker';
 import {
   execCompose,
   getComposeServiceContainerId,
@@ -13,8 +13,141 @@ import {
   getNginxContainerErrorLogPath,
 } from '~/lib/logPaths';
 import { ensureNginxDeploymentLogDir } from '~/lib/nginxLogs';
+import { assertDockerDnsName } from '~/lib/deploymentRouting';
 
 const NGINX_CONFIG_DIR = path.join(getAppsDir(), '../nginx/conf.d');
+const DEFAULT_APP_CLIENT_MAX_BODY_SIZE = '10M';
+const NGINX_RETRY_DELAYS_MS = [1000, 2000, 4000, 8000, 15000, 30000];
+
+export type NginxApplyResult =
+  | { status: 'applied' }
+  | { status: 'deferred'; reason: string }
+  | { status: 'rejected'; reason: string };
+
+let nginxApplyInFlight: Promise<NginxApplyResult> | null = null;
+let nginxRetryTimer: ReturnType<typeof setTimeout> | null = null;
+let nginxRetryAttempt = 0;
+let configMutationTail: Promise<void> = Promise.resolve();
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function isNginxValidationError(error: unknown): boolean {
+  const message = errorMessage(error).toLowerCase();
+  return (
+    message.includes('nginx: [emerg]') ||
+    (message.includes('configuration file') && message.includes('test failed')) ||
+    message.includes('syntax is invalid')
+  );
+}
+
+function clearNginxRetry(): void {
+  if (nginxRetryTimer) {
+    clearTimeout(nginxRetryTimer);
+    nginxRetryTimer = null;
+  }
+  nginxRetryAttempt = 0;
+}
+
+function scheduleNginxRetry(reason: string): void {
+  if (nginxRetryTimer) {
+    return;
+  }
+
+  const delayMs =
+    NGINX_RETRY_DELAYS_MS[
+      Math.min(nginxRetryAttempt, NGINX_RETRY_DELAYS_MS.length - 1)
+    ];
+  nginxRetryAttempt += 1;
+
+  void logger.warning('nginx config apply deferred', {
+    reason,
+    retryAttempt: nginxRetryAttempt,
+    nextRetryMs: delayMs,
+  });
+
+  nginxRetryTimer = setTimeout(() => {
+    nginxRetryTimer = null;
+    void reloadNginx();
+  }, delayMs);
+  nginxRetryTimer.unref?.();
+}
+
+function atomicWriteConfig(configPath: string, content: string): void {
+  const tempPath = `${configPath}.${process.pid}.${Date.now()}.tmp`;
+  try {
+    fs.writeFileSync(tempPath, content);
+    fs.renameSync(tempPath, configPath);
+  } finally {
+    if (fs.existsSync(tempPath)) {
+      fs.unlinkSync(tempPath);
+    }
+  }
+}
+
+function restoreConfig(configPath: string, previousContent: string | null): void {
+  if (previousContent === null) {
+    if (fs.existsSync(configPath)) {
+      fs.unlinkSync(configPath);
+    }
+    return;
+  }
+
+  atomicWriteConfig(configPath, previousContent);
+}
+
+function queueConfigMutation<T>(operation: () => Promise<T>): Promise<T> {
+  const queued = configMutationTail.then(operation, operation);
+  configMutationTail = queued.then(
+    () => undefined,
+    () => undefined
+  );
+  return queued;
+}
+
+async function applyConfigMutation(
+  configPath: string,
+  renderNextContent: () => string | null,
+  options: { rollbackOnDeferred?: boolean } = {}
+): Promise<NginxApplyResult> {
+  return queueConfigMutation(async () => {
+    const previousContent = fs.existsSync(configPath)
+      ? fs.readFileSync(configPath, 'utf8')
+      : null;
+    const nextContent = renderNextContent();
+
+    if (nextContent === null) {
+      if (fs.existsSync(configPath)) {
+        fs.unlinkSync(configPath);
+      }
+    } else {
+      atomicWriteConfig(configPath, nextContent);
+    }
+
+    const result = await reloadNginx(true);
+    const shouldRollback =
+      result.status === 'rejected' ||
+      (options.rollbackOnDeferred && result.status === 'deferred');
+    if (!shouldRollback) {
+      return result;
+    }
+
+    restoreConfig(configPath, previousContent);
+    const rollbackResult = await reloadNginx(true);
+    if (rollbackResult.status === 'rejected') {
+      throw new Error(
+        `nginx rejected the new configuration and rollback validation failed: ${rollbackResult.reason}`
+      );
+    }
+
+    if (result.status === 'rejected') {
+      throw new Error(`nginx rejected the new configuration: ${result.reason}`);
+    }
+
+    return result;
+  });
+}
 
 async function waitForNginxContainer(): Promise<boolean> {
   const containerId = await waitForComposeService('nginx');
@@ -142,10 +275,16 @@ server {
     listen [::]:80;
     server_name ${domain};
 
+    resolver 127.0.0.11 valid=1s ipv6=off;
+    resolver_timeout 2s;
+    set $deployment_upstream ${upstreamServer};
+
+    client_max_body_size ${DEFAULT_APP_CLIENT_MAX_BODY_SIZE};
+
     access_log ${accessLog} combined;
     error_log ${errorLog} warn;
     
-    # Increase buffer size settings
+    # Increase proxy response buffer sizes
     proxy_buffer_size 128k;
     proxy_buffers 4 256k;
     proxy_busy_buffers_size 256k;
@@ -153,7 +292,7 @@ server {
     
     # Cache settings for static files, images and Next.js image optimization
     location ~* (\\.(jpg|jpeg|png|gif|ico|webp|svg|woff2|woff|ttf|mp4)$|/_next/image\\?) {
-        proxy_pass http://${upstreamServer};
+        proxy_pass http://$deployment_upstream;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -174,7 +313,7 @@ server {
     }
     
     location / {
-        proxy_pass http://${upstreamServer};
+        proxy_pass http://$deployment_upstream;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -199,50 +338,19 @@ const getPreviewBranchConfig = (
   const markers = getBranchMarkers(branch);
   return `
 ${markers.start}
-${getCommonNginxConfig(`${branch}.${domain}`, upstreamServer, appName, deploymentId)}
+${getCommonNginxConfig(domain, upstreamServer, appName, deploymentId)}
 ${markers.end}
 `;
 };
 
-function isValidUpstreamServer(upstreamServer: string): boolean {
-  const host = upstreamServer.replace(/:\d+$/, '');
-  return host.length > 0 && !upstreamServer.startsWith(':');
-}
-
-async function removeVhostWhenUpstreamUnavailable(
+async function updateNginxConfig(
   appName: string,
   domain: string,
-  previewBranch: string | undefined,
-  context: { containerId?: string; deploymentId?: number; reason: string }
-): Promise<void> {
-  await logger.warning(
-    'Removing nginx vhost so domain is not routed to a missing or stale upstream',
-    { appName, domain, previewBranch, ...context }
-  );
-
-  try {
-    if (previewBranch) {
-      await deletePreviewBranchConfig(appName, previewBranch);
-    } else {
-      await deleteAppConfig(domain);
-    }
-  } catch (error) {
-    await logger.warning('Failed to remove nginx vhost after upstream became unavailable', {
-      appName,
-      domain,
-      previewBranch,
-      error: error instanceof Error ? error.message : String(error),
-    });
-  }
-}
-
-async function updateNginxConfig(
-  appName: string, 
-  domain: string, 
-  containerId: string | null = null,
+  routingHostname: string,
   previewBranch?: string,
-  deploymentId?: number
-) {
+  deploymentId?: number,
+  options: { requireApplied?: boolean } = {}
+): Promise<NginxApplyResult> {
   try {
     await logger.info(`Using nginx config directory: ${NGINX_CONFIG_DIR}`);
     
@@ -255,34 +363,8 @@ async function updateNginxConfig(
       await ensureNginxDeploymentLogDir(appName, deploymentId);
     }
 
+    const upstreamServer = `${assertDockerDnsName(routingHostname)}:3000`;
     let configPath: string;
-    let upstreamServer = 'deployment-manager:3000';
-
-    if (containerId) {
-      await logger.debug('Getting container IP', { containerId });
-      const containerIp = (await getContainerIp(containerId)).trim();
-
-      if (!containerIp) {
-        await removeVhostWhenUpstreamUnavailable(appName, domain, previewBranch, {
-          containerId,
-          deploymentId,
-          reason: 'empty container IP',
-        });
-        return;
-      }
-
-      upstreamServer = `${containerIp}:3000`;
-      await logger.debug('Using container IP for upstream', { containerIp });
-    }
-
-    if (!isValidUpstreamServer(upstreamServer)) {
-      await removeVhostWhenUpstreamUnavailable(appName, domain, previewBranch, {
-        containerId: containerId ?? undefined,
-        deploymentId,
-        reason: 'invalid upstream server',
-      });
-      return;
-    }
 
     if (previewBranch) {
       if (deploymentId === undefined) {
@@ -290,30 +372,41 @@ async function updateNginxConfig(
       }
 
       configPath = path.join(NGINX_CONFIG_DIR, `preview-${appName}.conf`);
+      const applyResult = await applyConfigMutation(
+        configPath,
+        () => {
+          let existingConfig = fs.existsSync(configPath)
+            ? fs.readFileSync(configPath, 'utf8')
+            : '';
 
-      let existingConfig = '';
-      if (fs.existsSync(configPath)) {
-        existingConfig = fs.readFileSync(configPath, 'utf8');
-      }
+          const markers = getBranchMarkers(previewBranch);
+          const startIndex = existingConfig.indexOf(markers.start);
+          const endIndex = existingConfig.indexOf(markers.end);
 
-      const markers = getBranchMarkers(previewBranch);
-      const startIndex = existingConfig.indexOf(markers.start);
-      const endIndex = existingConfig.indexOf(markers.end);
+          if (startIndex !== -1 && endIndex !== -1) {
+            existingConfig =
+              existingConfig.substring(0, startIndex) +
+              existingConfig.substring(endIndex + markers.end.length);
+          }
 
-      if (startIndex !== -1 && endIndex !== -1) {
-        existingConfig = existingConfig.substring(0, startIndex) + 
-                        existingConfig.substring(endIndex + markers.end.length);
-      }
+          const branchConfig = getPreviewBranchConfig(
+            previewBranch,
+            domain,
+            upstreamServer,
+            appName,
+            deploymentId
+          );
 
-      const branchConfig = getPreviewBranchConfig(
-        previewBranch,
-        domain,
-        upstreamServer,
-        appName,
-        deploymentId
+          return (existingConfig + branchConfig).trim() + '\n';
+        },
+        { rollbackOnDeferred: options.requireApplied }
       );
-
-      fs.writeFileSync(configPath, (existingConfig + branchConfig).trim() + '\n');
+      await logger.info('Nginx desired configuration updated', {
+        configPath,
+        applyStatus: applyResult.status,
+        routingHostname,
+      });
+      return applyResult;
     } else {
       if (deploymentId === undefined) {
         throw new Error('deploymentId is required for production nginx config');
@@ -321,34 +414,107 @@ async function updateNginxConfig(
 
       configPath = path.join(NGINX_CONFIG_DIR, `app-${domain}.conf`);
       const config = getCommonNginxConfig(domain, upstreamServer, appName, deploymentId);
-      fs.writeFileSync(configPath, config);
+      const applyResult = await applyConfigMutation(configPath, () => config, {
+        rollbackOnDeferred: options.requireApplied,
+      });
+      await logger.info('Nginx desired configuration updated', {
+        configPath,
+        applyStatus: applyResult.status,
+        routingHostname,
+      });
+      return applyResult;
     }
-
-    await logger.info(`Writing nginx config to: ${configPath}`);
-    await reloadNginx();
-    await logger.info('Nginx configuration updated successfully');
   } catch (error) {
     await logger.error(`Error updating nginx config`, error as Error);
     throw error;
   }
 }
 
-async function reloadNginx() {
-  const nginxContainerId = await getComposeServiceContainerId('nginx');
+async function validateNginxConfigurationInOneOffContainer(): Promise<NginxApplyResult | null> {
+  try {
+    await execCompose('run --rm --no-deps nginx nginx -t');
+    return null;
+  } catch (error) {
+    if (isNginxValidationError(error)) {
+      return { status: 'rejected', reason: errorMessage(error) };
+    }
+
+    return { status: 'deferred', reason: errorMessage(error) };
+  }
+}
+
+async function applyNginxConfiguration(
+  validateWhenStopped: boolean
+): Promise<NginxApplyResult> {
+  let nginxContainerId: string | null;
+  try {
+    nginxContainerId = await getComposeServiceContainerId('nginx');
+  } catch (error) {
+    return { status: 'deferred', reason: errorMessage(error) };
+  }
+
   if (!nginxContainerId) {
-    await logger.warning('nginx container not running; skipping reload');
-    return;
+    if (validateWhenStopped) {
+      const validationResult = await validateNginxConfigurationInOneOffContainer();
+      if (validationResult) {
+        return validationResult;
+      }
+    }
+
+    return { status: 'deferred', reason: 'nginx container is not running' };
   }
 
   try {
     await execCompose('exec -T nginx nginx -t');
-    await execCompose('exec -T nginx nginx -s reload');
-    await logger.info('Nginx configuration reloaded successfully');
   } catch (error) {
-    await logger.warning('Error reloading nginx', {
-      error: error instanceof Error ? error.message : String(error),
-    });
+    if (isNginxValidationError(error)) {
+      return { status: 'rejected', reason: errorMessage(error) };
+    }
+
+    return { status: 'deferred', reason: errorMessage(error) };
   }
+
+  try {
+    await execCompose('exec -T nginx nginx -s reload');
+    return { status: 'applied' };
+  } catch (error) {
+    return { status: 'deferred', reason: errorMessage(error) };
+  }
+}
+
+async function reloadNginx(validateWhenStopped = false): Promise<NginxApplyResult> {
+  if (nginxApplyInFlight) {
+    const inFlightResult = await nginxApplyInFlight;
+    if (validateWhenStopped && inFlightResult.status === 'deferred') {
+      return reloadNginx(true);
+    }
+    return inFlightResult;
+  }
+
+  nginxApplyInFlight = (async () => {
+    const result = await applyNginxConfiguration(validateWhenStopped);
+
+    if (result.status === 'applied') {
+      const recoveredAfterAttempts = nginxRetryAttempt;
+      clearNginxRetry();
+      await logger.info('Nginx configuration applied', {
+        recoveredAfterAttempts,
+      });
+    } else if (result.status === 'deferred') {
+      scheduleNginxRetry(result.reason);
+    } else {
+      clearNginxRetry();
+      await logger.warning('Nginx configuration rejected', {
+        reason: result.reason,
+      });
+    }
+
+    return result;
+  })().finally(() => {
+    nginxApplyInFlight = null;
+  });
+
+  return nginxApplyInFlight;
 }
 
 async function deleteAppConfig(domain: string) {
@@ -365,9 +531,11 @@ async function deleteAppConfig(domain: string) {
     
     if (fs.existsSync(configPath)) {
       await logger.info(`Found nginx config at ${configPath}, deleting...`);
-      await fs.promises.unlink(configPath);
-      
-      await reloadNginx();
+      const applyResult = await applyConfigMutation(configPath, () => null);
+      await logger.info('Nginx desired configuration removed', {
+        configPath,
+        applyStatus: applyResult.status,
+      });
     } else {
       await logger.info(`No nginx config found at ${configPath}, skipping deletion`);
     }
@@ -383,25 +551,26 @@ async function deletePreviewBranchConfig(appName: string, branch: string) {
     const configPath = path.join(NGINX_CONFIG_DIR, `preview-${appName}.conf`);
     
     if (fs.existsSync(configPath)) {
-      let config = fs.readFileSync(configPath, 'utf8');
-      
-      const markers = getBranchMarkers(branch);
-      const startIndex = config.indexOf(markers.start);
-      const endIndex = config.indexOf(markers.end);
+      const applyResult = await applyConfigMutation(configPath, () => {
+        let config = fs.readFileSync(configPath, 'utf8');
+        const markers = getBranchMarkers(branch);
+        const startIndex = config.indexOf(markers.start);
+        const endIndex = config.indexOf(markers.end);
 
-      if (startIndex !== -1 && endIndex !== -1) {
-        config = config.substring(0, startIndex) + 
-                config.substring(endIndex + markers.end.length);
-        
-        fs.writeFileSync(configPath, config.trim() + '\n');
-        
-        if (!config.trim()) {
-          fs.unlinkSync(configPath);
+        if (startIndex === -1 || endIndex === -1) {
+          return config;
         }
-        
-        await reloadNginx();
-        await logger.info(`Removed nginx config for preview branch ${branch}`);
-      }
+
+        config =
+          config.substring(0, startIndex) +
+          config.substring(endIndex + markers.end.length);
+        const trimmedConfig = config.trim();
+        return trimmedConfig ? `${trimmedConfig}\n` : null;
+      });
+
+      await logger.info(`Removed nginx config for preview branch ${branch}`, {
+        applyStatus: applyResult.status,
+      });
     }
   } catch (error) {
     await logger.error(`Error deleting preview branch nginx config`, error as Error);
@@ -413,6 +582,7 @@ interface LocationConfig {
   path: string;
   proxyPass: string;
   allowCors?: boolean;
+  resolveAtRuntime?: boolean;
 }
 
 interface ServiceVhostOptions {
@@ -442,6 +612,30 @@ function getForwardedProtoLines(forwardedProto: ServiceVhostOptions['forwardedPr
   }
 }
 
+function getProxyPassLines(
+  serviceName: string,
+  location: LocationConfig,
+  index: number
+): string {
+  if (!location.resolveAtRuntime) {
+    return `        proxy_pass ${location.proxyPass};`;
+  }
+
+  const target = new URL(location.proxyPass);
+  if (!['http:', 'https:'].includes(target.protocol)) {
+    throw new Error(`Unsupported proxy protocol for ${serviceName}`);
+  }
+  if (target.pathname !== '/' || target.search || target.hash) {
+    throw new Error(`Runtime-resolved proxy target for ${serviceName} must not contain a URI`);
+  }
+
+  const variableName = `${serviceName.replace(/[^a-zA-Z0-9_]/g, '_')}_upstream_${index}`;
+  return `        resolver 127.0.0.11 valid=1s ipv6=off;
+        resolver_timeout 2s;
+        set $${variableName} ${target.host};
+        proxy_pass ${target.protocol}//$${variableName};`;
+}
+
 async function createServiceVhostConfig(
   serviceName: string,
   serverName: string,
@@ -454,11 +648,12 @@ async function createServiceVhostConfig(
     const clientMaxBodySize = options.clientMaxBodySize || '5M';
     const forwardedProtoLines = getForwardedProtoLines(options.forwardedProto);
     
-    const locationBlocks = locations.map(loc => {
+    const locationBlocks = locations.map((loc, index) => {
+      const proxyPassLines = getProxyPassLines(serviceName, loc, index);
       const baseConfig = `
     # ${serviceName} ${loc.path === '/' ? 'API' : loc.path}
     location ${loc.path} {
-        proxy_pass ${loc.proxyPass};
+${proxyPassLines}
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -491,9 +686,10 @@ server {
 ${locationBlocks}
 }`;
 
-    fs.writeFileSync(configPath, config);
-    await reloadNginx();
-    await logger.info(`Created nginx config for service ${serviceName}`);
+    const applyResult = await applyConfigMutation(configPath, () => config);
+    await logger.info(`Created nginx config for service ${serviceName}`, {
+      applyStatus: applyResult.status,
+    });
   } catch (error) {
     await logger.error(`Error creating nginx config for service ${serviceName}`, error as Error);
     throw error;
