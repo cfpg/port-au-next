@@ -7,7 +7,6 @@ import logger from '~/services/logger';
 import { modifyNextConfig } from '~/services/nextConfig';
 
 import { execCommand } from '~/utils/docker';
-import { getComposeServiceContainerId } from '~/utils/compose';
 import { formatDockerEnvString } from '~/utils/dockerEnv';
 import getAppsDir from '~/utils/getAppsDir';
 import { migratorImageTag } from '~/services/prismaMigrate';
@@ -34,15 +33,22 @@ import {
   parseGeneratedDockerfileMarker,
   shouldRegenerateGeneratedDockerfile,
 } from '~/utils/generatedDockerfileMarker';
+import {
+  APPLICATION_DOCKER_NETWORK,
+  assertDockerDnsName,
+  getContainerRoutingHostname,
+  getDeploymentNetworkAlias,
+} from '~/lib/deploymentRouting';
 
 interface ContainerInfo {
   containerId: string;
   containerName?: string;
+  routingHostname?: string;
 }
 
 // Constants
 const APPS_DIR: string = getAppsDir();
-const networkName: string = 'port-au-next_port_au_next_network';
+const networkName: string = APPLICATION_DOCKER_NETWORK;
 
 async function ensureDockerfile(appDir: string, appId: number): Promise<void> {
   const dockerfilePath = path.join(appDir, 'Dockerfile');
@@ -204,12 +210,18 @@ async function startContainer(
   containerName: string, 
   imageTag: string, 
   networkName: string, 
-  envString: string
+  envString: string,
+  options: { networkAlias?: string } = {}
 ): Promise<ContainerInfo> {
-  await logger.info('Starting container', { containerName });
+  const networkAlias = options.networkAlias
+    ? assertDockerDnsName(options.networkAlias)
+    : undefined;
+  const networkAliasArg = networkAlias ? ` --network-alias ${networkAlias}` : '';
+
+  await logger.info('Starting container', { containerName, networkAlias });
   
   await execCommand(
-    `docker run -d --restart unless-stopped --name ${containerName} --network ${networkName} ${envString} ${imageTag}`
+    `docker run -d --restart unless-stopped --name ${containerName} --network ${networkName}${networkAliasArg} ${envString} ${imageTag}`
   );
   
   const containerId = await execCommand(
@@ -223,7 +235,8 @@ async function startContainer(
 
   return {
     containerId: containerId.trim(),
-    containerName
+    containerName,
+    routingHostname: networkAlias ?? assertDockerDnsName(containerName),
   };
 }
 
@@ -261,7 +274,9 @@ async function buildAndStartContainer(
 
     const envString = formatDockerEnvString(appEnv);
 
-    return await startContainer(containerName, runnerTag, networkName, envString);
+    return await startContainer(containerName, runnerTag, networkName, envString, {
+      networkAlias: getDeploymentNetworkAlias(deploymentId),
+    });
   } catch (error) {
     await logger.error(`Error building and starting container`, error as Error);
     throw error;
@@ -325,6 +340,95 @@ async function waitForHealthyContainer(containerId: string, timeout: number = 30
   throw error;
 }
 
+async function hasDockerHealthcheck(containerId: string): Promise<boolean> {
+  const healthcheckJson = (await execCommand(
+    `docker inspect --format '{{json .Config.Healthcheck}}' ${containerId}`
+  )) as string;
+
+  if (!healthcheckJson.trim() || healthcheckJson.trim() === 'null') {
+    return false;
+  }
+
+  const healthcheck = JSON.parse(healthcheckJson) as { Test?: string[] };
+  return Boolean(
+    healthcheck.Test?.length && healthcheck.Test[0]?.toUpperCase() !== 'NONE'
+  );
+}
+
+async function probeContainerHttp(routingHostname: string): Promise<boolean> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 3000);
+
+  try {
+    const response = await fetch(`http://${routingHostname}:3000/`, {
+      redirect: 'manual',
+      signal: controller.signal,
+    });
+    return response.status < 500;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+/**
+ * Requires the container to accept HTTP traffic before nginx can route to it.
+ * A custom Docker healthcheck is also honored when one is configured.
+ */
+async function waitForContainerReady(
+  containerId: string,
+  routingHostname: string,
+  timeout: number = 60000
+): Promise<void> {
+  const hostname = assertDockerDnsName(routingHostname);
+  const usesDockerHealthcheck = await hasDockerHealthcheck(containerId);
+  const startedAt = Date.now();
+
+  await logger.info('Waiting for container readiness', {
+    containerId,
+    routingHostname: hostname,
+    usesDockerHealthcheck,
+    timeout,
+  });
+
+  while (Date.now() - startedAt < timeout) {
+    const status = ((await execCommand(
+      `docker inspect --format '{{.State.Status}}' ${containerId}`
+    )) as string).trim();
+
+    if (status === 'exited' || status === 'dead') {
+      throw new Error(`Container entered ${status} state during readiness check`);
+    }
+
+    if (status === 'running') {
+      let dockerHealthy = true;
+      if (usesDockerHealthcheck) {
+        const healthStatus = ((await execCommand(
+          `docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}starting{{end}}' ${containerId}`
+        )) as string).trim();
+        dockerHealthy = healthStatus === 'healthy';
+      }
+
+      if (dockerHealthy && (await probeContainerHttp(hostname))) {
+        await logger.info('Container readiness passed', {
+          containerId,
+          routingHostname: hostname,
+          usesDockerHealthcheck,
+          durationMs: Date.now() - startedAt,
+        });
+        return;
+      }
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+
+  throw new Error(
+    `Container readiness timeout for ${hostname} after ${timeout}ms`
+  );
+}
+
 async function containerExists(containerId: string): Promise<boolean> {
   try {
     // Use --no-trunc to get full container IDs in the listing
@@ -380,6 +484,46 @@ async function recoverContainers(): Promise<void> {
 
     for (const deployment of deployments) {
       try {
+        const previewBranch = deployment.is_preview
+          ? deployment.preview_branch || deployment.deployment_branch
+          : undefined;
+        const routeDomain = deployment.is_preview
+          ? deployment.preview_subdomain
+          : deployment.domain;
+
+        if (!routeDomain) {
+          throw new Error(
+            `No routing domain is configured for deployment ${deployment.deployment_id}`
+          );
+        }
+
+        const reconcileContainerRoute = async (
+          containerId: string,
+          knownRoutingHostname?: string
+        ): Promise<void> => {
+          const routingHostname =
+            knownRoutingHostname ??
+            (await getContainerRoutingHostname(
+              containerId,
+              deployment.deployment_id
+            ));
+
+          await updateNginxConfig(
+            deployment.name,
+            routeDomain,
+            routingHostname,
+            previewBranch,
+            deployment.deployment_id
+          );
+          await logger.info('Nginx route reconciled with Docker DNS', {
+            name: deployment.name,
+            domain: routeDomain,
+            previewBranch,
+            deploymentId: deployment.deployment_id,
+            routingHostname,
+          });
+        };
+
         const exists = await containerExists(deployment.container_id);
         
         if (!exists) {
@@ -413,20 +557,19 @@ async function recoverContainers(): Promise<void> {
             const timestamp = new Date().getTime();
             const containerName = `${deployment.name}_${deployment.version}_${timestamp}`;
 
-            const { containerId } = await startContainer(
+            const { containerId, routingHostname } = await startContainer(
               containerName,
               imageTag,
               networkName,
-              envString
+              envString,
+              {
+                networkAlias: getDeploymentNetworkAlias(
+                  deployment.deployment_id
+                ),
+              }
             );
 
-            await updateNginxConfig(
-              deployment.name,
-              deployment.domain,
-              containerId,
-              undefined,
-              deployment.deployment_id
-            );
+            await reconcileContainerRoute(containerId, routingHostname);
 
             await updateDeploymentContainer(deployment.container_id, containerId);
 
@@ -440,20 +583,14 @@ async function recoverContainers(): Promise<void> {
               containerId: deployment.container_id
             });
 
-            const { containerId } = await buildAndStartContainer(
+            const { containerId, routingHostname } = await buildAndStartContainer(
               deployment,
               deployment.version,
               dbEnv,
               deployment.deployment_id
             );
 
-            await updateNginxConfig(
-              deployment.name,
-              deployment.domain,
-              containerId,
-              undefined,
-              deployment.deployment_id
-            );
+            await reconcileContainerRoute(containerId, routingHostname);
 
             await updateDeploymentContainer(deployment.container_id, containerId);
           }
@@ -485,46 +622,27 @@ async function recoverContainers(): Promise<void> {
           ).catch(() => null) as string | null;
 
           if (!retryStatus || retryStatus.trim() !== 'running') {
-            // Simply start the existing container instead of creating a new one
             await startExistingContainer(deployment.container_id);
-
-            // Container could start with a different IP address, so we need to update the nginx config
-            await updateNginxConfig(
-              deployment.name,
-              deployment.domain,
-              deployment.container_id,
-              undefined,
-              deployment.deployment_id
-            );
+            await reconcileContainerRoute(deployment.container_id);
 
             await logger.info(`Successfully recovered existing container`, {
               name: deployment.name,
               containerId: deployment.container_id,
             });
           } else {
+            await reconcileContainerRoute(deployment.container_id);
             await logger.info(`Container recovered on its own`, { 
               name: deployment.name,
               status: retryStatus.trim() 
             });
           }
         } else {
-          await logger.info(`Container is healthy`, { 
+          await logger.info(`Container is running`, {
             name: deployment.name,
             status: containerStatus ? containerStatus.trim() : 'unknown'
           });
 
-          // Update nginx config with container's new internal IP address
-          await updateNginxConfig(
-            deployment.name,
-            deployment.domain,
-            deployment.container_id,
-            undefined,
-            deployment.deployment_id
-          );
-          await logger.info(`Nginx config updated with container's new internal IP address`, {
-            name: deployment.name,
-            containerId: deployment.container_id
-          });
+          await reconcileContainerRoute(deployment.container_id);
         }
       } catch (error) {
         await logger.error(`Failed to recover container`, { 
@@ -592,25 +710,6 @@ async function getServicesHealth(): Promise<ServiceHealth[]> {
   return healthStatus;
 }
 
-async function getServiceContainerIp(serviceName: string): Promise<string> {
-  try {
-    const containerId = await getComposeServiceContainerId(serviceName);
-    if (!containerId) {
-      throw new Error(`Service ${serviceName} not found`);
-    }
-
-    const ip = await execCommand(`docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' ${containerId}`) as string;
-    if (!ip.trim()) {
-      throw new Error(`Could not get IP for service ${serviceName}`);
-    }
-
-    return ip.trim();
-  } catch (error) {
-    await logger.error(`Error getting container IP for service ${serviceName}`, error as Error);
-    throw error;
-  }
-}
-
 export {
   buildAndStartContainer,
   buildReleaseImages,
@@ -618,10 +717,10 @@ export {
   stopContainer,
   waitForContainerRunning,
   waitForHealthyContainer,
+  waitForContainerReady,
   recoverContainers,
   containerExists,
   deleteAppContainers,
   getServicesHealth,
-  getServiceContainerIp,
   ensureDockerfile,
-}; 
+};

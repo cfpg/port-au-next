@@ -104,6 +104,49 @@ docker compose up --build -d
 
 4. Access the deployment manager UI at `http://localhost:80` or using the `DEPLOYMENT_MANAGER_HOST` you configured in the `.env` file and log in with the configured admin credentials
 
+### Startup and reverse-proxy recovery
+
+Deployment-manager exposes unauthenticated container health endpoints at
+`/api/health/live` and `/api/health/ready`. The readiness endpoint returns `200`
+after critical database and admin initialization; Compose waits for it before
+starting nginx.
+
+nginx and deployment-manager recover independently:
+
+- If nginx is unavailable, deployment-manager remains healthy and records nginx
+  configuration as deferred until a later validation/reload succeeds.
+- If deployment-manager is unavailable, nginx remains running and returns `502`
+  for management routes until Docker DNS resolves the service again.
+- nginx initializes the shared application-log directory on every container
+  start. Deployment-manager creates per-deployment directories through the
+  shared `nginx/logs` bind mount.
+
+Application traffic also uses Docker DNS rather than container IP addresses.
+Each new deployment receives an immutable alias such as `pan-deployment-271`.
+The green container must accept HTTP traffic (and pass its Docker healthcheck,
+when configured) before nginx atomically switches to that alias. The previous
+container remains routed if readiness, nginx validation, or reload fails.
+Containers created before alias support use their unique Docker container name
+until their next deployment. Platform vhosts use their stable Compose service
+names. This prevents a recycled Docker IP from serving one application's site
+under another application's domain.
+
+Useful checks:
+
+```bash
+docker compose ps
+curl -fsS http://localhost:3000/api/health/ready
+docker compose exec nginx nginx -t
+docker compose logs deployment-manager nginx
+```
+
+An `nginx config apply deferred` log is recoverable and will be retried. An
+`nginx configuration rejected` log indicates that `nginx -t` rejected desired
+configuration; the previous file is restored before the operation fails.
+If nginx cannot start because a tracked or manually edited config is invalid,
+run `docker compose run --rm --no-deps nginx nginx -t`, correct or restore the
+reported file under `nginx/conf.d`, and then run `docker compose up -d nginx`.
+
 ## Cloudflare Tunnels
 
 Port-Au-Next integrates with your Cloudflare account to manage **tunnel published applications** and **proxied CNAME DNS** from the dashboard. You still add domains to Cloudflare and run `cloudflared` on your machine — those steps stay manual.

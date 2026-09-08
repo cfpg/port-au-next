@@ -129,17 +129,27 @@ export async function cleanupStaleBuildingDeployments() {
 
 export async function deduplicateActiveDeployments() {
   const result = await pool.query(`
-    UPDATE deployments
+    WITH ranked_active AS (
+      SELECT id,
+             ROW_NUMBER() OVER (
+               PARTITION BY app_id,
+                 CASE
+                   WHEN COALESCE(is_preview, FALSE)
+                     THEN COALESCE(preview_branch_id, -id)
+                   ELSE 0
+                 END
+               ORDER BY id DESC
+             ) AS route_rank
+      FROM deployments
+      WHERE status = 'active'
+    )
+    UPDATE deployments d
     SET status = 'inactive',
-        inactive_at = COALESCE(inactive_at, CURRENT_TIMESTAMP)
-    WHERE status = 'active'
-      AND id NOT IN (
-        SELECT DISTINCT ON (app_id, COALESCE(branch, '')) id
-        FROM deployments
-        WHERE status = 'active'
-        ORDER BY app_id, COALESCE(branch, ''), id DESC
-      )
-    RETURNING id, app_id, branch
+        inactive_at = COALESCE(d.inactive_at, CURRENT_TIMESTAMP)
+    FROM ranked_active r
+    WHERE d.id = r.id
+      AND r.route_rank > 1
+    RETURNING d.id, d.app_id, d.branch, d.container_id
   `);
   return result.rows;
 }
@@ -160,10 +170,14 @@ export async function cleanupOrphanedPreviewDeployments() {
 
 export async function getActiveDeployments() {
   const result = await pool.query(`
-    SELECT a.id, a.name, a.domain, a.branch, a.root_path, a.db_user, a.db_password, a.db_name,
-           d.id AS deployment_id, d.container_id, d.version, d.branch AS deployment_branch
+    SELECT a.id, a.name, a.domain, a.preview_domain, a.branch, a.root_path,
+           a.db_user, a.db_password, a.db_name,
+           d.id AS deployment_id, d.container_id, d.version,
+           d.branch AS deployment_branch, d.is_preview,
+           pb.branch AS preview_branch, pb.subdomain AS preview_subdomain
     FROM deployments d
     JOIN apps a ON a.id = d.app_id
+    LEFT JOIN preview_branches pb ON pb.id = d.preview_branch_id
     WHERE d.status = 'active'
   `);
   return result.rows;

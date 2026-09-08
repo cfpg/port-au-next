@@ -37,6 +37,7 @@ ENV HOSTNAME="0.0.0.0"
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 EXPOSE 3000
+HEALTHCHECK --interval=5s --timeout=3s --start-period=10s --retries=12 CMD node -e "fetch('http://127.0.0.1:3000/', {redirect:'manual'}).then(r => process.exit(r.status < 500 ? 0 : 1)).catch(() => process.exit(1))"
 CMD ["node", "server.js"]
 `;
 }
@@ -112,6 +113,7 @@ COPY --from=builder /prisma-runtime-stage/ ./
 
 USER nextjs
 EXPOSE 3000
+HEALTHCHECK --interval=5s --timeout=3s --start-period=10s --retries=12 CMD node -e "fetch('http://127.0.0.1:3000/', {redirect:'manual'}).then(r => process.exit(r.status < 500 ? 0 : 1)).catch(() => process.exit(1))"
 CMD ["node", "server.js"]
 `;
 }
