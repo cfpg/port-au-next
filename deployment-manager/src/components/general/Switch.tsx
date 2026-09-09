@@ -47,7 +47,7 @@ export default function Switch({ checked, onChange, disabled, label, hint, class
   if (!label) return track;
 
   return (
-    <div className="flex items-start justify-between gap-16">
+    <div className="w-full flex items-start justify-between gap-16">
       <div className="min-w-0">
         <div className={`font-display font-semibold text-panel ${disabled ? 'text-ink-faint' : ''}`}>{label}</div>
         {hint ? <div className={`text-field mt-3 leading-[1.5] ${disabled ? 'text-ink-faint' : 'text-ink-muted'}`}>{hint}</div> : null}

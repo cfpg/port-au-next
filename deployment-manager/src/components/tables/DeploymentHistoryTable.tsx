@@ -9,7 +9,6 @@ import getGithubRepoPath from '~/utils/getGithubRepoPath';
 import Badge from '~/components/general/Badge';
 import CodeToken from '~/components/general/CodeToken';
 import { getServiceStatusTone } from '~/utils/serviceColors';
-import ViewLogsButton from '~/components/deployments/ViewLogsButton';
 import Link from '~/components/general/Link';
 import AppDeployButton from '~/components/buttons/AppDeployButton';
 import EmptyState from '~/components/general/EmptyState';
@@ -131,7 +130,7 @@ export default function DeploymentHistoryTable({
     {
       key: 'actions',
       header: 'actions',
-      width: scope === 'app' ? '66px' : '110px',
+      width: scope === 'app' ? '66px' : '88px',
       align: 'right',
       render: (d) =>
         scope === 'app' ? (
@@ -139,7 +138,7 @@ export default function DeploymentHistoryTable({
         ) : (
           <>
             <AppDeployButton app={{ name: d.app_name, id: d.app_id } as App} branch={d.branch} />
-            <ViewLogsButton deploymentId={d.id} appName={d.app_name} />
+            <DeploymentRowMenu deployment={d} />
           </>
         ),
     },

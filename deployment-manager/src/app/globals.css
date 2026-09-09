@@ -82,19 +82,35 @@
   --radius-menu: 5px;
   --radius-panel: 6px;
 
-  /* TYPE SCALE */
+  /* TYPE SCALE - every size pairs a line-height, so controls size themselves
+     from padding + border alone. Left to Preflight's inherited `line-height:
+     1.5`, a sm Button (text-label) renders ~29px tall against a size-26
+     icon-only control it sits next to. Pairing --text-label--line-height: 14px
+     makes both converge on 26px. */
   --text-nano: 9.5px;
+  --text-nano--line-height: 12px;
   --text-micro: 10px;
+  --text-micro--line-height: 13px;
   --text-mini: 10.5px;
+  --text-mini--line-height: 13px;
   --text-meta: 11px;
+  --text-meta--line-height: 14px;
   --text-label: 11.5px;
+  --text-label--line-height: 14px;
   --text-field: 12px;
+  --text-field--line-height: 15px;
   --text-panel: 12.5px;
+  --text-panel--line-height: 16px;
   --text-body: 13px;
+  --text-body--line-height: 17px;
   --text-lead: 14px;
+  --text-lead--line-height: 18px;
   --text-resource: 17px;
+  --text-resource--line-height: 21px;
   --text-page: 20px;
+  --text-page--line-height: 24px;
   --text-kit: 32px;
+  --text-kit--line-height: 36px;
 
   /* TRACKING */
   --tracking-heading: -0.022em;

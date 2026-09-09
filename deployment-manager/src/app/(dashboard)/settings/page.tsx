@@ -24,15 +24,8 @@ const SettingsPage = async () => {
         />
       </div>
 
-      <div className="mb-24">
-        <Panel
-          title="Cloudflare"
-          content={<CloudflareSettingsCard />}
-        />
-      </div>
-
       <div className="font-mono text-micro tracking-caps-wide uppercase text-ink-faint mb-12">Services Health</div>
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(196px,1fr))] gap-10">
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(196px,1fr))] gap-10 mb-24">
         {servicesHealth.map((service) => (
           <ServiceCard
             key={service.id}
@@ -42,6 +35,13 @@ const SettingsPage = async () => {
             id={service.id}
           />
         ))}
+      </div>
+
+      <div>
+        <Panel
+          title="Cloudflare"
+          content={<CloudflareSettingsCard />}
+        />
       </div>
     </main>
   );

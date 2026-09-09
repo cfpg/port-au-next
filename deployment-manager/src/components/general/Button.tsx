@@ -9,7 +9,7 @@ export const buttonStyles = tv({
   slots: {
     wrapper: 'inline-flex relative',
     base: [
-      'inline-flex items-center justify-center gap-6 font-display cursor-pointer',
+      'inline-flex items-center justify-center gap-6 font-display cursor-pointer whitespace-nowrap',
       'rounded-control transition-colors duration-150 focus-ring',
       'disabled:cursor-not-allowed disabled:bg-canvas disabled:text-ink-ghost disabled:border-line',
     ],

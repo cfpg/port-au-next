@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Link from '~/components/general/Link';
 import Avatar from '~/components/general/Avatar';
+import Brand from '~/components/general/Brand';
 import { HomeIcon, GridIcon, GearIcon, PlusIcon, MenuIcon } from '~/components/general/icons';
 import getSingleAppPath from '~/utils/getSingleAppPath';
 import { useSession } from '~/lib/auth-client';
@@ -34,21 +35,7 @@ export default function Sidebar({ apps }: SidebarProps) {
   return (
     <nav className="flex flex-col h-full">
       <div className="flex items-center justify-between gap-9 px-14 py-13 border-b border-line-soft">
-        <div className="flex items-center gap-9">
-          <svg width="20" height="20" viewBox="0 0 48 48" fill="none">
-            <defs>
-              <linearGradient id="pan-sidebar-sun" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0" stopColor="#F0A53C" />
-                <stop offset="1" stopColor="#E2553B" />
-              </linearGradient>
-            </defs>
-            <path d="M10 31 A14 14 0 0 1 38 31 Z" fill="url(#pan-sidebar-sun)" />
-            <line x1="14" y1="23.5" x2="34" y2="23.5" stroke="#fff" strokeWidth="2" />
-            <line x1="11.5" y1="28" x2="36.5" y2="28" stroke="#fff" strokeWidth="2" />
-            <line x1="8" y1="35" x2="40" y2="35" stroke="#3E7C8C" strokeWidth="2.4" strokeLinecap="round" />
-          </svg>
-          <span className="font-display font-semibold text-body tracking-brand">Port-Au-Next</span>
-        </div>
+        <Brand />
         <button
           type="button"
           onClick={() => setIsNavOpen(!isNavOpen)}

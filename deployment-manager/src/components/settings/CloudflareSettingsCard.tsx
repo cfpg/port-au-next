@@ -551,7 +551,6 @@ export default function CloudflareSettingsCard() {
             <Input
               id="cf-api-token"
               label="API Token"
-              type="password"
               value={apiToken}
               onChange={(e) => setApiToken(e.target.value)}
               placeholder="Scoped token with Tunnel + DNS permissions"
