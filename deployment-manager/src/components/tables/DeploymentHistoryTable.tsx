@@ -1,74 +1,86 @@
 import { App, Deployment, ServiceStatus } from '~/types';
-import Table, {
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '~/components/general/Table';
+import Table, { TableColumn } from '~/components/general/Table';
 import RelativeTime from '~/components/general/RelativeTime';
 import getGithubRepoPath from '~/utils/getGithubRepoPath';
 import Badge from '~/components/general/Badge';
+import CodeToken from '~/components/general/CodeToken';
 import { getServiceStatusTone } from '~/utils/serviceColors';
 import ViewLogsButton from '~/components/deployments/ViewLogsButton';
 import Link from '~/components/general/Link';
 import AppDeployButton from '~/components/buttons/AppDeployButton';
+import EmptyState from '~/components/general/EmptyState';
 
 interface DeploymentHistoryTableProps {
-  deployments: Deployment[];
+  deployments?: Deployment[];
 }
 
 export default function DeploymentHistoryTable({
-  deployments = [],
+  deployments,
 }: DeploymentHistoryTableProps) {
+  const columns: TableColumn<Deployment>[] = [
+    {
+      key: 'app',
+      header: 'app',
+      width: '1.3fr',
+      render: (d) => (
+        <Link href={`/apps/${d.app_name}/deployments/${d.id}`} variant="default" className="truncate block">
+          {d.app_name}
+        </Link>
+      ),
+    },
+    {
+      key: 'version',
+      header: 'version',
+      width: '1.5fr',
+      render: (d) => <span className="font-mono text-meta text-ink">{d.version}</span>,
+    },
+    { key: 'branch', header: 'branch', width: '0.7fr', render: (d) => <span className="font-mono text-meta text-ink-muted">{d.branch || 'main'}</span> },
+    {
+      key: 'commit',
+      header: 'commit',
+      width: '0.7fr',
+      render: (d) =>
+        d.commit_id ? (
+          <CodeToken href={`https://github.com/${getGithubRepoPath(d.app_repository)}/commit/${d.commit_id}`}>
+            {d.commit_id.substring(0, 7)}
+          </CodeToken>
+        ) : (
+          <CodeToken>{null}</CodeToken>
+        ),
+    },
+    {
+      key: 'status',
+      header: 'status',
+      width: '0.9fr',
+      render: (d) => <Badge tone={getServiceStatusTone(d.status as ServiceStatus)} withDot>{d.status}</Badge>,
+    },
+    {
+      key: 'deployedAt',
+      header: 'deployed at',
+      width: '1.7fr',
+      render: (d) => (d.deployed_at ? <RelativeTime value={d.deployed_at} showRelative /> : <span className="font-mono text-meta text-ink-ghost">N/A</span>),
+    },
+    {
+      key: 'actions',
+      header: 'actions',
+      width: '110px',
+      align: 'right',
+      render: (d) => (
+        <>
+          <AppDeployButton app={{ name: d.app_name, id: d.app_id } as App} branch={d.branch} />
+          <ViewLogsButton deploymentId={d.id} appName={d.app_name} />
+        </>
+      ),
+    },
+  ];
+
   return (
-    <div className="overflow-x-auto">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>App</TableHead>
-            <TableHead>Version</TableHead>
-            <TableHead>Branch</TableHead>
-            <TableHead>Commit</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Deployed At</TableHead>
-            <TableHead className='text-right'>Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {deployments.map((deployment) => (
-            <TableRow key={deployment.id}>
-              <TableCell className="font-medium text-gray-900">
-                <Link href={`/apps/${deployment.app_name}/deployments/${deployment.id}`}>
-                  {deployment.app_name}
-                </Link>
-              </TableCell>
-              <TableCell>{deployment.version}</TableCell>
-              <TableCell>{deployment.branch || 'main'}</TableCell>
-              <TableCell>
-                {deployment.commit_id ? <a href={`https://github.com/${getGithubRepoPath(deployment.app_repository)}/commit/${deployment.commit_id}`} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700 underline">{deployment.commit_id.substring(0, 7)}</a> : 'N/A'}
-              </TableCell>
-              <TableCell>
-                <Badge tone={getServiceStatusTone(deployment.status as ServiceStatus)} withDot>{deployment.status}</Badge>
-              </TableCell>
-              <TableCell>
-                {deployment.deployed_at ? (
-                  <RelativeTime value={deployment.deployed_at} showRelative />
-                ) : (
-                  '—'
-                )}
-              </TableCell>
-              <TableCell className="font-medium flex justify-end space-x-2">
-                <AppDeployButton app={{ name: deployment.app_name, id: deployment.app_id } as App} branch={deployment.branch} />
-                <ViewLogsButton
-                  deploymentId={deployment.id}
-                  appName={deployment.app_name}
-                />
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
+    <Table
+      columns={columns}
+      rows={deployments ?? []}
+      rowKey={(d) => d.id}
+      isLoading={!deployments}
+      emptyState={<EmptyState title="No deployments yet" description="Deployments will appear here once you deploy this app." />}
+    />
   );
 }

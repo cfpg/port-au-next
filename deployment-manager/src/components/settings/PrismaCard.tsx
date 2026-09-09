@@ -4,7 +4,8 @@ import { useState } from 'react';
 import useSWR from 'swr';
 import { AppFeature } from '~/types/appFeatures';
 import fetcher from '~/utils/fetcher';
-import Button from '~/components/general/Button';
+import Switch from '~/components/general/Switch';
+import Callout from '~/components/general/Callout';
 import { showToast } from '~/components/general/Toaster';
 import { App } from '~/types';
 import TestDatabaseCard from '~/components/settings/TestDatabaseCard';
@@ -42,18 +43,15 @@ export default function PrismaCard({ app }: PrismaCardProps) {
     await mutateFeatures();
   };
 
-  const handleTogglePrisma = async () => {
+  const handleTogglePrisma = async (next: boolean) => {
     setIsUpdatingPrisma(true);
     try {
       await patchFeature({
         feature: AppFeature.USES_PRISMA,
-        enabled: !isEnabled,
-        config: { auto_migrate: !isEnabled ? autoMigrate : false },
+        enabled: next,
+        config: { auto_migrate: next ? autoMigrate : false },
       });
-      showToast(
-        `Prisma CREATEDB ${!isEnabled ? 'granted' : 'revoked'} successfully`,
-        'success'
-      );
+      showToast(`Prisma CREATEDB ${next ? 'granted' : 'revoked'} successfully`, 'success');
     } catch {
       showToast('Failed to update Prisma setting', 'error');
     } finally {
@@ -61,18 +59,15 @@ export default function PrismaCard({ app }: PrismaCardProps) {
     }
   };
 
-  const handleToggleAutoMigrate = async () => {
+  const handleToggleAutoMigrate = async (next: boolean) => {
     setIsUpdatingMigrate(true);
     try {
       await patchFeature({
         feature: AppFeature.USES_PRISMA,
         enabled: true,
-        config: { auto_migrate: !autoMigrate },
+        config: { auto_migrate: next },
       });
-      showToast(
-        `Auto-migrate on deploy ${!autoMigrate ? 'enabled' : 'disabled'}`,
-        'success'
-      );
+      showToast(`Auto-migrate on deploy ${next ? 'enabled' : 'disabled'}`, 'success');
     } catch {
       showToast('Failed to update auto-migrate setting', 'error');
     } finally {
@@ -81,70 +76,58 @@ export default function PrismaCard({ app }: PrismaCardProps) {
   };
 
   return (
-    <div className="space-y-6">
-      <div
-        className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950"
-        role="note"
-      >
-        <p className="font-medium">Database migrations and zero-downtime deploys</p>
-        <p className="mt-2 text-amber-900/90">
-          When auto-migrate runs, SQL is applied to the <strong>live</strong> database while the
-          previous deployment may still be serving traffic. Use{' '}
-          <strong>expand/contract</strong> migrations so the old app version keeps working until
-          traffic switches. Rolling back the app does <strong>not</strong> roll back the database.
-        </p>
-        <p className="mt-2">
-          <a
-            href="https://github.com/cfpg/port-au-next#prisma-migrations-and-expandcontract"
-            className="font-medium text-amber-950 underline hover:text-amber-800"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read expand/contract guidance in the README
-          </a>
-        </p>
-      </div>
-
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-medium">Uses Prisma</h3>
-          <p className="text-sm text-gray-500">
-            Grants CREATEDB on the app database user for Prisma shadow databases. When this app has
-            no custom Dockerfile in git, the platform maintains a generated Dockerfile (Node 24,{' '}
-            <code className="text-xs">prisma generate</code> at build) on the next deploy. Commit
-            your own Dockerfile to override — if you enable auto-migrate, add a{' '}
-            <code className="text-xs">migrator</code> stage (see README).
-          </p>
-        </div>
-        <Button
-          variant={isEnabled ? 'primary' : 'secondary'}
-          onClick={handleTogglePrisma}
-          disabled={isUpdatingPrisma}
+    <div className="flex flex-col gap-16">
+      <Callout tone="warning" title="Database migrations and zero-downtime deploys">
+        When auto-migrate runs, SQL is applied to the live database while the previous deployment
+        may still be serving traffic. Use expand/contract migrations so the old app version keeps
+        working until traffic switches. Rolling back the app does not roll back the database.{' '}
+        <a
+          href="https://github.com/cfpg/port-au-next#prisma-migrations-and-expandcontract"
+          className="underline"
+          target="_blank"
+          rel="noopener noreferrer"
         >
-          {isEnabled ? 'Enabled' : 'Disabled'}
-        </Button>
-      </div>
+          Read the guidance
+        </a>
+      </Callout>
 
-      {isEnabled && (
-        <div className="flex items-center justify-between border-t border-gray-100 pt-4">
-          <div>
-            <h4 className="text-base font-medium">Run migrations on deploy</h4>
-            <p className="text-sm text-gray-500">
-              After the new container starts, run{' '}
-              <code className="text-xs">prisma migrate status</code> and{' '}
-              <code className="text-xs">prisma migrate deploy</code> in a one-off job, then switch
-              traffic. Requires <code className="text-xs">prisma/migrations/</code> in the repo.
-            </p>
-          </div>
-          <Button
-            variant={autoMigrate ? 'primary' : 'secondary'}
-            onClick={handleToggleAutoMigrate}
-            disabled={isUpdatingMigrate}
-          >
-            {autoMigrate ? 'Enabled' : 'Disabled'}
-          </Button>
+      <div className="border border-line rounded-menu overflow-hidden">
+        <div className="flex items-start justify-between gap-16 px-14 py-12 bg-surface border-b border-line-soft">
+          <Switch
+            checked={isEnabled}
+            onChange={handleTogglePrisma}
+            disabled={isUpdatingPrisma}
+            label="Uses Prisma"
+            hint={
+              <>
+                Grants CREATEDB on the app database user for Prisma shadow databases. When this app
+                has no custom Dockerfile in git, the platform maintains a generated Dockerfile
+                (Node 24, <span className="font-mono text-meta">prisma generate</span> at build) on
+                the next deploy. Commit your own Dockerfile to override — if you enable
+                auto-migrate, add a <span className="font-mono text-meta">migrator</span> stage (see
+                README).
+              </>
+            }
+          />
         </div>
-      )}
+        <div className={`flex items-start justify-between gap-16 px-14 py-12 ${isEnabled ? 'bg-surface' : 'bg-paper'}`}>
+          <Switch
+            checked={autoMigrate}
+            onChange={handleToggleAutoMigrate}
+            disabled={isUpdatingMigrate || !isEnabled}
+            label="Run migrations on deploy"
+            hint={
+              <>
+                After the new container starts, run{' '}
+                <span className="font-mono text-meta">prisma migrate status</span> and{' '}
+                <span className="font-mono text-meta">prisma migrate deploy</span> in a one-off job,
+                then switch traffic. Requires{' '}
+                <span className="font-mono text-meta">prisma/migrations/</span> in the repo.
+              </>
+            }
+          />
+        </div>
+      </div>
 
       <TestDatabaseCard app={app} />
     </div>

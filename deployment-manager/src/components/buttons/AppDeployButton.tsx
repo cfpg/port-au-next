@@ -48,12 +48,14 @@ export default function AppDeployButton({ app, branch, showDropdown = false }: A
   return (
     <>
       <Button
+        variant="primary"
         disabled={isLoading}
+        loading={isLoading}
         size="sm"
         onClick={() => handleDeploy(branch)}
         dropdown={dropdownItems}
       >
-        <i className="fas fa-rocket mr-2" />
+        <i className="fas fa-rocket" />
         Deploy
       </Button>
       <DeployPreviewBranchModal

@@ -7,4 +7,5 @@ export { default as AlertCircleIcon } from './AlertCircleIcon';
 export { default as AlertTriangleIcon } from './AlertTriangleIcon';
 export { default as MoreVerticalIcon } from './MoreVerticalIcon';
 export { default as ExternalLinkIcon } from './ExternalLinkIcon';
+export { default as InfoIcon } from './InfoIcon';
 export type { IconProps } from './types';

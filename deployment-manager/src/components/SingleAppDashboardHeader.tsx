@@ -1,8 +1,9 @@
 "use client";
 
 import { ServiceStatus } from "~/types";
-import Card from "./general/Card";
+import Panel from "./general/Panel";
 import Badge from "./general/Badge";
+import DefinitionList from "./general/DefinitionList";
 import { getServiceStatusTone } from "~/utils/serviceColors";
 import RelativeTime from "~/components/general/RelativeTime";
 import AppDeployButton from "./buttons/AppDeployButton";
@@ -18,57 +19,48 @@ export default function SingleAppDashboardHeader({ appId }: { appId: number }) {
   }
 
   return (
-    <Card
-      className="bg-white text-black"
+    <Panel
       header={
         <>
-          <h3 className="text-2xl font-bold">{app.name}</h3>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-4">
-              <Badge tone={getServiceStatusTone(app.status as ServiceStatus)} withDot>
-                {app.status}
-              </Badge>
-              <AppDeployButton app={app} showDropdown={true} />
-              <AppDeleteButton appName={app.name} />
-            </div>
+          <div className="flex items-center gap-11">
+            <h3 className="font-display font-bold text-resource tracking-subhead m-0">{app.name}</h3>
+            <Badge tone={getServiceStatusTone(app.status as ServiceStatus)} withDot>
+              {app.status}
+            </Badge>
+          </div>
+          <div className="flex items-center gap-7">
+            <AppDeployButton app={app} showDropdown={true} />
+            <AppDeleteButton appName={app.name} />
           </div>
         </>
       }
       content={
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <h3 className="font-semibold mb-2">Repository</h3>
-            <p className="text-sm text-gray-500">{app.repo_url}</p>
-          </div>
-          <div>
-            <h3 className="font-semibold mb-2">Branch</h3>
-            <p className="text-sm text-gray-500">{app.branch}</p>
-          </div>
-          <div>
-            <h3 className="font-semibold mb-2">Domain</h3>
-            <p className="text-sm text-gray-500">
-              {
-                app.domain ?
-                  <a href={`https://${app.domain}`} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700 underline">{app.domain}</a> : 'Not set'
-              }
-            </p>
-          </div>
-          <div>
-            <h3 className="font-semibold mb-2">Last Deployment</h3>
-            <p className="text-sm text-gray-500">
-              {app.last_deployment ? (
-                <RelativeTime
-                  value={app.last_deployment.deployed_at}
-                  showRelative
-                />
+        <DefinitionList
+          className="border-0 p-0"
+          items={[
+            { label: 'Repository', value: app.repo_url },
+            { label: 'Branch', value: app.branch },
+            {
+              label: 'Domain',
+              value: app.domain ? (
+                <a href={`https://${app.domain}`} target="_blank" rel="noopener noreferrer" className="underline decoration-primary-line underline-offset-2">
+                  {app.domain}
+                </a>
               ) : (
-                'Never'
-              )}
-            </p>
-          </div>
-        </div>
+                <span className="text-ink-ghost">Not set</span>
+              ),
+            },
+            {
+              label: 'Last Deployment',
+              value: app.last_deployment ? (
+                <RelativeTime value={app.last_deployment.deployed_at} showRelative />
+              ) : (
+                <span className="text-ink-ghost">Never</span>
+              ),
+            },
+          ]}
+        />
       }
     />
-  )
-
+  );
 }

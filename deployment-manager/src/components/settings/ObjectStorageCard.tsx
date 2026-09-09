@@ -7,7 +7,7 @@ import fetcher from '~/utils/fetcher';
 import Button from '~/components/general/Button';
 import Input from '~/components/general/Input';
 import { showToast } from '~/components/general/Toaster';
-import SettingsInstructionsToggleable from '~/components/general/SettingsInstructionsToggleable';
+import Disclosure from '~/components/general/Disclosure';
 
 interface ObjectStorageCardProps {
   app: App;
@@ -101,7 +101,7 @@ export default function ObjectStorageCard({ app }: ObjectStorageCardProps) {
             showToggle
             className="mt-4"
           />
-          <SettingsInstructionsToggleable title="Using Object Storage in Your App">
+          <Disclosure title="Using Object Storage in Your App">
             <h4 className="text-sm font-medium text-blue-800 mb-2">Using Object Storage in Your App</h4>
             <p className="text-sm text-blue-700">
               These environment variables are automatically available in your app:
@@ -128,7 +128,7 @@ export default function ObjectStorageCard({ app }: ObjectStorageCardProps) {
                 &#125;);
               </code>
             </div>
-          </SettingsInstructionsToggleable>
+          </Disclosure>
         </div>
       ) : (
         <div className="bg-gray-50 p-4 rounded-md">

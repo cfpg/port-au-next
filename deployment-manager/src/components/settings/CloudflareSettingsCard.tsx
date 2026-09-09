@@ -5,7 +5,8 @@ import useSWR from 'swr';
 import Button from '~/components/general/Button';
 import Input from '~/components/general/Input';
 import { showToast } from '~/components/general/Toaster';
-import SettingsInstructionsToggleable from '~/components/general/SettingsInstructionsToggleable';
+import Disclosure from '~/components/general/Disclosure';
+import CopyField from '~/components/general/CopyField';
 import fetcher from '~/utils/fetcher';
 
 interface CloudflareConfigStatus {
@@ -334,12 +335,6 @@ export default function CloudflareSettingsCard() {
     }
   };
 
-  const copyToken = async () => {
-    if (!tunnelToken) return;
-    await navigator.clipboard.writeText(tunnelToken);
-    showToast('Tunnel token copied', 'success');
-  };
-
   return (
     <div className="space-y-8">
       {!connected ? (
@@ -349,9 +344,8 @@ export default function CloudflareSettingsCard() {
             cloudflared on your machine manually.
           </p>
 
-          <SettingsInstructionsToggleable
+          <Disclosure
             title="How to create an API token and find your Account ID"
-            expandedMaxHeightClass="max-h-[1200px]"
           >
             <div className="space-y-4 text-sm text-blue-700">
               <div>
@@ -473,7 +467,7 @@ export default function CloudflareSettingsCard() {
                 </p>
               </div>
             </div>
-          </SettingsInstructionsToggleable>
+          </Disclosure>
 
           {config?.envFallback && (
             <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded p-3">
@@ -633,22 +627,17 @@ export default function CloudflareSettingsCard() {
           </div>
 
           {tunnelToken && (
-            <SettingsInstructionsToggleable title="Install cloudflared (manual)">
-              <p className="text-sm text-gray-700 mb-2">
+            <Disclosure title="Install cloudflared (manual)">
+              <p className="text-panel text-ink-muted mb-9">
                 Run this on your homelab machine to connect the tunnel connector:
               </p>
-              <div className="bg-gray-900 text-gray-100 p-3 rounded text-sm font-mono break-all">
-                cloudflared service install {tunnelToken}
-              </div>
-              <div className="mt-2 flex gap-2">
-                <Button variant="secondary" size="sm" onClick={copyToken}>
-                  Copy token
-                </Button>
+              <CopyField label="Install command" value={`cloudflared service install ${tunnelToken}`} />
+              <div className="mt-9 flex gap-7">
                 <Button variant="secondary" size="sm" onClick={() => setTunnelToken(null)}>
                   Hide
                 </Button>
               </div>
-            </SettingsInstructionsToggleable>
+            </Disclosure>
           )}
 
           {connected && (
@@ -783,7 +772,7 @@ export default function CloudflareSettingsCard() {
             </div>
           )}
 
-          <SettingsInstructionsToggleable title="Setup checklist">
+          <Disclosure title="Setup checklist">
             <ol className="list-decimal list-inside text-sm text-gray-700 space-y-1">
               <li>Connect API token (done)</li>
               <li>Select or create a tunnel</li>
@@ -793,7 +782,7 @@ export default function CloudflareSettingsCard() {
               <li>Assign hostnames in app settings — routes + DNS are automated</li>
               <li>Platform service routes sync from root <code>.env</code> *_HOST vars (including Umami when set)</li>
             </ol>
-          </SettingsInstructionsToggleable>
+          </Disclosure>
         </>
       )}
     </div>

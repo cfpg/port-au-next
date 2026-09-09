@@ -5,7 +5,7 @@ import useSWR from 'swr';
 
 import Button from '~/components/general/Button';
 import Input from '~/components/general/Input';
-import SettingsInstructionsToggleable from '~/components/general/SettingsInstructionsToggleable';
+import Disclosure from '~/components/general/Disclosure';
 import { showToast } from '~/components/general/Toaster';
 import { App } from '~/types';
 import fetcher from '~/utils/fetcher';
@@ -140,7 +140,7 @@ export default function ErrorTrackingCard({ app }: ErrorTrackingCardProps) {
             </div>
           ) : null}
 
-          <SettingsInstructionsToggleable title="Add error tracking to your Next.js app">
+          <Disclosure title="Add error tracking to your Next.js app">
             <p className="text-sm text-blue-700 mb-2">
               These env vars are injected on production deploy when error tracking is enabled:
             </p>
@@ -190,7 +190,7 @@ Sentry.init({
                 ? 'Use the dashboard username and password above to sign in at the dashboard URL and view this app\u2019s errors.'
                 : 'Use the platform admin login at the dashboard URL to view this app\u2019s errors.'}
             </p>
-          </SettingsInstructionsToggleable>
+          </Disclosure>
         </div>
       ) : data && !enabled && data.projectId ? (
         <div className="bg-gray-50 p-4 rounded-md">

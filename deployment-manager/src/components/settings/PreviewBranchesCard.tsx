@@ -8,7 +8,7 @@ import Button from '~/components/general/Button';
 import Input from '~/components/general/Input';
 import { showToast } from '~/components/general/Toaster';
 import { App } from '~/types';
-import SettingsInstructionsToggleable from '~/components/general/SettingsInstructionsToggleable';
+import Disclosure from '~/components/general/Disclosure';
 
 interface PreviewBranchesCardProps {
   app: App;
@@ -131,7 +131,7 @@ export default function PreviewBranchesCard({ app, initialPreviewDomain }: Previ
             </p>
           </div>
 
-          <SettingsInstructionsToggleable title="DNS & tunnel">
+          <Disclosure title="DNS & tunnel">
             <p className="text-sm text-blue-700">
               When Cloudflare is connected in Settings, saving the preview domain creates a wildcard
               tunnel route and proxied CNAME for:
@@ -144,7 +144,7 @@ export default function PreviewBranchesCard({ app, initialPreviewDomain }: Previ
             <p className="mt-2 text-sm text-blue-700">
               The domain must already exist in your Cloudflare account with active nameservers.
             </p>
-          </SettingsInstructionsToggleable>
+          </Disclosure>
         </div>
       )}
     </div>

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { signIn } from '~/lib/auth-client';
 import { useRouter } from 'next/navigation';
-import Card from '~/components/general/Card';
+import Panel from '~/components/general/Panel';
 import Input from '~/components/general/Input';
 
 export default function LoginPage() {
@@ -41,7 +41,7 @@ export default function LoginPage() {
 
   return (
     <div className="w-full max-w-md">
-      <Card
+      <Panel
         title="Sign In"
         content={
           <form onSubmit={handleSubmit} className="space-y-4">

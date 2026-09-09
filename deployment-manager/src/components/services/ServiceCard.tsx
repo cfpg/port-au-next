@@ -1,6 +1,6 @@
 import { getServiceColor, getServiceStatusTone } from '~/utils/serviceColors';
 import { Service, ServiceStatus } from '~/types';
-import Card from '~/components/general/Card';
+import Panel from '~/components/general/Panel';
 import Badge from '~/components/general/Badge';
 
 interface ServiceCardProps {
@@ -15,7 +15,7 @@ export default function ServiceCard({ name, status, service, id }: ServiceCardPr
   const shortId = id.slice(0, 8); // Show only first 8 characters of container ID
 
   return (
-    <Card
+    <Panel
       className="h-full"
       title={
         <div className="flex items-center space-x-3">

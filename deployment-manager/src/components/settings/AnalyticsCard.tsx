@@ -5,7 +5,7 @@ import useSWR from 'swr';
 
 import Button from '~/components/general/Button';
 import Input from '~/components/general/Input';
-import SettingsInstructionsToggleable from '~/components/general/SettingsInstructionsToggleable';
+import Disclosure from '~/components/general/Disclosure';
 import { showToast } from '~/components/general/Toaster';
 import { App } from '~/types';
 import fetcher from '~/utils/fetcher';
@@ -116,7 +116,7 @@ export default function AnalyticsCard({ app }: AnalyticsCardProps) {
             />
           </div>
 
-          <SettingsInstructionsToggleable title="Add tracking to your Next.js app">
+          <Disclosure title="Add tracking to your Next.js app">
             <p className="text-sm text-blue-700 mb-2">
               These env vars are injected on production deploy when analytics is enabled:
             </p>
@@ -152,9 +152,9 @@ export function UmamiAnalytics() {
             <p className="text-sm text-blue-700 mt-3">
               Cookie banners and privacy notices are your responsibility once you add tracking.
             </p>
-          </SettingsInstructionsToggleable>
+          </Disclosure>
 
-          <SettingsInstructionsToggleable title="If you use Content-Security-Policy">
+          <Disclosure title="If you use Content-Security-Policy">
             <p className="text-sm text-blue-700">
               Allow your Umami host in <code>script-src</code> and <code>connect-src</code> if
               responses include a CSP header, for example:
@@ -166,7 +166,7 @@ export function UmamiAnalytics() {
                 connect-src &apos;self&apos; https://your-analytics-host;
               </code>
             </div>
-          </SettingsInstructionsToggleable>
+          </Disclosure>
         </div>
       ) : data && !enabled && data.websiteId ? (
         <div className="bg-gray-50 p-4 rounded-md">

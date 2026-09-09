@@ -1,4 +1,4 @@
-import Card from "~/components/general/Card";
+import Panel from "~/components/general/Panel";
 import { fetchServicesHealth } from "./actions";
 import SettingsAdminUser from "~/components/settings/SettingsAdminUser";
 import CloudflareSettingsCard from "~/components/settings/CloudflareSettingsCard";
@@ -28,14 +28,14 @@ const SettingsPage = async () => {
       <h1 className="text-3xl font-bold mb-8">Settings</h1>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-        <Card
+        <Panel
           title="Account"
           content={<SettingsAdminUser email={session?.user.email || ''} />}
         />
       </div>
 
       <div className="mb-8">
-        <Card
+        <Panel
           title="Cloudflare"
           content={<CloudflareSettingsCard />}
         />

@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 
 import DeploymentLogViewerContainer from '~/components/deployments/DeploymentLogViewerContainer';
-import Card from '~/components/general/Card';
+import Panel from '~/components/general/Panel';
 import fetchLogs from '~/queries/fetchLogs';
 
 interface SingleAppDeploymentPageProps {
@@ -32,7 +32,7 @@ export default async function SingleAppDeploymentPage({ params }: SingleAppDeplo
           <h1 className="text-2xl font-bold">Deployment Logs - {appName}</h1>
         </div>
 
-        <Card
+        <Panel
           title={`Deployment #${deploymentId}`}
           content={
             <DeploymentLogViewerContainer

@@ -1,5 +1,5 @@
 import { createApp } from "~/app/(dashboard)/apps/[appName]/actions";
-import Card from '~/components/general/Card';
+import Panel from '~/components/general/Panel';
 import Input from '~/components/general/Input';
 
 export default async function AppRegistrationForm() {
@@ -16,7 +16,7 @@ export default async function AppRegistrationForm() {
   }
 
   return (
-    <Card
+    <Panel
       className="bg-white"
       title="Register New App"
       content={

@@ -1,7 +1,7 @@
 "use client";
 
 import useSWR from 'swr';
-import Card from '~/components/general/Card';
+import Panel from '~/components/general/Panel';
 import ActivePreviewBranches from '~/components/settings/ActivePreviewBranches';
 import DeploymentHistoryTable from '~/components/tables/DeploymentHistoryTable';
 import fetcher from '~/utils/fetcher';
@@ -13,18 +13,18 @@ export default function SingleAppDashboard({ appId }: { appId: number }) {
   return (
     <>
       {/* Active Preview Branches Section */}
-      <Card
+      <Panel
         className='bg-white text-black mb-8'
         title="Active Preview Branches"
-        padding="table"
+        flush
         content={app ? <ActivePreviewBranches app={app} /> : <div className="text-center py-4 text-gray-500">Loading…</div>}
       />
 
       {/* Deployment History Section */}
-      <Card
+      <Panel
         className='bg-white text-black mb-8'
         title="Deployment History"
-        padding="table"
+        flush
         content={
           <DeploymentHistoryTable deployments={deployments ?? []} />
         }

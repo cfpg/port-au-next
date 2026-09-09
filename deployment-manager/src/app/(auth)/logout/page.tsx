@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { signOut } from '~/lib/auth-client';
 import { useRouter } from 'next/navigation';
-import Card from '~/components/general/Card';
+import Panel from '~/components/general/Panel';
 
 export default function LogoutPage() {
   const router = useRouter();
@@ -19,7 +19,7 @@ export default function LogoutPage() {
 
   return (
     <div className="w-full max-w-md">
-      <Card
+      <Panel
         title="Signing Out"
         content={
           <div className="text-center py-4">
