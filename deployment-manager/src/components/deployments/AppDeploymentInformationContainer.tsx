@@ -1,5 +1,5 @@
 import Badge from "~/components/general/Badge";
-import { getServiceStatusColor } from "~/utils/serviceColors";
+import { getServiceStatusTone } from "~/utils/serviceColors";
 import { ServiceStatus, DeploymentLog, AppDeployment } from "~/types";
 import DeploymentLogEntry from "~/components/deployments/DeploymentLogEntry";
 
@@ -20,7 +20,7 @@ export function AppDeploymentInformation({ app }: { app: AppDeployment }) {
           <strong>Deployment Date:</strong> {new Date(app.deployed_at || "").toLocaleString()}
         </p>
         <p className="text-sm text-gray-600">
-          <strong>Deployment Status:</strong> <Badge color={getServiceStatusColor(app.status as ServiceStatus)} withDot>{app.status}</Badge>
+          <strong>Deployment Status:</strong> <Badge tone={getServiceStatusTone(app.status as ServiceStatus)} withDot>{app.status}</Badge>
         </p>
       </div>
     </div>

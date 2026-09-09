@@ -193,7 +193,7 @@ export default function EnvVarsSettings({ app }: EnvVarsSettingsProps) {
           ]}
           className="w-48"
         />
-        <Button type="button" color="blue" onClick={() => setImportModalOpen(true)}>
+        <Button type="button" variant="primary" onClick={() => setImportModalOpen(true)}>
           <i className="fas fa-file-import mr-2" />
           Import from .env
         </Button>
@@ -270,7 +270,7 @@ export default function EnvVarsSettings({ app }: EnvVarsSettingsProps) {
 
         <Button
           type="button"
-          color="gray"
+          variant="secondary"
           onClick={() => fetchExport(exportHost)}
           disabled={exportLoading}
         >
@@ -292,11 +292,11 @@ export default function EnvVarsSettings({ app }: EnvVarsSettingsProps) {
                 Contains plaintext secrets. Handle with care.
               </p>
               <div className="flex gap-3">
-                <Button type="button" color="gray" onClick={() => setExportVisible(false)}>
+                <Button type="button" variant="secondary" onClick={() => setExportVisible(false)}>
                   <i className="fas fa-xmark mr-2" />
                   Hide
                 </Button>
-                <Button type="button" color="blue" onClick={handleCopyExport}>
+                <Button type="button" variant="primary" onClick={handleCopyExport}>
                   <i className="fas fa-copy mr-2" />
                   Copy to clipboard
                 </Button>

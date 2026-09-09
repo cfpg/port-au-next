@@ -68,7 +68,7 @@ export default function ObjectStorageCard({ app }: ObjectStorageCardProps) {
         </div>
         {!credentials && (
           <Button
-            color="green"
+            variant="primary"
             onClick={handleEnable}
             disabled={isUpdating}
           >

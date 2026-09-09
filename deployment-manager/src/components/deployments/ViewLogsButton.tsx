@@ -16,7 +16,7 @@ export default function ViewLogsButton({ deploymentId, appName }: ViewLogsButton
 
   return (
     <div className="text-left">
-      <Button color="gray-light" size="sm" onClick={() => setIsModalOpen(true)}>
+      <Button variant="secondary" size="sm" onClick={() => setIsModalOpen(true)}>
         <i className="fas fa-eye mr-2"></i>
         View Logs
       </Button>

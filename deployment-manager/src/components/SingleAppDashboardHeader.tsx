@@ -3,8 +3,8 @@
 import { ServiceStatus } from "~/types";
 import Card from "./general/Card";
 import Badge from "./general/Badge";
-import { getServiceStatusColor } from "~/utils/serviceColors";
-import DateTimeText from "~/components/general/DateTimeText";
+import { getServiceStatusTone } from "~/utils/serviceColors";
+import RelativeTime from "~/components/general/RelativeTime";
 import AppDeployButton from "./buttons/AppDeployButton";
 import AppDeleteButton from "./buttons/AppDeleteButton";
 import useSWR from "swr";
@@ -25,7 +25,7 @@ export default function SingleAppDashboardHeader({ appId }: { appId: number }) {
           <h3 className="text-2xl font-bold">{app.name}</h3>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-4">
-              <Badge color={getServiceStatusColor(app.status as ServiceStatus)} withDot>
+              <Badge tone={getServiceStatusTone(app.status as ServiceStatus)} withDot>
                 {app.status}
               </Badge>
               <AppDeployButton app={app} showDropdown={true} />
@@ -57,7 +57,7 @@ export default function SingleAppDashboardHeader({ appId }: { appId: number }) {
             <h3 className="font-semibold mb-2">Last Deployment</h3>
             <p className="text-sm text-gray-500">
               {app.last_deployment ? (
-                <DateTimeText
+                <RelativeTime
                   value={app.last_deployment.deployed_at}
                   showRelative
                 />

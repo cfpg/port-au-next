@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { formatDateTimeStable } from '~/lib/formatDateTime';
 import getRelativeTime from '~/utils/getRelativeTime';
 
-interface DateTimeTextProps {
+interface RelativeTimeProps {
   value: string;
   showRelative?: boolean;
   className?: string;
@@ -16,12 +16,12 @@ interface DateTimeTextProps {
  * Absolute time is formatted identically on server and client.
  * Relative suffix is client-only (uses Date.now()) to avoid hydration mismatch.
  */
-export default function DateTimeText({
+export default function RelativeTime({
   value,
   showRelative = false,
-  className,
-  relativeClassName = 'text-gray-400',
-}: DateTimeTextProps) {
+  className = 'font-mono text-meta text-ink-muted',
+  relativeClassName = 'text-ink-ghost',
+}: RelativeTimeProps) {
   const absolute = formatDateTimeStable(value);
   const [relative, setRelative] = useState('');
 
@@ -39,7 +39,7 @@ export default function DateTimeText({
     <span className={className}>
       {absolute}
       {showRelative && relative ? (
-        <span className={relativeClassName}> ({relative})</span>
+        <span className={relativeClassName}> · {relative}</span>
       ) : null}
     </span>
   );

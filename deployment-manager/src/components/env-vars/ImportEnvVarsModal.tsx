@@ -157,10 +157,10 @@ export default function ImportEnvVarsModal({
             </div>
           )}
           <div className="flex justify-end gap-3">
-            <Button type="button" color="gray" onClick={handleClose}>
+            <Button type="button" variant="secondary" onClick={handleClose}>
               Cancel
             </Button>
-            <Button type="button" color="blue" onClick={handleContinue}>
+            <Button type="button" variant="primary" onClick={handleContinue}>
               Continue
             </Button>
           </div>
@@ -218,16 +218,16 @@ export default function ImportEnvVarsModal({
           </div>
 
           <div className="flex justify-between gap-3">
-            <Button type="button" color="gray" onClick={() => setStep('paste')} disabled={isSaving}>
+            <Button type="button" variant="secondary" onClick={() => setStep('paste')} disabled={isSaving}>
               Back
             </Button>
             <div className="flex gap-3">
-              <Button type="button" color="gray" onClick={handleClose} disabled={isSaving}>
+              <Button type="button" variant="secondary" onClick={handleClose} disabled={isSaving}>
                 Cancel
               </Button>
               <Button
                 type="button"
-                color="green"
+                variant="primary"
                 onClick={handleSave}
                 disabled={isSaving || toImport.length === 0}
               >

@@ -6,10 +6,10 @@ import Table, {
   TableHeader,
   TableRow,
 } from '~/components/general/Table';
-import DateTimeText from '~/components/general/DateTimeText';
+import RelativeTime from '~/components/general/RelativeTime';
 import getGithubRepoPath from '~/utils/getGithubRepoPath';
 import Badge from '~/components/general/Badge';
-import { getServiceStatusColor } from '~/utils/serviceColors';
+import { getServiceStatusTone } from '~/utils/serviceColors';
 import ViewLogsButton from '~/components/deployments/ViewLogsButton';
 import Link from '~/components/general/Link';
 import AppDeployButton from '~/components/buttons/AppDeployButton';
@@ -49,11 +49,11 @@ export default function DeploymentHistoryTable({
                 {deployment.commit_id ? <a href={`https://github.com/${getGithubRepoPath(deployment.app_repository)}/commit/${deployment.commit_id}`} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700 underline">{deployment.commit_id.substring(0, 7)}</a> : 'N/A'}
               </TableCell>
               <TableCell>
-                <Badge color={getServiceStatusColor(deployment.status as ServiceStatus)} withDot>{deployment.status}</Badge>
+                <Badge tone={getServiceStatusTone(deployment.status as ServiceStatus)} withDot>{deployment.status}</Badge>
               </TableCell>
               <TableCell>
                 {deployment.deployed_at ? (
-                  <DateTimeText value={deployment.deployed_at} showRelative />
+                  <RelativeTime value={deployment.deployed_at} showRelative />
                 ) : (
                   '—'
                 )}

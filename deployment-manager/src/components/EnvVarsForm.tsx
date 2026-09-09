@@ -55,7 +55,7 @@ export function EnvVarsForm({
           </div>
           <Button
             type="button"
-            color="red"
+            variant="danger"
             onClick={() => onRemove(index)}
             className="mb-2"
           >
@@ -66,11 +66,11 @@ export function EnvVarsForm({
       ))}
 
       <div className="flex items-center gap-4">
-        <Button type="button" color="blue" onClick={onAdd}>
+        <Button type="button" variant="primary" onClick={onAdd}>
           <i className="fas fa-plus mr-2"></i>
           Add Variable
         </Button>
-        <Button type="submit" color="green" disabled={!unsavedChanges}>
+        <Button type="submit" variant="primary" disabled={!unsavedChanges}>
           <i className="fas fa-save mr-2"></i>
           Save Changes
         </Button>

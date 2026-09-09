@@ -97,11 +97,11 @@ export default function ErrorTrackingCard({ app }: ErrorTrackingCardProps) {
           </p>
         </div>
         {!enabled ? (
-          <Button color="green" onClick={handleEnable} disabled={isUpdating}>
+          <Button variant="primary" onClick={handleEnable} disabled={isUpdating}>
             Enable
           </Button>
         ) : (
-          <Button color="red" onClick={handleDisable} disabled={isUpdating}>
+          <Button variant="danger" onClick={handleDisable} disabled={isUpdating}>
             Disable
           </Button>
         )}

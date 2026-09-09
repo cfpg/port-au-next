@@ -1,57 +1,66 @@
 import { tv } from 'tailwind-variants';
+import { AlertTriangleIcon } from './icons';
 
 const badge = tv({
-  base: 'inline-flex items-center rounded-full text-sm font-medium px-2 py-1',
+  base: 'inline-flex items-center gap-6 font-mono text-mini rounded-badge px-8 py-3 border',
   variants: {
-    color: {
-      gray: 'bg-gray-100 text-gray-800',
-      red: 'bg-red-100 text-red-800',
-      yellow: 'bg-yellow-100 text-yellow-800',
-      green: 'bg-green-100 text-green-800',
-      blue: 'bg-blue-100 text-blue-800',
-      indigo: 'bg-indigo-100 text-indigo-800',
-      purple: 'bg-purple-100 text-purple-800',
-      pink: 'bg-pink-100 text-pink-800'
+    tone: {
+      success: 'bg-success-tint text-success-ink border-success-line',
+      warning: 'bg-warning-tint text-warning-ink border-warning-line',
+      danger: 'bg-danger-tint text-danger-ink border-danger-line',
+      idle: 'bg-idle-tint text-idle-ink border-idle-line',
     },
-    withDot: {
-      true: 'space-x-1.5'
-    }
   },
   defaultVariants: {
-    color: 'gray'
-  }
+    tone: 'idle',
+  },
 });
 
 const dot = tv({
-  base: 'h-1.5 w-1.5 rounded-full',
+  base: 'w-6 h-6 rounded-full shrink-0',
   variants: {
-    color: {
-      gray: 'bg-gray-800',
-      red: 'bg-red-800',
-      yellow: 'bg-yellow-800',
-      green: 'bg-green-800',
-      blue: 'bg-blue-800',
-      indigo: 'bg-indigo-800',
-      purple: 'bg-purple-800',
-      pink: 'bg-pink-800'
-    }
+    tone: {
+      success: 'bg-success',
+      warning: 'bg-warning',
+      danger: 'bg-danger',
+      idle: 'bg-idle-dot',
+    },
+    pulse: {
+      true: 'animate-dot',
+    },
   },
   defaultVariants: {
-    color: 'gray'
-  }
+    tone: 'idle',
+  },
 });
+
+export type BadgeTone = 'success' | 'warning' | 'danger' | 'idle';
 
 interface BadgeProps {
   children: React.ReactNode;
-  color?: 'gray' | 'red' | 'yellow' | 'green' | 'blue' | 'indigo' | 'purple' | 'pink';
+  tone?: BadgeTone;
+  /** Shows the tone dot. Off by default for dense, dot-free rows. */
   withDot?: boolean;
+  /** Swaps the dot for a warning triangle — for a state that needs attention rather than one in progress. */
+  needsAttention?: boolean;
+  className?: string;
 }
 
-export default function Badge({ children, color = 'gray', withDot = false }: BadgeProps) {
+/**
+ * The single status-reporting component for the app: four tones only,
+ * everything else in the product maps onto success/warning/danger/idle.
+ * `warning` pulses automatically (build/pending) unless `needsAttention`
+ * swaps the dot for a triangle (e.g. "missing route").
+ */
+export default function Badge({ children, tone = 'idle', withDot = true, needsAttention = false, className }: BadgeProps) {
   return (
-    <span className={badge({ color, withDot })}>
-      {withDot && <span className={dot({ color })} />}
+    <span className={badge({ tone, className })}>
+      {needsAttention ? (
+        <AlertTriangleIcon size={11} className={tone === 'warning' ? 'text-warning-deep' : undefined} />
+      ) : withDot ? (
+        <span className={dot({ tone, pulse: tone === 'warning' })} />
+      ) : null}
       <span>{children}</span>
     </span>
   );
-} 
+}

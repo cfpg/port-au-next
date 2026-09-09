@@ -21,7 +21,7 @@ import {
   normalizeDeploymentLogMetadata,
 } from '~/lib/deploymentLogDisplay';
 import { isDeploymentInFlight } from '~/lib/deploymentLogStatus';
-import { getServiceStatusColor } from '~/utils/serviceColors';
+import { getServiceStatusTone } from '~/utils/serviceColors';
 import { fileLogFetcher } from '~/utils/fileLogFetcher';
 import { AppDeployment, DeploymentLog, ServiceStatus } from '~/types';
 
@@ -276,7 +276,7 @@ export default function DeploymentLogViewer({
           </p>
           <p className="text-sm text-gray-600">
             <strong>Status:</strong>{' '}
-            <Badge color={getServiceStatusColor(app.status as ServiceStatus)} withDot>
+            <Badge tone={getServiceStatusTone(app.status as ServiceStatus)} withDot>
               {app.status}
             </Badge>
           </p>
@@ -316,7 +316,7 @@ export default function DeploymentLogViewer({
             />
             <span className="tabular-nums">{autoRefreshLabel}</span>
           </label>
-          <Button color="gray-light" size="sm" onClick={() => void refreshActive()}>
+          <Button variant="secondary" size="sm" onClick={() => void refreshActive()}>
             <i className="fas fa-sync-alt mr-2"></i>
             Refresh
           </Button>

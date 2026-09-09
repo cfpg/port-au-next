@@ -117,7 +117,7 @@ export default function PrismaCard({ app }: PrismaCardProps) {
           </p>
         </div>
         <Button
-          color={isEnabled ? 'green' : 'gray'}
+          variant={isEnabled ? 'primary' : 'secondary'}
           onClick={handleTogglePrisma}
           disabled={isUpdatingPrisma}
         >
@@ -137,7 +137,7 @@ export default function PrismaCard({ app }: PrismaCardProps) {
             </p>
           </div>
           <Button
-            color={autoMigrate ? 'green' : 'gray'}
+            variant={autoMigrate ? 'primary' : 'secondary'}
             onClick={handleToggleAutoMigrate}
             disabled={isUpdatingMigrate}
           >

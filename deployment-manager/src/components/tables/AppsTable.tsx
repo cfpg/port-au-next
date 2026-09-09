@@ -1,6 +1,6 @@
 "use client";
 
-import { getServiceStatusColor } from '~/utils/serviceColors';
+import { getServiceStatusTone } from '~/utils/serviceColors';
 import Link from '~/components/general/Link';
 import getSingleAppPath from '~/utils/getSingleAppPath';
 import { App, ServiceStatus } from '~/types';
@@ -46,7 +46,7 @@ export default function AppsTable({
           {apps.map((app) => (
             <tr key={app.id}>
               <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                <Link href={getSingleAppPath(app.name)} variant="nav" className='underline text-blue-500 hover:text-blue-700'>{app.name}</Link>
+                <Link href={getSingleAppPath(app.name)} variant="default">{app.name}</Link>
               </td>
               <td className="px-6 py-4 text-sm text-gray-500 break-words whitespace-pre-wrap">
                 {app.repo_url}
@@ -58,7 +58,7 @@ export default function AppsTable({
                 <a href={`https://${app.domain}`} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700 underline">{app.domain}</a>
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
-                <Badge color={getServiceStatusColor(app.status as ServiceStatus)} withDot>{app.status}</Badge>
+                <Badge tone={getServiceStatusTone(app.status as ServiceStatus)} withDot>{app.status}</Badge>
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                 {app.last_deployment ? new Date(app.last_deployment.deployed_at).toLocaleString() : 'Never'}
@@ -67,7 +67,7 @@ export default function AppsTable({
                 <AppDeployButton app={app} showDropdown={true} />
                 <Link
                   href={getSingleAppPath(app.name)}
-                  color="yellow"
+                  tone="secondary"
                   size="sm"
                   variant="button"
                 >

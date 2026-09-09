@@ -85,7 +85,7 @@ export default function PreviewBranchDeleteButton({ appId, branch, onDeleted }: 
           {error && <p className="text-red-500 text-sm break-words whitespace-pre-wrap bg-red-100 p-2 rounded-md border-red-200 border">{error}</p>}
           <div className="flex justify-end gap-2">
             <Button
-              color='red'
+              variant='danger'
               disabled={branchToConfirm !== branch || isLoading}
               onClick={handleDelete}
             >
@@ -95,7 +95,7 @@ export default function PreviewBranchDeleteButton({ appId, branch, onDeleted }: 
             <Button
               disabled={isLoading}
               onClick={handleClose}
-              color='gray'
+              variant='secondary'
             >
               <i className="fas fa-times mr-2"></i>
               Cancel
@@ -104,7 +104,7 @@ export default function PreviewBranchDeleteButton({ appId, branch, onDeleted }: 
         </div>
       </Modal>
 
-      <Button color='red' size="sm" onClick={() => setIsModalOpen(true)}>
+      <Button variant='danger' size="sm" onClick={() => setIsModalOpen(true)}>
         <i className="fas fa-trash mr-2"></i>
         Delete
       </Button>

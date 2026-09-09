@@ -89,11 +89,11 @@ export default function AnalyticsCard({ app }: AnalyticsCardProps) {
           </p>
         </div>
         {!enabled ? (
-          <Button color="green" onClick={handleEnable} disabled={isUpdating}>
+          <Button variant="primary" onClick={handleEnable} disabled={isUpdating}>
             Enable
           </Button>
         ) : (
-          <Button color="red" onClick={handleDisable} disabled={isUpdating}>
+          <Button variant="danger" onClick={handleDisable} disabled={isUpdating}>
             Disable
           </Button>
         )}

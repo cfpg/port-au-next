@@ -12,23 +12,23 @@ export function getServiceColor(serviceName: Service): string {
   return serviceColors[serviceName];
 } 
 
-export const getServiceStatusColor = (status: ServiceStatus) => {
+export const getServiceStatusTone = (status: ServiceStatus) => {
   switch (status.toLowerCase()) {
     case 'running':
     case 'success':
     case 'active':
-      return 'green';
+      return 'success';
     case 'stopped':
-      return 'gray';
+      return 'idle';
     case 'error':
     case 'failed':
-      return 'red';
+      return 'danger';
     case 'pending':
     case 'building':
     case 'preflight':
     case 'migrating':
-      return 'yellow';
+      return 'warning';
     default:
-      return 'gray';
+      return 'idle';
   }
 }

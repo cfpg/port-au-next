@@ -1,4 +1,4 @@
-import { getServiceColor, getServiceStatusColor } from '~/utils/serviceColors';
+import { getServiceColor, getServiceStatusTone } from '~/utils/serviceColors';
 import { Service, ServiceStatus } from '~/types';
 import Card from '~/components/general/Card';
 import Badge from '~/components/general/Badge';
@@ -35,8 +35,8 @@ export default function ServiceCard({ name, status, service, id }: ServiceCardPr
           </div>
           <div className="flex items-center justify-between">
             <span className="text-xs text-gray-500" title={id}>ID: {shortId}</span>
-            <Badge 
-              color={getServiceStatusColor(status as ServiceStatus)}
+            <Badge
+              tone={getServiceStatusTone(status as ServiceStatus)}
               withDot
             >
               {status}

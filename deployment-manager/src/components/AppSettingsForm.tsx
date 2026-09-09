@@ -98,7 +98,7 @@ export function AppSettingsForm({ appId, initialSettings }: AppSettingsFormProps
         </p>
       )}
 
-      <Button type="submit" color='green'>
+      <Button type="submit" variant='primary'>
         <i className="fas fa-save mr-2"></i>
         Save Changes
       </Button>

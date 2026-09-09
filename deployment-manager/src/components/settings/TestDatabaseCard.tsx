@@ -69,7 +69,7 @@ export default function TestDatabaseCard({ app }: { app: App }) {
           )}
         </div>
         <Button
-          color={enabled ? 'green' : 'gray'}
+          variant={enabled ? 'primary' : 'secondary'}
           onClick={handleToggle}
           disabled={isUpdating || data === undefined}
         >

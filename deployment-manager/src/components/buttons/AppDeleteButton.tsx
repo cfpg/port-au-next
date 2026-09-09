@@ -54,7 +54,7 @@ export default function AppDeleteButton({ appName }: { appName: string }) {
           />
           <div className="flex justify-end gap-2">
             <Button 
-              color='red' 
+              variant='danger' 
               disabled={appNameToConfirm !== appName || isLoading} 
               onClick={handleDelete}
             >
@@ -64,7 +64,7 @@ export default function AppDeleteButton({ appName }: { appName: string }) {
             <Button 
               disabled={isLoading} 
               onClick={handleClose} 
-              color='gray'
+              variant='secondary'
             >
               <i className="fas fa-times mr-2"></i>
               Cancel
@@ -73,7 +73,7 @@ export default function AppDeleteButton({ appName }: { appName: string }) {
         </div>
       </Modal>
 
-      <Button color='red' size="sm" onClick={() => setIsModalOpen(true)}>
+      <Button variant='danger' size="sm" onClick={() => setIsModalOpen(true)}>
         <i className="fas fa-trash mr-2"></i>
         Delete
       </Button>

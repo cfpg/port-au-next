@@ -1,106 +1,92 @@
 import { ComponentProps } from 'react';
 import { default as NextLink } from 'next/link';
 import { tv, type VariantProps } from 'tailwind-variants';
+import { buttonStyles } from './Button';
+import { ExternalLinkIcon } from './icons';
 
 const linkStyles = tv({
-  base: 'transition-colors duration-200 cursor-pointer',
+  base: 'transition-colors duration-150',
   variants: {
     variant: {
-      default: 'text-gray-700',
-      nav: 'flex items-center p-2 text-gray-700 rounded hover:bg-gray-100',
-      subNav: 'block p-2 text-gray-700 rounded hover:bg-gray-100',
-      button: 'inline-flex items-center justify-center rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2',
-    },
-    color: {
-      primary: 'text-blue-600 hover:text-blue-900',
-      blue: 'text-blue-600 hover:text-blue-900',
-      green: 'text-green-600 hover:text-green-900',
-      yellow: 'text-yellow-600 hover:text-yellow-900',
-      red: 'text-red-600 hover:text-red-900',
-      gray: 'text-gray-700 hover:text-gray-900',
-    },
-    size: {
-      sm: 'text-sm px-2 py-1',
-      md: 'text-sm px-3 py-2',
-      lg: 'text-base px-4 py-2',
+      /** In-app navigation to a resource — mono, no underline. */
+      default: 'font-mono text-field',
+      /** Leaves the app / points at a hostname the user owns — underlined. */
+      hostname: 'font-mono text-field underline decoration-primary-line underline-offset-2',
+      /** Quiet, for footers and secondary chrome. */
+      quiet: 'text-ink-faint hover:text-ink-muted',
+      /** Sidebar section item. */
+      nav: 'flex items-center gap-9 rounded-control px-9 py-7 text-panel font-medium text-ink-muted hover:bg-hover',
+      /** Sidebar app entry — a hostname, so mono. */
+      subNav: 'block rounded-control px-8 py-5 font-mono text-meta text-ink-muted truncate hover:bg-hover',
     },
     isActive: {
-      true: 'bg-gray-100',
+      true: '',
     },
-    underline: {
-      true: 'underline',
-      false: 'no-underline',
-    }
   },
   compoundVariants: [
-    {
-      variant: "nav",
-      class: 'no-underline',
-    },
-    {
-      variant: "subNav",
-      class: 'no-underline',
-    },
-    {
-      variant: 'button',
-      color: 'primary',
-      class: 'bg-indigo-600 text-white hover:bg-indigo-900 hover:text-white focus:ring-indigo-500 no-underline'
-    },
-    {
-      variant: 'button',
-      color: 'blue',
-      class: 'bg-blue-600 text-white hover:bg-blue-900 hover:text-white focus:ring-blue-500 no-underline'
-    },
-    {
-      variant: 'button',
-      color: 'green',
-      class: 'bg-green-600 text-white hover:bg-green-900 hover:text-white focus:ring-green-500 no-underline'
-    },
-    {
-      variant: 'button',
-      color: 'yellow',
-      class: 'bg-yellow-600 text-white hover:bg-yellow-900 hover:text-white focus:ring-yellow-500 no-underline'
-    },
-    {
-      variant: 'button',
-      color: 'red',
-      class: 'bg-red-600 text-white hover:bg-red-900 hover:text-white focus:ring-red-500 no-underline'
-    },
-    {
-      variant: 'button',
-      color: 'gray',
-      class: 'bg-gray-100 text-gray-900 hover:bg-gray-300 hover:text-gray-900 focus:ring-gray-500 no-underline'
-    }
+    { variant: 'nav', isActive: true, class: 'bg-primary-tint text-ink' },
+    { variant: 'subNav', isActive: true, class: 'bg-primary-tint text-primary-active' },
   ],
   defaultVariants: {
     variant: 'default',
     isActive: false,
-    size: 'md',
-    color: 'primary',
-    underline: true,
-  }
+  },
 });
 
-type LinkProps = ComponentProps<typeof NextLink> &
-  VariantProps<typeof linkStyles> & {
-    className?: string;
-  };
+type LinkVariant = NonNullable<VariantProps<typeof linkStyles>['variant']>;
+type ButtonTone = NonNullable<VariantProps<typeof buttonStyles>['variant']>;
+type ButtonSize = NonNullable<VariantProps<typeof buttonStyles>['size']>;
+
+type LinkProps = Omit<ComponentProps<typeof NextLink>, 'className'> & {
+  variant?: LinkVariant | 'button';
+  isActive?: boolean;
+  className?: string;
+  /** Only applies when variant="button" — matches Button's variant prop. */
+  tone?: ButtonTone;
+  /** Only applies when variant="button". */
+  size?: ButtonSize;
+  /** Appends the "leaves the app" arrow and opens in a new tab. */
+  external?: boolean;
+};
 
 export default function Link({
-  variant,
-  color,
-  size,
+  variant = 'default',
   isActive,
+  tone,
+  size,
+  external,
   className,
   children,
   ...props
 }: LinkProps) {
+  if (variant === 'button') {
+    return (
+      <NextLink
+        {...props}
+        target={external ? '_blank' : props.target}
+        rel={external ? 'noopener noreferrer' : props.rel}
+        className={buttonStyles({ variant: tone, size }).base({ className })}
+      >
+        {children}
+      </NextLink>
+    );
+  }
+
   return (
     <NextLink
       {...props}
-      className={linkStyles({ variant, color, size, isActive, className })}
+      target={external ? '_blank' : props.target}
+      rel={external ? 'noopener noreferrer' : props.rel}
+      className={linkStyles({ variant, isActive, className })}
     >
-      {children}
+      {external ? (
+        <span className="inline-flex items-center gap-5">
+          {children}
+          <ExternalLinkIcon />
+        </span>
+      ) : (
+        children
+      )}
     </NextLink>
   );
-} 
+}

@@ -152,7 +152,7 @@ function HostnameStatusBlock({
       </dl>
 
       {canSync && onSync && (
-        <Button color="blue" size="sm" onClick={onSync} disabled={isSyncing}>
+        <Button variant="primary" size="sm" onClick={onSync} disabled={isSyncing}>
           {isSyncing ? 'Syncing…' : syncLabel}
         </Button>
       )}
@@ -276,7 +276,7 @@ export default function CloudflareAppCard({ app }: CloudflareAppCardProps) {
       )}
 
       {app.domain && data.preview && data.readiness === 'ready' && (
-        <Button color="gray-light" size="sm" onClick={() => handleSync('all')} disabled={isSyncing}>
+        <Button variant="secondary" size="sm" onClick={() => handleSync('all')} disabled={isSyncing}>
           Sync domain + preview
         </Button>
       )}

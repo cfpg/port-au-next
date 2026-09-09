@@ -506,7 +506,7 @@ export default function CloudflareSettingsCard() {
             />
           </div>
           <div className="flex gap-2">
-            <Button color="green" onClick={handleConnect} disabled={isBusy}>
+            <Button variant="primary" onClick={handleConnect} disabled={isBusy}>
               Connect Cloudflare
             </Button>
           </div>
@@ -528,10 +528,10 @@ export default function CloudflareSettingsCard() {
               )}
             </div>
             <div className="flex gap-2">
-              <Button color="gray" onClick={handleTestConnection} disabled={isBusy}>
+              <Button variant="secondary" onClick={handleTestConnection} disabled={isBusy}>
                 Test connection
               </Button>
-              <Button color="red" onClick={handleDisconnect} disabled={isBusy}>
+              <Button variant="danger" onClick={handleDisconnect} disabled={isBusy}>
                 Disconnect
               </Button>
             </div>
@@ -545,7 +545,7 @@ export default function CloudflareSettingsCard() {
               onChange={(e) => setTunnelOriginUrl(e.target.value)}
               placeholder={config.tunnelOriginUrl || 'http://localhost'}
             />
-            <Button color="blue" onClick={handleSaveOriginUrl} disabled={isBusy}>
+            <Button variant="primary" onClick={handleSaveOriginUrl} disabled={isBusy}>
               Save
             </Button>
           </div>
@@ -565,7 +565,7 @@ export default function CloudflareSettingsCard() {
                   placeholder="my-homelab-tunnel"
                   className="w-48"
                 />
-                <Button color="blue" onClick={handleCreateTunnel} disabled={isBusy}>
+                <Button variant="primary" onClick={handleCreateTunnel} disabled={isBusy}>
                   Create tunnel
                 </Button>
               </div>
@@ -607,7 +607,7 @@ export default function CloudflareSettingsCard() {
                         <td className="px-4 py-2">
                           <div className="flex gap-2">
                             <Button
-                              color={tunnel.selected ? 'green' : 'gray-light'}
+                              variant={tunnel.selected ? 'primary' : 'secondary'}
                               size="sm"
                               onClick={() => handleSelectTunnel(tunnel)}
                               disabled={isBusy || tunnel.selected}
@@ -615,7 +615,7 @@ export default function CloudflareSettingsCard() {
                               {tunnel.selected ? 'Selected' : 'Select'}
                             </Button>
                             <Button
-                              color="gray-light"
+                              variant="secondary"
                               size="sm"
                               onClick={() => handleShowToken(tunnel.id)}
                               disabled={isBusy}
@@ -641,10 +641,10 @@ export default function CloudflareSettingsCard() {
                 cloudflared service install {tunnelToken}
               </div>
               <div className="mt-2 flex gap-2">
-                <Button color="gray-light" size="sm" onClick={copyToken}>
+                <Button variant="secondary" size="sm" onClick={copyToken}>
                   Copy token
                 </Button>
-                <Button color="gray-light" size="sm" onClick={() => setTunnelToken(null)}>
+                <Button variant="secondary" size="sm" onClick={() => setTunnelToken(null)}>
                   Hide
                 </Button>
               </div>
@@ -665,7 +665,7 @@ export default function CloudflareSettingsCard() {
                   </p>
                 </div>
                 <Button
-                  color="blue"
+                  variant="primary"
                   onClick={handleSyncAllPlatformServices}
                   disabled={isBusy || platformServicesData?.readiness !== 'ready'}
                 >
@@ -713,7 +713,7 @@ export default function CloudflareSettingsCard() {
                           <td className="px-4 py-2">{dnsStatusLabel(service.hostname.dnsStatus)}</td>
                           <td className="px-4 py-2">
                             <Button
-                              color="blue"
+                              variant="primary"
                               size="sm"
                               onClick={() => handleSyncPlatformService(service.id)}
                               disabled={
@@ -765,7 +765,7 @@ export default function CloudflareSettingsCard() {
                           <td className="px-4 py-2">
                             {route.managedBy === 'port-au-next' && (
                               <Button
-                                color="red"
+                                variant="danger"
                                 size="sm"
                                 onClick={() => handleRemoveRoute(route.hostname)}
                                 disabled={isBusy}

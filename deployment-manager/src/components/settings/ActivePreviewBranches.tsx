@@ -3,11 +3,11 @@
 import useSWR from 'swr';
 import { App, ServiceStatus } from '~/types';
 import fetcher from '~/utils/fetcher';
-import { getServiceStatusColor } from '~/utils/serviceColors';
+import { getServiceStatusTone } from '~/utils/serviceColors';
 import Badge from '~/components/general/Badge';
 import AppDeployButton from '~/components/buttons/AppDeployButton';
 import getGithubRepoPath from '~/utils/getGithubRepoPath';
-import DateTimeText from '~/components/general/DateTimeText';
+import RelativeTime from '~/components/general/RelativeTime';
 import Table, {
   TableBody,
   TableCell,
@@ -107,13 +107,13 @@ export default function ActivePreviewBranches({ app }: ActivePreviewBranchesProp
                 )}
               </TableCell>
               <TableCell>
-                <Badge color={getServiceStatusColor(previewBranch.status as ServiceStatus)} withDot>
+                <Badge tone={getServiceStatusTone(previewBranch.status as ServiceStatus)} withDot>
                   {previewBranch.status}
                 </Badge>
               </TableCell>
               <TableCell>
                 {previewBranch.last_deployment_at ? (
-                  <DateTimeText
+                  <RelativeTime
                     value={previewBranch.last_deployment_at}
                     showRelative
                   />

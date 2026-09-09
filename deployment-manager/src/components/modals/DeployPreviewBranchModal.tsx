@@ -124,12 +124,12 @@ export default function DeployPreviewBranchModal({
         )}
 
         <div className="flex justify-end space-x-3">
-          <Button color="gray" onClick={handleClose}>
+          <Button variant="secondary" onClick={handleClose}>
             Cancel
           </Button>
           <Button
             type="submit"
-            color="primary"
+            variant="primary"
             disabled={!branch || isLoading}
           >
             {isLoading ? (

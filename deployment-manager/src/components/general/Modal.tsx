@@ -58,7 +58,7 @@ export default function Modal({ isOpen, onClose, title, children, size, classNam
           <Button
             onClick={onClose}
             className={closeButton()}
-            color="transparent"
+            variant="ghost"
             size="sm"
           >
             &times;

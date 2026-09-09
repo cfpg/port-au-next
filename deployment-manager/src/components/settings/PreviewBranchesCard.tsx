@@ -93,7 +93,7 @@ export default function PreviewBranchesCard({ app, initialPreviewDomain }: Previ
           </p>
         </div>
         <Button
-          color={isEnabled ? 'green' : 'gray'}
+          variant={isEnabled ? 'primary' : 'secondary'}
           onClick={handleToggle}
           disabled={isUpdating}
         >
@@ -116,7 +116,7 @@ export default function PreviewBranchesCard({ app, initialPreviewDomain }: Previ
               />
               <div className="flex items-end">
                 <Button
-                  color="blue"
+                  variant="primary"
                   onClick={handleUpdatePreviewDomain}
                   disabled={isUpdating}
                 >

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import UserAvatar from '~/components/general/UserAvatar';
+import Avatar from '~/components/general/Avatar';
 import ChangePasswordModal from '~/components/modals/ChangePasswordModal';
 
 interface SettingsAdminUserProps {
@@ -14,7 +14,7 @@ export default function SettingsAdminUser({ email }: SettingsAdminUserProps) {
   return (
     <>
       <div className="flex items-center space-x-4">
-        <UserAvatar name="Admin User" className="w-12 h-12" />
+        <Avatar name="Admin User" size="lg" className="w-48 h-48" />
         <div>
           <div className="text-lg font-medium">Admin User</div>
           <div className="text-sm text-gray-500">{email}</div>
