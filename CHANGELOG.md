@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Changed
+
+### Fixed
+
+## [0.7.0] - 2026-09-09
+
+### Added
+
 - **Deployment-manager design system:** New UI Kit foundation (color, spacing, typography, radius, shadow, and motion tokens) and a full set of primitive and composite components (buttons, inputs, selects, switches, badges, tables, panels, modals, menus, callouts, and more) used throughout the dashboard.
 - **Applications table search, filtering, sorting, and pagination:** The Applications list now supports filtering by name/domain/repo, filtering by status, sorting by name, and pagination, replacing the previous unfiltered static list.
 - **Shared `Popover` primitive:** Dropdown menus, split-button menus, and tooltips now share one positioning primitive that portals its content to escape clipping ancestors (e.g. a scrollable table) and computes placement from the trigger's actual position, instead of each reimplementing its own open/close and positioning logic.
