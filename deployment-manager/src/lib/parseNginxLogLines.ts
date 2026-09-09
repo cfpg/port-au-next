@@ -35,7 +35,7 @@ const NGINX_ERROR =
 function parseRequestLine(request: string): { method: string; path: string } {
   const match = request.match(/^(\S+)\s+(\S+)\s+\S+$/);
   if (!match) {
-    return { method: '—', path: request || '—' };
+    return { method: '-', path: request || '-' };
   }
   return { method: match[1], path: match[2] };
 }
@@ -106,20 +106,20 @@ export function parseLogLines(
 }
 
 export function getHttpStatusClass(status: number): string {
-  if (status >= 500) return 'text-red-700 font-semibold';
-  if (status >= 400) return 'text-amber-700 font-semibold';
-  if (status >= 300) return 'text-blue-700';
-  if (status >= 200) return 'text-green-700';
-  return 'text-gray-700';
+  if (status >= 500) return 'text-danger-ink font-semibold';
+  if (status >= 400) return 'text-warning-ink font-semibold';
+  if (status >= 300) return 'text-primary';
+  if (status >= 200) return 'text-success-ink';
+  return 'text-ink-muted';
 }
 
 export function getErrorLevelClass(level: string): string {
   const normalized = level.toLowerCase();
   if (normalized === 'error' || normalized === 'crit' || normalized === 'alert' || normalized === 'emerg') {
-    return 'text-red-700 font-semibold uppercase';
+    return 'text-danger-ink font-semibold uppercase';
   }
   if (normalized === 'warn' || normalized === 'warning') {
-    return 'text-amber-700 font-semibold uppercase';
+    return 'text-warning-ink font-semibold uppercase';
   }
-  return 'text-gray-600 uppercase';
+  return 'text-ink-muted uppercase';
 }

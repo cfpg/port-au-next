@@ -1,14 +1,15 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import useSWR from 'swr';
 import { AppFeature } from '~/types/appFeatures';
 import fetcher from '~/utils/fetcher';
+import Switch from '~/components/general/Switch';
 import Button from '~/components/general/Button';
 import Input from '~/components/general/Input';
 import { showToast } from '~/components/general/Toaster';
 import { App } from '~/types';
-import SettingsInstructionsToggleable from '~/components/general/SettingsInstructionsToggleable';
+import Disclosure from '~/components/general/Disclosure';
 
 interface PreviewBranchesCardProps {
   app: App;
@@ -26,7 +27,7 @@ export default function PreviewBranchesCard({ app, initialPreviewDomain }: Previ
 
   const isEnabled = features?.[AppFeature.PREVIEW_BRANCHES]?.enabled || false;
 
-  const handleToggle = async () => {
+  const handleToggle = async (next: boolean) => {
     setIsUpdating(true);
     try {
       const response = await fetch(`/api/apps/${app.id}/features`, {
@@ -36,7 +37,7 @@ export default function PreviewBranchesCard({ app, initialPreviewDomain }: Previ
         },
         body: JSON.stringify({
           feature: AppFeature.PREVIEW_BRANCHES,
-          enabled: !isEnabled,
+          enabled: next,
         }),
       });
 
@@ -45,8 +46,8 @@ export default function PreviewBranchesCard({ app, initialPreviewDomain }: Previ
       }
 
       await mutateFeatures();
-      showToast(`Preview Branches ${!isEnabled ? 'enabled' : 'disabled'} successfully`, 'success');
-    } catch (error) {
+      showToast(`Preview Branches ${next ? 'enabled' : 'disabled'} successfully`, 'success');
+    } catch {
       showToast('Failed to update Preview Branches feature', 'error');
     } finally {
       setIsUpdating(false);
@@ -76,7 +77,7 @@ export default function PreviewBranchesCard({ app, initialPreviewDomain }: Previ
       }
 
       showToast('Preview domain updated successfully', 'success');
-    } catch (error) {
+    } catch {
       showToast('Failed to update preview domain', 'error');
     } finally {
       setIsUpdating(false);
@@ -84,27 +85,23 @@ export default function PreviewBranchesCard({ app, initialPreviewDomain }: Previ
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-medium">Preview Branches</h3>
-          <p className="text-sm text-gray-500">
-            Enable preview deployments for feature branches with separate databases and subdomains
-          </p>
+    <div className="flex flex-col gap-16">
+      <div className="border border-line rounded-menu overflow-hidden">
+        <div className="flex items-start justify-between gap-16 px-14 py-12 bg-surface">
+          <Switch
+            checked={isEnabled}
+            onChange={handleToggle}
+            disabled={isUpdating}
+            label="Preview Branches"
+            hint="Enable preview deployments for feature branches with separate databases and subdomains."
+          />
         </div>
-        <Button
-          color={isEnabled ? 'green' : 'gray'}
-          onClick={handleToggle}
-          disabled={isUpdating}
-        >
-          {isEnabled ? 'Enabled' : 'Disabled'}
-        </Button>
       </div>
 
       {isEnabled && (
-        <div className="space-y-6">
+        <div className="flex flex-col gap-16">
           <div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="flex items-end gap-10">
               <Input
                 type="text"
                 label="Preview Domain"
@@ -114,39 +111,31 @@ export default function PreviewBranchesCard({ app, initialPreviewDomain }: Previ
                 placeholder={`preview.${app.domain}`}
                 className="flex-1"
               />
-              <div className="flex items-end">
-                <Button
-                  color="blue"
-                  onClick={handleUpdatePreviewDomain}
-                  disabled={isUpdating}
-                >
-                  Update
-                </Button>
-              </div>
+              <Button variant="primary" onClick={handleUpdatePreviewDomain} loading={isUpdating}>
+                Update
+              </Button>
             </div>
-            <p className="mt-1 text-sm text-gray-500">
+            <p className="text-mini text-ink-faint mt-9 leading-[1.6]">
               We will use subdomains from your domain to access preview branches.<br />
-              For example, <i>{previewDomain ? `dev.${previewDomain}` : `dev.preview.${app.domain}`}</i> will be used to access <i>dev</i> branch.<br />
-              And <i>{previewDomain ? `pr-123.${previewDomain}` : `pr-123.preview.${app.domain}`}</i> will be used to access <i>pr-123</i> branch.
+              For example, <span className="font-mono text-meta">{previewDomain ? `dev.${previewDomain}` : `dev.preview.${app.domain}`}</span> will be used to access <span className="font-mono text-meta">dev</span> branch.<br />
+              And <span className="font-mono text-meta">{previewDomain ? `pr-123.${previewDomain}` : `pr-123.preview.${app.domain}`}</span> will be used to access <span className="font-mono text-meta">pr-123</span> branch.
             </p>
           </div>
 
-          <SettingsInstructionsToggleable title="DNS & tunnel">
-            <p className="text-sm text-blue-700">
+          <Disclosure title="DNS & tunnel">
+            <p className="text-panel text-ink-muted">
               When Cloudflare is connected in Settings, saving the preview domain creates a wildcard
               tunnel route and proxied CNAME for:
             </p>
-            <div className="mt-2 bg-white p-3 rounded border border-blue-200">
-              <code className="text-sm">
-                *.{previewDomain.replace(/^\*\./g, '') || `preview.${app.domain}`}
-              </code>
+            <div className="mt-9 bg-hover border border-line-token rounded-control p-11 font-mono text-meta text-ink">
+              *.{previewDomain.replace(/^\*\./g, '') || `preview.${app.domain}`}
             </div>
-            <p className="mt-2 text-sm text-blue-700">
+            <p className="mt-9 text-panel text-ink-muted">
               The domain must already exist in your Cloudflare account with active nameservers.
             </p>
-          </SettingsInstructionsToggleable>
+          </Disclosure>
         </div>
       )}
     </div>
   );
-} 
+}

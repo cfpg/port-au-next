@@ -1,40 +1,36 @@
 'use client';
 
-import { tv, VariantProps } from 'tailwind-variants';
-import Button from './Button';
+import { useEffect } from 'react';
+import { tv } from '~/lib/tv';
+import { VariantProps } from 'tailwind-variants';
 
 const modal = tv({
   slots: {
-    backdrop: "fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4",
-    container: "bg-white rounded-lg shadow-xl w-full flex flex-col",
-    header: "flex justify-between items-center px-6 py-4 rounded-t-lg border-b border-gray-200 bg-gray-100",
-    title: "text-xl font-bold text-black",
-    closeButton: "text-gray-500 hover:text-gray-700 text-2xl",
-    content: "p-6 overflow-y-auto flex-1"
+    backdrop: 'fixed inset-0 bg-ink/35 backdrop-blur-[1.5px] flex items-center justify-center p-24 z-100 animate-overlay-in',
+    container: 'w-full bg-surface border border-line rounded-panel shadow-modal overflow-hidden animate-modal-in flex flex-col',
+    header: 'flex items-center justify-between gap-10 px-14 py-11 border-b border-line',
+    title: 'font-display font-semibold text-body',
+    closeButton: 'inline-flex items-center justify-center size-24 bg-transparent border-0 rounded-control text-ink-faint cursor-pointer transition-colors duration-150 hover:bg-hover hover:text-ink focus-ring',
+    content: 'p-14 overflow-y-auto flex-1',
   },
   variants: {
     size: {
-      sm: { container: "max-w-sm max-h-[90vh]" },
-      md: { container: "max-w-md max-h-[90vh]" },
-      lg: { container: "max-w-lg max-h-[90vh]" },
-      xl: { container: "max-w-xl max-h-[90vh]" },
-      "2xl": { container: "max-w-2xl max-h-[90vh]" },
-      "3xl": { container: "max-w-3xl max-h-[90vh]" },
-      "4xl": { container: "max-w-4xl max-h-[90vh]" },
-      "5xl": { container: "max-w-5xl max-h-[90vh]" },
-      "6xl": { container: "max-w-6xl max-h-[90vh]" },
-      "7xl": { container: "max-w-7xl max-h-[90vh]" },
+      sm: { container: 'max-w-380 max-h-[90vh]' },
+      md: { container: 'max-w-450 max-h-[90vh]' },
+      lg: { container: 'max-w-600 max-h-[90vh]' },
+      xl: { container: 'max-w-720 max-h-[90vh]' },
+      '2xl': { container: 'max-w-840 max-h-[90vh]' },
+      '3xl': { container: 'max-w-960 max-h-[90vh]' },
       logs: {
-        backdrop: "fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-3 sm:p-4",
-        container:
-          "max-w-[1600px] w-full h-[calc(100dvh-1.5rem)] max-h-[calc(100dvh-1.5rem)] min-h-0",
-        content: "p-4 overflow-hidden flex-1 min-h-0 flex flex-col",
+        backdrop: 'p-12',
+        container: 'max-w-[1600px] h-[calc(100dvh-24px)] max-h-[calc(100dvh-24px)] min-h-0',
+        content: 'p-14 overflow-hidden flex-1 min-h-0 flex flex-col',
       },
-    }
+    },
   },
   defaultVariants: {
-    size: "2xl"
-  }
+    size: '2xl',
+  },
 });
 
 interface ModalProps extends VariantProps<typeof modal> {
@@ -43,26 +39,38 @@ interface ModalProps extends VariantProps<typeof modal> {
   title: string;
   children: React.ReactNode;
   className?: string;
-};
+}
 
+/**
+ * For a decision or a short form - never for content you'd want to keep
+ * open while working. Escape and backdrop-click close it (destructive
+ * confirmations should use ConfirmDialog instead, which disables both).
+ */
 export default function Modal({ isOpen, onClose, title, children, size, className }: ModalProps) {
+  useEffect(() => {
+    if (!isOpen) return;
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') onClose();
+    }
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const { backdrop, container, header, title: titleStyles, closeButton, content } = modal({ size, className });
 
   return (
-    <div className={backdrop()}>
-      <div className={container()}>
+    <div className={backdrop()} onClick={onClose}>
+      <div className={container()} onClick={(e) => e.stopPropagation()}>
         <div className={header()}>
-          <h2 className={titleStyles()}>{title}</h2>
-          <Button
-            onClick={onClose}
-            className={closeButton()}
-            color="transparent"
-            size="sm"
-          >
-            &times;
-          </Button>
+          <span className={titleStyles()}>{title}</span>
+          <button type="button" onClick={onClose} className={closeButton()} aria-label="Close">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+              <line x1="6" y1="6" x2="18" y2="18" />
+              <line x1="18" y1="6" x2="6" y2="18" />
+            </svg>
+          </button>
         </div>
         <div className={content()}>
           {children}
@@ -70,4 +78,4 @@ export default function Modal({ isOpen, onClose, title, children, size, classNam
       </div>
     </div>
   );
-} 
+}

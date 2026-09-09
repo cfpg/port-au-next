@@ -1,6 +1,7 @@
 import { createApp } from "~/app/(dashboard)/apps/[appName]/actions";
-import Card from '~/components/general/Card';
+import FormSection from '~/components/general/FormSection';
 import Input from '~/components/general/Input';
+import Button from '~/components/general/Button';
 
 export default async function AppRegistrationForm() {
   async function handleSubmit(formData: FormData) {
@@ -16,65 +17,24 @@ export default async function AppRegistrationForm() {
   }
 
   return (
-    <Card
-      className="bg-white"
+    <FormSection
       title="Register New App"
-      content={
-        <form action={handleSubmit} className="space-y-4">
-          <Input
-            type="text"
-            id="name"
-            name="name"
-            label="App Name"
-            required
-          />
-
-          <Input
-            type="text"
-            id="repository"
-            name="repository"
-            label="Repository URL"
-            required
-          />
-
-          <Input
-            type="text"
-            id="branch"
-            name="branch"
-            label="Branch"
-            defaultValue="main"
-            required
-          />
-
-          <Input
-            type="text"
-            id="domain"
-            name="domain"
-            label="Domain"
-            required
-          />
-
-          <div>
-            <Input
-              type="text"
-              id="root_path"
-              name="root_path"
-              label="Project path (optional)"
-              placeholder="marketing-site"
-            />
-            <p className="mt-1 text-sm text-gray-500">
-              For monorepos, set the subdirectory containing your Next.js app (must include
-              package.json and next.config.ts). Leave empty to use the repository root.
-            </p>
-          </div>
-
-          <button
-            type="submit"
-            className="w-full px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors"
-          >
-            Register App
-          </button>
-        </form>}
-    />
+      action={handleSubmit}
+      footer={<Button type="submit" variant="primary">Register app</Button>}
+    >
+      <Input type="text" id="name" name="name" label="App Name" required />
+      <Input type="text" id="repository" name="repository" label="Repository URL" required />
+      <Input type="text" id="branch" name="branch" label="Branch" defaultValue="main" required />
+      <Input type="text" id="domain" name="domain" label="Domain" required />
+      <Input
+        type="text"
+        id="root_path"
+        name="root_path"
+        label="Project path"
+        placeholder="marketing-site"
+        className="col-span-full"
+        hint="For monorepos, the subdirectory containing your Next.js app (must include package.json and next.config.ts). Leave empty to use the repository root."
+      />
+    </FormSection>
   );
 }

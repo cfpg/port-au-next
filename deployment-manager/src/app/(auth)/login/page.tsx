@@ -3,8 +3,11 @@
 import { useState } from 'react';
 import { signIn } from '~/lib/auth-client';
 import { useRouter } from 'next/navigation';
-import Card from '~/components/general/Card';
+import Panel from '~/components/general/Panel';
 import Input from '~/components/general/Input';
+import Button from '~/components/general/Button';
+import Callout from '~/components/general/Callout';
+import packageJson from '../../../../package.json';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -40,11 +43,16 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="w-full max-w-md">
-      <Card
-        title="Sign In"
+    <div className="w-full max-w-380">
+      <div className="text-center mb-24">
+        <h1 className="font-display font-bold text-page tracking-title m-0">Sign in</h1>
+        <p className="text-field text-ink-muted mt-4">Administrator access to the deployment dashboard.</p>
+      </div>
+
+      <Panel
         content={
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="flex flex-col gap-14">
+            {error ? <Callout tone="danger">{error}</Callout> : null}
             <Input
               type="email"
               id="email"
@@ -54,30 +62,23 @@ export default function LoginPage() {
               required
             />
             <Input
-              type="password"
               id="password"
               label="Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              showToggle
               required
             />
-            {error && (
-              <div className="text-red-500 text-sm bg-red-50 p-2 rounded-md">
-                {error}
-              </div>
-            )}
-            <div className="flex items-center justify-between">
-              <button
-                className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline disabled:opacity-50"
-                type="submit"
-                disabled={isLoading}
-              >
-                {isLoading ? 'Signing in...' : 'Sign In'}
-              </button>
-            </div>
+            <Button type="submit" variant="primary" loading={isLoading} className="w-full justify-center">
+              Sign in
+            </Button>
           </form>
         }
       />
+
+      <p className="text-center font-mono text-mini text-ink-faint mt-16">
+        port-au-next v{packageJson.version} &middot; self-hosted
+      </p>
     </div>
   );
 }

@@ -3,7 +3,7 @@
 import useSWR from 'swr';
 import AppsTable from '~/components/tables/AppsTable';
 import DeploymentHistoryTable from '~/components/tables/DeploymentHistoryTable';
-import Card from '~/components/general/Card';
+import Panel from '~/components/general/Panel';
 import fetcher from '~/utils/fetcher';
 
 export default function AppsSection() {
@@ -12,9 +12,9 @@ export default function AppsSection() {
 
   return (
     <>
-      <Card
-        className="bg-white mb-8"
-        padding="table"
+      <Panel
+        className="mb-24"
+        flush
         title="Applications"
         content={
           <AppsTable
@@ -23,9 +23,8 @@ export default function AppsSection() {
         }
       />
 
-      <Card
-        className="bg-white"
-        padding="table"
+      <Panel
+        flush
         title="Deployment History"
         content={
           <DeploymentHistoryTable

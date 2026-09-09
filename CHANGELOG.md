@@ -12,6 +12,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.7.0] - 2026-09-09
+
+### Added
+
+- **Deployment-manager design system:** New UI Kit foundation (color, spacing, typography, radius, shadow, and motion tokens) and a full set of primitive and composite components (buttons, inputs, selects, switches, badges, tables, panels, modals, menus, callouts, and more) used throughout the dashboard.
+- **Applications table search, filtering, sorting, and pagination:** The Applications list now supports filtering by name/domain/repo, filtering by status, sorting by name, and pagination, replacing the previous unfiltered static list.
+- **Shared `Popover` primitive:** Dropdown menus, split-button menus, and tooltips now share one positioning primitive that portals its content to escape clipping ancestors (e.g. a scrollable table) and computes placement from the trigger's actual position, instead of each reimplementing its own open/close and positioning logic.
+
+### Changed
+
+- **Deployment-manager dashboard redesign:** Every dashboard page (Dashboard, Applications, App detail, App settings, Environment variables, Deployment logs, Settings) and the login/logout pages now use the new design system in place of the previous ad hoc styling.
+- Settings toggles (Uses Prisma, Test Database, Analytics, Error Tracking, Preview Branches) now use a single switch control instead of separate "Enabled"/"Disabled" buttons.
+- Deployment history row actions are now a single overflow menu (view logs, redeploy, copy commit SHA) instead of multiple buttons per row.
+- Services Health now appears before Cloudflare on the Settings page.
+
+### Fixed
+
+- **Split-button dropdown overflow:** The Deploy button's dropdown in the Applications table no longer overflows the table and forces a horizontal scrollbar; it now opens toward whichever side has room.
+- **Button/icon-button height mismatch:** Buttons and their adjacent icon-only controls (e.g. the row overflow menu) now render at consistent heights.
+- **Class-merging conflicts:** Custom typography, radius, shadow, and motion utility classes no longer collide with unrelated Tailwind utility classes when combined on the same element, which could previously cause one of them to be silently dropped (e.g. button text losing its color).
+- Switch controls in settings rows now align to the right edge of their row instead of sitting flush against the label text.
+- The "View Logs" action in the deployment history table no longer wraps onto two lines.
+
 ## [0.6.1] - 2026-09-08
 
 ### Added

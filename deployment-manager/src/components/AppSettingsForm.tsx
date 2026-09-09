@@ -3,11 +3,13 @@
 import { useState } from 'react';
 import Button from '~/components/general/Button';
 import Input from '~/components/general/Input';
+import FormSection from '~/components/general/FormSection';
 import { updateAppSettings } from '~/app/(dashboard)/apps/[appName]/actions';
 import { showToast } from '~/components/general/Toaster';
 
 interface AppSettingsFormProps {
   appId: number;
+  className?: string;
   initialSettings: {
     name?: string;
     domain?: string;
@@ -18,8 +20,12 @@ interface AppSettingsFormProps {
   };
 }
 
-export function AppSettingsForm({ appId, initialSettings }: AppSettingsFormProps) {
+export function AppSettingsForm({ appId, className, initialSettings }: AppSettingsFormProps) {
   const [settings, setSettings] = useState(initialSettings);
+  const [isSaving, setIsSaving] = useState(false);
+  const isDirty = Object.keys(initialSettings).some(
+    (key) => settings[key as keyof typeof settings] !== initialSettings[key as keyof typeof initialSettings]
+  );
 
   const handleChange = (field: keyof typeof settings, value: string) => {
     setSettings((prev) => ({ ...prev, [field]: value }));
@@ -27,81 +33,82 @@ export function AppSettingsForm({ appId, initialSettings }: AppSettingsFormProps
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    const result = await updateAppSettings(appId, settings);
-
-    if (result?.success) {
-      showToast("App settings updated successfully.", "success");
-    } else {
-      showToast(result?.error || 'Failed to update app settings', "error");
+    setIsSaving(true);
+    try {
+      const result = await updateAppSettings(appId, settings);
+      if (result?.success) {
+        showToast('App settings updated successfully.', 'success');
+      } else {
+        showToast(result?.error || 'Failed to update app settings', 'error');
+      }
+    } finally {
+      setIsSaving(false);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Input
-          id="name"
-          label="App Name"
-          value={settings.name || ''}
-          onChange={(e) => handleChange('name', e.target.value)}
-          placeholder="myapp"
-        />
+    <FormSection
+      title="App Settings"
+      className={className}
+      onSubmit={handleSubmit}
+      footer={
+        <Button type="submit" variant="primary" loading={isSaving} disabled={!isDirty || isSaving}>
+          Save changes
+        </Button>
+      }
+    >
+      <Input
+        id="name"
+        label="App Name"
+        value={settings.name || ''}
+        onChange={(e) => handleChange('name', e.target.value)}
+        placeholder="myapp"
+      />
 
-        <Input
-          id="domain"
-          label="Domain"
-          value={settings.domain || ''}
-          onChange={(e) => handleChange('domain', e.target.value)}
-          placeholder="srv1.example.com"
-        />
-        <p className="md:col-span-2 -mt-2 text-sm text-gray-500">
-          Saving a domain creates a Cloudflare tunnel published application and proxied CNAME when
-          Cloudflare is connected in Settings.
-        </p>
+      <Input
+        id="domain"
+        label="Domain"
+        value={settings.domain || ''}
+        onChange={(e) => handleChange('domain', e.target.value)}
+        placeholder="srv1.example.com"
+        hint="Saving a domain creates a Cloudflare tunnel route and proxied CNAME when Cloudflare is connected in Settings."
+      />
 
-        <Input
-          id="repository"
-          label="Repository"
-          value={settings.repo_url || ''}
-          onChange={(e) => handleChange('repo_url', e.target.value)}
-          placeholder="https://github.com/myapp/myapp"
-        />
+      <Input
+        id="repository"
+        label="Repository"
+        value={settings.repo_url || ''}
+        onChange={(e) => handleChange('repo_url', e.target.value)}
+        placeholder="https://github.com/myapp/myapp"
+      />
 
-        <Input
-          id="branch"
-          label="Branch"
-          value={settings.branch || ''}
-          onChange={(e) => handleChange('branch', e.target.value)}
-          placeholder="main"
-        />
+      <Input
+        id="branch"
+        label="Branch"
+        value={settings.branch || ''}
+        onChange={(e) => handleChange('branch', e.target.value)}
+        placeholder="main"
+      />
 
-        <div className="md:col-span-2">
-          <Input
-            id="root_path"
-            label="Project path"
-            value={settings.root_path || ''}
-            onChange={(e) => handleChange('root_path', e.target.value)}
-            placeholder="marketing-site"
-          />
-          <p className="mt-1 text-sm text-gray-500">
-            For monorepos, set the subdirectory containing your Next.js app (must include
-            package.json and next.config.ts). Leave empty to use the repository root.
-          </p>
-        </div>
-      </div>
+      <Input
+        id="root_path"
+        label="Project path"
+        className="col-span-full"
+        value={settings.root_path || ''}
+        onChange={(e) => handleChange('root_path', e.target.value)}
+        placeholder="marketing-site"
+        hint="For monorepos, the subdirectory containing your Next.js app (must include package.json and next.config.ts). Leave empty to use the repository root."
+      />
 
       {settings.cloudflare_zone_id && (
-        <p className="text-sm text-gray-500">
-          Cloudflare zone ID: <span className="font-mono">{settings.cloudflare_zone_id}</span>
-          {' '}(set automatically when the tunnel route is created)
-        </p>
+        <Input
+          label="Cloudflare zone ID"
+          className="col-span-full"
+          value={settings.cloudflare_zone_id}
+          disabled
+          hint="Set automatically when the tunnel route is created."
+        />
       )}
-
-      <Button type="submit" color='green'>
-        <i className="fas fa-save mr-2"></i>
-        Save Changes
-      </Button>
-    </form>
+    </FormSection>
   );
-} 
+}

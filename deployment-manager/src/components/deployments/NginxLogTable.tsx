@@ -10,8 +10,8 @@ import {
 } from '~/lib/parseNginxLogLines';
 
 const thClass =
-  'px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide border-b border-gray-200 bg-gray-50';
-const tdClass = 'px-3 py-2 text-xs text-gray-800 align-top break-words border-b border-gray-100';
+  'px-9 py-7 text-left font-mono text-nano font-semibold text-ink-faint uppercase tracking-caps border-b border-line bg-paper';
+const tdClass = 'px-9 py-7 font-mono text-mini text-ink align-top break-words border-b border-line-soft';
 
 interface NginxLogTableProps {
   content: string;
@@ -23,7 +23,7 @@ export default function NginxLogTable({ content, variant }: NginxLogTableProps) 
 
   if (rows.length === 0) {
     return (
-      <p className="text-gray-500 text-center py-8 text-sm">(empty log file)</p>
+      <p className="text-ink-faint text-center py-24 text-field">(empty log file)</p>
     );
   }
 
@@ -36,7 +36,7 @@ export default function NginxLogTable({ content, variant }: NginxLogTableProps) 
 
 function AccessLogTable({ rows }: { rows: ParsedLogRow[] }) {
   return (
-    <table className="w-full text-xs table-auto border-collapse">
+    <table className="w-full text-mini table-auto border-collapse">
       <thead className="sticky top-0 z-10">
         <tr>
           <th className={thClass}>Time</th>
@@ -49,7 +49,7 @@ function AccessLogTable({ rows }: { rows: ParsedLogRow[] }) {
           <th className={thClass}>User agent</th>
         </tr>
       </thead>
-      <tbody className="bg-white">
+      <tbody className="bg-surface">
         {rows.map((row, index) =>
           row.kind === 'access' ? (
             <AccessRow key={`${row.time}-${index}`} row={row} />
@@ -64,24 +64,24 @@ function AccessLogTable({ rows }: { rows: ParsedLogRow[] }) {
 
 function AccessRow({ row }: { row: ParsedAccessLogRow }) {
   return (
-    <tr className="hover:bg-gray-50/80">
-      <td className={`${tdClass} font-mono whitespace-nowrap`}>{row.time}</td>
-      <td className={`${tdClass} font-mono`}>{row.ip}</td>
-      <td className={tdClass}>{row.method}</td>
-      <td className={`${tdClass} font-mono`}>{row.path}</td>
-      <td className={tdClass}>
+    <tr className="transition-colors duration-100 hover:bg-paper">
+      <td className={`${tdClass} whitespace-nowrap`}>{row.time}</td>
+      <td className={tdClass}>{row.ip}</td>
+      <td className={`${tdClass} font-sans`}>{row.method}</td>
+      <td className={tdClass}>{row.path}</td>
+      <td className={`${tdClass} font-sans`}>
         <span className={getHttpStatusClass(row.status)}>{row.status}</span>
       </td>
-      <td className={`${tdClass} font-mono tabular-nums`}>{row.size}</td>
-      <td className={tdClass}>{row.referrer || '—'}</td>
-      <td className={tdClass}>{row.userAgent || '—'}</td>
+      <td className={`${tdClass} tabular-nums`}>{row.size}</td>
+      <td className={`${tdClass} font-sans`}>{row.referrer || '-'}</td>
+      <td className={`${tdClass} font-sans`}>{row.userAgent || '-'}</td>
     </tr>
   );
 }
 
 function ErrorLogTable({ rows }: { rows: ParsedLogRow[] }) {
   return (
-    <table className="w-full text-xs table-auto border-collapse">
+    <table className="w-full text-mini table-auto border-collapse">
       <thead className="sticky top-0 z-10">
         <tr>
           <th className={thClass}>Time</th>
@@ -89,7 +89,7 @@ function ErrorLogTable({ rows }: { rows: ParsedLogRow[] }) {
           <th className={thClass}>Message</th>
         </tr>
       </thead>
-      <tbody className="bg-white">
+      <tbody className="bg-surface">
         {rows.map((row, index) =>
           row.kind === 'error' ? (
             <ErrorRow key={`${row.time}-${index}`} row={row} />
@@ -104,20 +104,20 @@ function ErrorLogTable({ rows }: { rows: ParsedLogRow[] }) {
 
 function ErrorRow({ row }: { row: ParsedErrorLogRow }) {
   return (
-    <tr className="hover:bg-gray-50/80">
-      <td className={`${tdClass} font-mono whitespace-nowrap`}>{row.time}</td>
-      <td className={tdClass}>
+    <tr className="transition-colors duration-100 hover:bg-paper">
+      <td className={`${tdClass} whitespace-nowrap`}>{row.time}</td>
+      <td className={`${tdClass} font-sans`}>
         <span className={getErrorLevelClass(row.level)}>{row.level}</span>
       </td>
-      <td className={`${tdClass} font-mono`}>{row.message}</td>
+      <td className={tdClass}>{row.message}</td>
     </tr>
   );
 }
 
 function RawRow({ raw, colSpan }: { raw: string; colSpan: number }) {
   return (
-    <tr className="bg-gray-50">
-      <td colSpan={colSpan} className={`${tdClass} font-mono text-gray-600`}>
+    <tr className="bg-paper">
+      <td colSpan={colSpan} className={`${tdClass} text-ink-faint`}>
         {raw}
       </td>
     </tr>

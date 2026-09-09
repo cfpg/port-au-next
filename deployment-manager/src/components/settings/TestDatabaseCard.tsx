@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import useSWR from 'swr';
 
-import Button from '~/components/general/Button';
+import Switch from '~/components/general/Switch';
+import Callout from '~/components/general/Callout';
 import { showToast } from '~/components/general/Toaster';
 import { App } from '~/types';
 import fetcher from '~/utils/fetcher';
@@ -29,13 +30,13 @@ export default function TestDatabaseCard({ app }: { app: App }) {
   );
   const enabled = data?.enabled === true;
 
-  const handleToggle = async () => {
+  const handleToggle = async (next: boolean) => {
     setIsUpdating(true);
     try {
       const response = await fetch(`/api/apps/${app.id}/test-database`, {
-        method: enabled ? 'PATCH' : 'POST',
+        method: next ? 'POST' : 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: enabled ? JSON.stringify({ enabled: false }) : undefined,
+        body: next ? undefined : JSON.stringify({ enabled: false }),
       });
       const payload = await response.json();
       if (!response.ok) {
@@ -43,7 +44,7 @@ export default function TestDatabaseCard({ app }: { app: App }) {
       }
       await mutate();
       showToast(
-        `Test database ${enabled ? 'disabled' : 'enabled'}. Redeploy for env changes to take effect.`,
+        `Test database ${next ? 'enabled' : 'disabled'}. Redeploy for env changes to take effect.`,
         'success'
       );
     } catch (error) {
@@ -54,37 +55,37 @@ export default function TestDatabaseCard({ app }: { app: App }) {
   };
 
   return (
-    <div className="border-t border-gray-100 pt-6">
-      <div className="flex items-start justify-between gap-6">
-        <div>
-          <h3 className="text-lg font-medium">Test Database</h3>
-          <p className="text-sm text-gray-500">
-            Provision a persistent, empty PostgreSQL database with separate credentials. It is
-            available to production builds and containers after the next deploy.
-          </p>
-          {data?.database && (
-            <p className="mt-2 text-sm text-gray-500">
-              Database: <code className="text-xs">{data.database}</code>
-            </p>
-          )}
+    <div className="flex flex-col gap-16 pt-16 border-t border-line-soft">
+      <div className="border border-line rounded-menu overflow-hidden">
+        <div className="flex items-start justify-between gap-16 px-14 py-12 bg-surface">
+          <Switch
+            checked={enabled}
+            onChange={handleToggle}
+            disabled={isUpdating || data === undefined}
+            label="Test Database"
+            hint={
+              <>
+                Provision a persistent, empty PostgreSQL database with separate credentials. It is
+                available to production builds and containers after the next deploy.
+                {data?.database ? (
+                  <>
+                    {' '}Database: <span className="font-mono text-meta">{data.database}</span>
+                  </>
+                ) : null}
+              </>
+            }
+          />
         </div>
-        <Button
-          color={enabled ? 'green' : 'gray'}
-          onClick={handleToggle}
-          disabled={isUpdating || data === undefined}
-        >
-          {enabled ? 'Enabled' : 'Disabled'}
-        </Button>
       </div>
 
       {enabled && (
-        <div className="mt-4 rounded-md bg-blue-50 p-4 text-sm text-blue-800">
-          <p>These reserved variables will be injected on the next production deploy:</p>
-          <code className="mt-2 block text-xs leading-5">{ENV_KEYS.join('\n')}</code>
-          <p className="mt-2">
-            Disabling stops injection but retains the database and its data for re-enabling.
-          </p>
-        </div>
+        <Callout tone="info">
+          These reserved variables will be injected on the next production deploy:
+          <br />
+          <span className="font-mono text-meta">{ENV_KEYS.join('  ')}</span>
+          <br />
+          Disabling stops injection but retains the database and its data for re-enabling.
+        </Callout>
       )}
     </div>
   );

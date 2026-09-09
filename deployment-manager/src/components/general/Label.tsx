@@ -1,7 +1,7 @@
-import { tv } from 'tailwind-variants';
+import { tv } from '~/lib/tv';
 
 const label = tv({
-  base: 'text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70',
+  base: 'font-display font-semibold text-label text-ink block peer-disabled:cursor-not-allowed peer-disabled:opacity-70',
   variants: {},
   defaultVariants: {},
 });
@@ -12,4 +12,4 @@ interface LabelProps extends React.LabelHTMLAttributes<HTMLLabelElement> {
 
 export default function Label({ className, ...props }: LabelProps) {
   return <label className={label({ className })} {...props} />;
-} 
+}

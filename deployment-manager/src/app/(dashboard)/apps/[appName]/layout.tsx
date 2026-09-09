@@ -18,16 +18,13 @@ export default async function SingleAppLayout({ params, children }: { params: Pr
         }
       }}
     >
-      <div className="mb-8">
+      <div className="mb-16">
         <SingleAppDashboardHeader appId={app.id} />
       </div>
 
       <AppNavigation appName={appName} />
 
-      {/* Children */}
-      <div>
-        {children}
-      </div>
+      {children}
     </SWRConfig>
   )
 }

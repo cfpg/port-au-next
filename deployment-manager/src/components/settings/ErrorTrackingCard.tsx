@@ -3,9 +3,11 @@
 import { useState } from 'react';
 import useSWR from 'swr';
 
-import Button from '~/components/general/Button';
+import Switch from '~/components/general/Switch';
 import Input from '~/components/general/Input';
-import SettingsInstructionsToggleable from '~/components/general/SettingsInstructionsToggleable';
+import FieldGroup from '~/components/general/FieldGroup';
+import Disclosure from '~/components/general/Disclosure';
+import Callout from '~/components/general/Callout';
 import { showToast } from '~/components/general/Toaster';
 import { App } from '~/types';
 import fetcher from '~/utils/fetcher';
@@ -37,129 +39,79 @@ export default function ErrorTrackingCard({ app }: ErrorTrackingCardProps) {
     fetcher
   );
 
-  const handleEnable = async () => {
-    setIsUpdating(true);
-    try {
-      const response = await fetch(`/api/apps/${app.id}/error-tracking`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      });
-
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(payload.error || 'Failed to enable error tracking');
-      }
-
-      await mutate();
-      showToast(`Error tracking enabled. ${REDEPLOY_MESSAGE}`, 'success');
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to enable error tracking';
-      showToast(message, 'error');
-    } finally {
-      setIsUpdating(false);
-    }
-  };
-
-  const handleDisable = async () => {
-    setIsUpdating(true);
-    try {
-      const response = await fetch(`/api/apps/${app.id}/error-tracking`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enabled: false }),
-      });
-
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(payload.error || 'Failed to disable error tracking');
-      }
-
-      await mutate();
-      showToast(`Error tracking disabled. ${REDEPLOY_MESSAGE}`, 'success');
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to disable error tracking';
-      showToast(message, 'error');
-    } finally {
-      setIsUpdating(false);
-    }
-  };
-
   const enabled = data?.enabled === true;
   const hasDashboardLogin = Boolean(data?.dashboardUsername && data?.dashboardPassword);
 
+  const handleToggle = async (next: boolean) => {
+    setIsUpdating(true);
+    try {
+      const response = await fetch(`/api/apps/${app.id}/error-tracking`, {
+        method: next ? 'POST' : 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: next ? undefined : JSON.stringify({ enabled: false }),
+      });
+
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload.error || `Failed to ${next ? 'enable' : 'disable'} error tracking`);
+      }
+
+      await mutate();
+      showToast(`Error tracking ${next ? 'enabled' : 'disabled'}. ${REDEPLOY_MESSAGE}`, 'success');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : `Failed to ${next ? 'enable' : 'disable'} error tracking`;
+      showToast(message, 'error');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h3 className="text-lg font-medium">Error tracking (Bugsink)</h3>
-          <p className="text-sm text-gray-500">
-            Opt-in error logging via a per-app Bugsink project and Sentry-compatible DSN
-          </p>
+    <div className="flex flex-col gap-16">
+      <div className="border border-line rounded-menu overflow-hidden">
+        <div className="flex items-start justify-between gap-16 px-14 py-12 bg-surface">
+          <Switch
+            checked={enabled}
+            onChange={handleToggle}
+            disabled={isUpdating || data === undefined}
+            label="Error tracking (Bugsink)"
+            hint="Opt-in error logging via a per-app Bugsink project and Sentry-compatible DSN."
+          />
         </div>
-        {!enabled ? (
-          <Button color="green" onClick={handleEnable} disabled={isUpdating}>
-            Enable
-          </Button>
-        ) : (
-          <Button color="red" onClick={handleDisable} disabled={isUpdating}>
-            Disable
-          </Button>
-        )}
       </div>
 
       {enabled && data ? (
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="flex flex-col gap-14">
+          <FieldGroup>
             <Input label="Project ID" value={data.projectId || ''} disabled readOnly />
             <Input label="Project slug" value={data.projectSlug || ''} disabled readOnly />
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input label="DSN" value={data.dsnMasked || ''} disabled readOnly />
-            <Input
-              label="Dashboard URL"
-              value={data.dashboardUrl || ''}
-              disabled
-              readOnly
-            />
-          </div>
-          {hasDashboardLogin ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Input
-                label="Dashboard username"
-                value={data.dashboardUsername || ''}
-                disabled
-                readOnly
-              />
-              <Input
-                label="Dashboard password"
-                value={data.dashboardPassword || ''}
-                disabled
-                readOnly
-                showToggle
-              />
-            </div>
-          ) : null}
+            <Input label="Dashboard URL" value={data.dashboardUrl || ''} disabled readOnly />
+            {hasDashboardLogin ? (
+              <>
+                <Input label="Dashboard username" value={data.dashboardUsername || ''} disabled readOnly />
+                <Input label="Dashboard password" value={data.dashboardPassword || ''} disabled readOnly showToggle />
+              </>
+            ) : null}
+          </FieldGroup>
 
-          <SettingsInstructionsToggleable title="Add error tracking to your Next.js app">
-            <p className="text-sm text-blue-700 mb-2">
+          <Disclosure title="Add error tracking to your Next.js app">
+            <p className="text-panel text-ink-muted mb-9">
               These env vars are injected on production deploy when error tracking is enabled:
             </p>
-            <div className="bg-white p-3 rounded border border-blue-200">
-              <code className="text-sm">
-                SENTRY_DSN
-                <br />
-                NEXT_PUBLIC_SENTRY_DSN
-                <br />
-                SENTRY_ENVIRONMENT
-              </code>
+            <div className="bg-hover border border-line-token rounded-control p-11 font-mono text-meta text-ink mb-9">
+              SENTRY_DSN
+              <br />
+              NEXT_PUBLIC_SENTRY_DSN
+              <br />
+              SENTRY_ENVIRONMENT
             </div>
-            <p className="text-sm text-blue-700 mt-3 mb-2">
-              Install <code>@sentry/nextjs</code> and add Sentry config files. The SDK reads{' '}
-              <code>SENTRY_DSN</code> automatically:
+            <p className="text-panel text-ink-muted mt-9 mb-9">
+              Install <span className="font-mono text-meta bg-hover border border-line-token rounded-badge px-5 py-1">@sentry/nextjs</span> and add Sentry config files. The SDK reads{' '}
+              <span className="font-mono text-meta bg-hover border border-line-token rounded-badge px-5 py-1">SENTRY_DSN</span> automatically:
             </p>
-            <div className="bg-white p-3 rounded border border-blue-200 overflow-x-auto">
-              <code className="text-sm whitespace-pre">
-                {`npm install @sentry/nextjs
+            <div className="bg-hover border border-line-token rounded-control p-11 font-mono text-meta text-ink overflow-x-auto whitespace-pre">
+              {`npm install @sentry/nextjs
 
 // instrumentation.ts
 import * as Sentry from '@sentry/nextjs';
@@ -183,29 +135,24 @@ Sentry.init({
   enabled: Boolean(process.env.NEXT_PUBLIC_SENTRY_DSN),
   tracesSampleRate: 0,
 });`}
-              </code>
             </div>
-            <p className="text-sm text-blue-700 mt-3">
+            <p className="text-panel text-ink-muted mt-9">
               {hasDashboardLogin
-                ? 'Use the dashboard username and password above to sign in at the dashboard URL and view this app\u2019s errors.'
-                : 'Use the platform admin login at the dashboard URL to view this app\u2019s errors.'}
+                ? 'Use the dashboard username and password above to sign in at the dashboard URL and view this app’s errors.'
+                : 'Use the platform admin login at the dashboard URL to view this app’s errors.'}
             </p>
-          </SettingsInstructionsToggleable>
+          </Disclosure>
         </div>
       ) : data && !enabled && data.projectId ? (
-        <div className="bg-gray-50 p-4 rounded-md">
-          <p className="text-sm text-gray-600">
-            Error tracking is disabled. Bugsink project, dashboard login, and DSN are retained.
-            Enable again to resume env injection without reprovisioning.
-          </p>
-        </div>
+        <Callout tone="info">
+          Error tracking is disabled. Bugsink project, dashboard login, and DSN are retained.
+          Enable again to resume env injection without reprovisioning.
+        </Callout>
       ) : (
-        <div className="bg-gray-50 p-4 rounded-md">
-          <p className="text-sm text-gray-600">
-            Error tracking is not enabled. Enable to provision an isolated Bugsink team, project,
-            dashboard login, and DSN for this app.
-          </p>
-        </div>
+        <Callout tone="info">
+          Error tracking is not enabled. Enable to provision an isolated Bugsink team, project,
+          dashboard login, and DSN for this app.
+        </Callout>
       )}
     </div>
   );

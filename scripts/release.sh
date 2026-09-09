@@ -201,8 +201,8 @@ if [ ! -f "$(git rev-parse --git-path MERGE_HEAD)" ]; then
 fi
 
 echo
-echo "Proposed main merge diff:"
-git --no-pager diff --cached --color=always
+echo "Proposed main merge summary:"
+git --no-pager diff --cached --stat --color=always
 
 echo
 if ! confirm "Commit this merge, tag $TAG, and atomically push main with the tag?"; then

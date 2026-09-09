@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { authClient } from '~/lib/auth-client';
 import Modal from '~/components/general/Modal';
 import Input from '~/components/general/Input';
+import Button from '~/components/general/Button';
+import Callout from '~/components/general/Callout';
 import { useRouter } from 'next/navigation';
 
 interface ChangePasswordModalProps {
@@ -56,8 +58,8 @@ export default function ChangePasswordModal({ isOpen, onClose }: ChangePasswordM
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Change Password">
-      <form onSubmit={handleSubmit} className="space-y-4">
+    <Modal isOpen={isOpen} onClose={onClose} title="Change Password" size="sm">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-14">
         <Input
           type="password"
           id="newPassword"
@@ -76,34 +78,19 @@ export default function ChangePasswordModal({ isOpen, onClose }: ChangePasswordM
           required
           minLength={8}
         />
-        {error && (
-          <div className="text-red-500 text-sm bg-red-50 p-2 rounded-md">
-            {error}
-          </div>
-        )}
-        {success && (
-          <div className="text-green-500 text-sm bg-green-50 p-2 rounded-md">
-            Password changed successfully! You will be redirected to the login page.
-          </div>
-        )}
-        <div className="flex justify-end space-x-3">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-            disabled={isLoading}
-          >
+        {error ? <Callout tone="danger">{error}</Callout> : null}
+        {success ? (
+          <Callout tone="info">Password changed successfully. You&apos;ll be redirected to the login page.</Callout>
+        ) : null}
+        <div className="flex justify-end gap-7">
+          <Button type="button" variant="secondary" onClick={onClose} disabled={isLoading}>
             Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isLoading ? 'Changing...' : 'Change Password'}
-          </button>
+          </Button>
+          <Button type="submit" variant="primary" loading={isLoading} disabled={isLoading}>
+            Change password
+          </Button>
         </div>
       </form>
     </Modal>
   );
-} 
+}
