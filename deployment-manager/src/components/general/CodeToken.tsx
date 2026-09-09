@@ -1,4 +1,4 @@
-import { tv } from 'tailwind-variants';
+import { tv } from '~/lib/tv';
 import NextLink from 'next/link';
 
 const codeToken = tv({

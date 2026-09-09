@@ -1,54 +1,15 @@
 "use client";
 
-import { tv } from 'tailwind-variants';
 import Link from '~/components/general/Link';
 import { usePathname } from 'next/navigation';
 
-const appNavigation = tv({
-  slots: {
-    base: 'mb-8',
-    list: 'flex gap-1 p-1 bg-gray-50 rounded-lg border border-gray-400 shadow-sm py-4 px-2',
-    item: 'relative',
-    link: [
-      'px-2 py-2 text-sm font-medium transition-colors rounded-md',
-      'text-gray-600 hover:text-gray-900',
-      'focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500'
-    ],
-    activeLink: [
-      'px-2 py-2 text-sm font-medium transition-colors rounded-md bg-blue-50 border border-blue-200',
-      'text-blue-600 font-semibold',
-      'focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500'
-    ]
-  },
-  variants: {
-    size: {
-      sm: {
-        link: 'text-xs px-3 py-1.5',
-        activeLink: 'text-xs px-3 py-1.5',
-      },
-      md: {
-        link: 'text-sm px-4 py-2',
-        activeLink: 'text-sm px-4 py-2',
-      },
-      lg: {
-        link: 'text-base px-5 py-2.5',
-        activeLink: 'text-base px-5 py-2.5',
-      }
-    }
-  },
-  defaultVariants: {
-    size: 'md'
-  }
-});
-
 interface AppNavigationProps {
   appName: string;
-  size?: 'sm' | 'md' | 'lg';
 }
 
-export default function AppNavigation({ appName, size }: AppNavigationProps) {
+/** Switches views of this one app — shares the kit Tabs' visual language. */
+export default function AppNavigation({ appName }: AppNavigationProps) {
   const pathname = usePathname();
-  const styles = appNavigation({ size });
 
   const isActive = (path: string) => {
     if (path === `/apps/${appName}`) {
@@ -64,23 +25,26 @@ export default function AppNavigation({ appName, size }: AppNavigationProps) {
   ];
 
   return (
-    <nav className={styles.base()}>
-      <ul className={styles.list()}>
-        {navItems.map((item) => {
-          const active = isActive(item.href);
-          return (
-            <li key={item.href} className={styles.item()}>
-              <Link
-                href={item.href}
-                className={active ? styles.activeLink() : styles.link()}
-                variant="default"
-              >
-                {item.label}
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
-    </nav>
+    <div className="flex gap-2 px-9 py-7 bg-paper border border-line rounded-panel mb-16" role="tablist">
+      {navItems.map((item) => {
+        const active = isActive(item.href);
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            variant="default"
+            aria-selected={active}
+            role="tab"
+            className={[
+              'font-display font-semibold text-field rounded-control px-13 py-7 border',
+              'transition-colors duration-100 focus-ring',
+              active ? 'bg-surface text-ink border-line shadow-panel' : 'bg-transparent border-transparent text-ink-muted hover:text-ink',
+            ].join(' ')}
+          >
+            {item.label}
+          </Link>
+        );
+      })}
+    </div>
   );
-} 
+}

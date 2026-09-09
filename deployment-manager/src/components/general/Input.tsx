@@ -1,6 +1,6 @@
 "use client";
 
-import { tv } from 'tailwind-variants';
+import { tv } from '~/lib/tv';
 import { useState } from 'react';
 import { EyeIcon, EyeOffIcon, AlertCircleIcon } from './icons';
 

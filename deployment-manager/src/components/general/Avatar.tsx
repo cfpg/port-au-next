@@ -1,4 +1,4 @@
-import { tv } from 'tailwind-variants';
+import { tv } from '~/lib/tv';
 
 const avatar = tv({
   base: 'inline-flex items-center justify-center shrink-0 rounded-control font-display font-semibold',

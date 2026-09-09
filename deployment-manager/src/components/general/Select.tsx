@@ -1,6 +1,6 @@
 "use client";
 
-import { tv } from 'tailwind-variants';
+import { tv } from '~/lib/tv';
 import { ChevronDownIcon } from './icons';
 
 const select = tv({

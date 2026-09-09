@@ -1,6 +1,7 @@
 import { ComponentProps } from 'react';
 import { default as NextLink } from 'next/link';
-import { tv, type VariantProps } from 'tailwind-variants';
+import { tv } from '~/lib/tv';
+import type { VariantProps } from 'tailwind-variants';
 import { buttonStyles } from './Button';
 import { ExternalLinkIcon } from './icons';
 

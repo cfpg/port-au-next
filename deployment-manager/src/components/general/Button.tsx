@@ -1,6 +1,7 @@
 "use client";
 
-import { tv, VariantProps } from 'tailwind-variants';
+import { tv } from '~/lib/tv';
+import { VariantProps } from 'tailwind-variants';
 import { useState, useRef, useEffect } from 'react';
 import { ChevronDownIcon, SpinnerIcon } from './icons';
 

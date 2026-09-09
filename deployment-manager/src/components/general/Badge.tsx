@@ -1,4 +1,4 @@
-import { tv } from 'tailwind-variants';
+import { tv } from '~/lib/tv';
 import { AlertTriangleIcon } from './icons';
 
 const badge = tv({

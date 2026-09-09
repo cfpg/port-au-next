@@ -1,4 +1,4 @@
-import { tv } from 'tailwind-variants';
+import { tv } from '~/lib/tv';
 import { InfoIcon, AlertTriangleIcon, AlertCircleIcon } from './icons';
 
 const callout = tv({

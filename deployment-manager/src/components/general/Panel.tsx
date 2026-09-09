@@ -1,4 +1,5 @@
-import { tv, type VariantProps } from 'tailwind-variants';
+import { tv } from '~/lib/tv';
+import type { VariantProps } from 'tailwind-variants';
 
 const panel = tv({
   slots: {

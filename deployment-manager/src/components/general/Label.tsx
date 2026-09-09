@@ -1,4 +1,4 @@
-import { tv } from 'tailwind-variants';
+import { tv } from '~/lib/tv';
 
 const label = tv({
   base: 'font-display font-semibold text-label text-ink block peer-disabled:cursor-not-allowed peer-disabled:opacity-70',

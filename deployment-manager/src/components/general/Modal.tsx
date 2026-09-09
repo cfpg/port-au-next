@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect } from 'react';
-import { tv, VariantProps } from 'tailwind-variants';
+import { tv } from '~/lib/tv';
+import { VariantProps } from 'tailwind-variants';
 
 const modal = tv({
   slots: {

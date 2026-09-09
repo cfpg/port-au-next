@@ -26,7 +26,7 @@ export default function SingleAppDashboard({ appId }: { appId: number }) {
         title="Deployment History"
         flush
         content={
-          <DeploymentHistoryTable deployments={deployments ?? []} />
+          <DeploymentHistoryTable deployments={deployments ?? []} scope="app" />
         }
       />
     </>
