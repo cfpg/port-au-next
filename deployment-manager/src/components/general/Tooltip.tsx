@@ -1,6 +1,7 @@
 'use client';
 
-import { cloneElement, useId, useState } from 'react';
+import { cloneElement, useId, useRef, useState } from 'react';
+import Popover from './Popover';
 
 interface TooltipProps {
   content: string;
@@ -16,29 +17,30 @@ interface TooltipProps {
 export default function Tooltip({ content, children, className }: TooltipProps) {
   const [open, setOpen] = useState(false);
   const id = useId();
+  const anchorRef = useRef<HTMLSpanElement>(null);
 
   return (
     <span
-      className="relative inline-flex"
+      ref={anchorRef}
+      className="inline-flex"
       onMouseEnter={() => setOpen(true)}
       onMouseLeave={() => setOpen(false)}
       onFocus={() => setOpen(true)}
       onBlur={() => setOpen(false)}
     >
       {cloneElement(children, { 'aria-describedby': id } as React.HTMLAttributes<HTMLElement>)}
-      {open ? (
+      <Popover open={open} onOpenChange={setOpen} anchorRef={anchorRef} placement="top" dismissOnInteractOutside={false}>
         <span
           id={id}
           role="tooltip"
           className={[
-            'absolute bottom-[calc(100%+6px)] left-1/2 -translate-x-1/2 whitespace-nowrap',
-            'bg-ink text-paper font-mono text-mini rounded-control px-8 py-5 shadow-tip z-20',
+            'block whitespace-nowrap bg-ink text-paper font-mono text-mini rounded-control px-8 py-5 shadow-tip z-110',
             className,
           ].join(' ')}
         >
           {content}
         </span>
-      ) : null}
+      </Popover>
     </span>
   );
 }

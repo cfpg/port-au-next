@@ -2,12 +2,13 @@
 
 import { tv } from '~/lib/tv';
 import { VariantProps } from 'tailwind-variants';
-import { useState, useRef, useEffect } from 'react';
+import { useRef, useState } from 'react';
 import { ChevronDownIcon, SpinnerIcon } from './icons';
+import Popover from './Popover';
 
 export const buttonStyles = tv({
   slots: {
-    wrapper: 'inline-flex relative',
+    wrapper: 'inline-flex',
     base: [
       'inline-flex items-center justify-center gap-6 font-display cursor-pointer whitespace-nowrap',
       'rounded-control transition-colors duration-150 focus-ring',
@@ -17,7 +18,7 @@ export const buttonStyles = tv({
       'inline-flex items-center justify-center cursor-pointer',
       'rounded-r-control transition-colors duration-150 focus-ring',
     ],
-    dropdownPanel: 'absolute top-[calc(100%+5px)] left-0 min-w-190 bg-surface border border-line rounded-menu shadow-pop p-4 z-20',
+    dropdownContent: 'min-w-190 bg-surface border border-line rounded-menu shadow-pop p-4 z-110',
     dropdownItem: [
       'w-full flex items-center gap-9 px-9 py-7 rounded-badge text-panel text-ink text-left cursor-pointer',
       'transition-colors duration-100 hover:bg-hover active:bg-pressed',
@@ -74,6 +75,8 @@ interface ButtonProps
     Omit<VariantProps<typeof buttonStyles>, 'hasDropdown'> {
   children: React.ReactNode;
   dropdown?: DropdownItem[];
+  /** Which edge the dropdown content aligns to. Flip to "right" near a container's right edge (e.g. a table's last column). */
+  dropdownAlign?: 'left' | 'right';
   /** Shows an inline spinner in place of any leading icon; label stays put so the control doesn't resize. */
   loading?: boolean;
 }
@@ -87,27 +90,12 @@ export default function Button({
   disabled,
   loading,
   dropdown,
+  dropdownAlign = 'left',
   onClick,
   ...props
 }: ButtonProps) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsDropdownOpen(false);
-      }
-    }
-
-    if (isDropdownOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isDropdownOpen]);
+  const wrapperRef = useRef<HTMLDivElement>(null);
 
   const isDisabled = disabled || loading;
   const styles = buttonStyles({ variant, size, iconOnly });
@@ -130,7 +118,7 @@ export default function Button({
   }
 
   return (
-    <div className={styles.wrapper({ className })} ref={dropdownRef}>
+    <div className={styles.wrapper({ className })} ref={wrapperRef}>
       <button
         className={buttonStyles({ variant, size, hasDropdown: true }).base()}
         disabled={isDisabled}
@@ -145,15 +133,21 @@ export default function Button({
         className={styles.dropdownButton()}
         onClick={(e) => {
           e.stopPropagation();
-          setIsDropdownOpen(!isDropdownOpen);
+          setIsDropdownOpen((v) => !v);
         }}
         disabled={isDisabled}
         aria-label="More deploy options"
+        aria-expanded={isDropdownOpen}
       >
         <ChevronDownIcon size={13} />
       </button>
-      {isDropdownOpen && (
-        <div className={styles.dropdownPanel()}>
+      <Popover
+        open={isDropdownOpen}
+        onOpenChange={setIsDropdownOpen}
+        anchorRef={wrapperRef}
+        placement={dropdownAlign === 'right' ? 'bottom-end' : 'bottom-start'}
+      >
+        <div className={styles.dropdownContent()}>
           {dropdown.map((item, index) => (
             <button
               key={index}
@@ -170,7 +164,7 @@ export default function Button({
             </button>
           ))}
         </div>
-      )}
+      </Popover>
     </div>
   );
 }

@@ -134,7 +134,7 @@ export default function AppsTable({ apps }: AppsTableProps) {
       align: 'right',
       render: (app) => (
         <>
-          <AppDeployButton app={app} showDropdown={true} />
+          <AppDeployButton app={app} showDropdown={true} dropdownAlign="right" />
           <Menu
             ariaLabel={`More actions for ${app.name}`}
             items={[

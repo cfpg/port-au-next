@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { MoreVerticalIcon } from './icons';
+import Popover from './Popover';
 
 export interface MenuItemDef {
   type?: 'item' | 'separator';
@@ -26,23 +27,12 @@ interface MenuProps {
  */
 export default function Menu({ items, align = 'right', ariaLabel = 'More actions', className }: MenuProps) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (ref.current && !ref.current.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    }
-    if (open) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [open]);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   return (
-    <div className={`relative inline-flex ${className ?? ''}`} ref={ref}>
+    <div className={`inline-flex ${className ?? ''}`}>
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-label={ariaLabel}
@@ -55,14 +45,13 @@ export default function Menu({ items, align = 'right', ariaLabel = 'More actions
       >
         <MoreVerticalIcon />
       </button>
-      {open && (
-        <div
-          role="menu"
-          className={[
-            'absolute top-[calc(100%+4px)] min-w-174 bg-surface border border-line rounded-menu shadow-pop p-4 z-30',
-            align === 'right' ? 'right-0' : 'left-0',
-          ].join(' ')}
-        >
+      <Popover
+        open={open}
+        onOpenChange={setOpen}
+        anchorRef={triggerRef}
+        placement={align === 'right' ? 'bottom-end' : 'bottom-start'}
+      >
+        <div role="menu" className="min-w-174 bg-surface border border-line rounded-menu shadow-pop p-4 z-110">
           {items.map((item, index) =>
             item.type === 'separator' ? (
               <div key={index} className="h-1 bg-line-soft my-4" />
@@ -93,7 +82,7 @@ export default function Menu({ items, align = 'right', ariaLabel = 'More actions
             )
           )}
         </div>
-      )}
+      </Popover>
     </div>
   );
 }
