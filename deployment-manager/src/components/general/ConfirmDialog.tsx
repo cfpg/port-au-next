@@ -11,7 +11,7 @@ interface ConfirmDialogProps {
   onConfirm: () => void | Promise<void>;
   title: string;
   description: React.ReactNode;
-  /** Verb-first, e.g. "Delete app" — never "Confirm". */
+  /** Verb-first, e.g. "Delete app" - never "Confirm". */
   confirmLabel: string;
   /** When set, the confirm button stays disabled until the user types this exact value. */
   confirmText?: string;
@@ -21,7 +21,7 @@ interface ConfirmDialogProps {
 
 /**
  * The only place bg-danger-solid appears. Deliberately not dismissible by
- * backdrop-click or Escape — a destructive action needs an explicit choice,
+ * backdrop-click or Escape - a destructive action needs an explicit choice,
  * not an accidental one.
  */
 export default function ConfirmDialog({

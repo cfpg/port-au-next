@@ -21,9 +21,8 @@ export default async function AppSettingsPage({
   }
 
   return (
-    <>
+    <div className="flex flex-col gap-24">
       <AppSettingsForm
-        className="mb-8"
         appId={app.id}
         initialSettings={{
           name: app.name,
@@ -35,43 +34,15 @@ export default async function AppSettingsPage({
         }}
       />
 
+      <Panel title="Cloudflare" content={<CloudflareAppCard app={app} />} />
+      <Panel title="Object Storage" content={<ObjectStorageCard app={app} />} />
+      <Panel title="Analytics" content={<AnalyticsCard app={app} />} />
+      <Panel title="Error tracking" content={<ErrorTrackingCard app={app} />} />
+      <Panel title="Database" content={<PrismaCard app={app} />} />
       <Panel
-        className="bg-white text-black mb-8"
-        title="Cloudflare"
-        content={<CloudflareAppCard app={app} />}
-      />
-
-      <Panel
-        className="bg-white text-black mb-8"
-        title="Object Storage"
-        content={<ObjectStorageCard app={app} />}
-      />
-
-      <Panel
-        className="bg-white text-black mb-8"
-        title="Analytics"
-        content={<AnalyticsCard app={app} />}
-      />
-
-      <Panel
-        className="bg-white text-black mb-8"
-        title="Error tracking"
-        content={<ErrorTrackingCard app={app} />}
-      />
-
-      <Panel
-        className="bg-white text-black mb-8"
-        title="Database"
-        content={<PrismaCard app={app} />}
-      />
-
-      <Panel
-        className="bg-white text-black mb-8"
         title="Preview Branches"
-        content={
-          <PreviewBranchesCard app={app} initialPreviewDomain={app.preview_domain} />
-        }
+        content={<PreviewBranchesCard app={app} initialPreviewDomain={app.preview_domain} />}
       />
-    </>
+    </div>
   );
 }

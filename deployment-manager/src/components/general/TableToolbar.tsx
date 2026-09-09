@@ -28,7 +28,7 @@ interface TableToolbarProps {
   resultLabel?: string;
 }
 
-/** Appears at 10+ rows — below that it's noise. */
+/** Appears at 10+ rows - below that it's noise. */
 export default function TableToolbar({
   searchValue,
   onSearchChange,

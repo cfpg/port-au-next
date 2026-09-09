@@ -26,7 +26,7 @@ export default async function Home() {
       <main>
         <PageHeader title="Dashboard" />
 
-        <div className="grid grid-cols-12 gap-8">
+        <div className="grid grid-cols-12 gap-24">
           <div className="col-span-12">
             <AppsSection />
           </div>

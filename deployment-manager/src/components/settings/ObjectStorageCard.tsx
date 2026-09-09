@@ -8,6 +8,8 @@ import Button from '~/components/general/Button';
 import Input from '~/components/general/Input';
 import { showToast } from '~/components/general/Toaster';
 import Disclosure from '~/components/general/Disclosure';
+import Callout from '~/components/general/Callout';
+import FieldGroup from '~/components/general/FieldGroup';
 
 interface ObjectStorageCardProps {
   app: App;
@@ -50,7 +52,7 @@ export default function ObjectStorageCard({ app }: ObjectStorageCardProps) {
 
       await mutate();
       showToast('Object storage enabled successfully', 'success');
-    } catch (error) {
+    } catch {
       showToast('Failed to enable object storage', 'error');
     } finally {
       setIsUpdating(false);
@@ -58,85 +60,56 @@ export default function ObjectStorageCard({ app }: ObjectStorageCardProps) {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="flex flex-col gap-16">
+      <div className="flex items-start justify-between gap-16">
         <div>
-          <h3 className="text-lg font-medium">Object Storage</h3>
-          <p className="text-sm text-gray-500">
-            Enable S3-compatible object storage for your app
-          </p>
+          <div className="font-display font-semibold text-panel">Object Storage</div>
+          <div className="text-field text-ink-muted mt-3">Enable S3-compatible object storage for your app.</div>
         </div>
         {!credentials && (
-          <Button
-            variant="primary"
-            onClick={handleEnable}
-            disabled={isUpdating}
-          >
+          <Button variant="primary" onClick={handleEnable} loading={isUpdating}>
             Enable
           </Button>
         )}
       </div>
 
       {credentials ? (
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Input
-              label="Bucket"
-              value={credentials.bucket}
-              disabled
-              readOnly
-            />
-            <Input
-              label="Access Key"
-              value={credentials.accessKey}
-              disabled
-              readOnly
-            />
-          </div>
-          <Input
-            label="Secret Key"
-            value={credentials.secretKey}
-            disabled
-            readOnly
-            showToggle
-            className="mt-4"
-          />
+        <div className="flex flex-col gap-14">
+          <FieldGroup>
+            <Input label="Bucket" value={credentials.bucket} disabled readOnly />
+            <Input label="Access Key" value={credentials.accessKey} disabled readOnly />
+          </FieldGroup>
+          <Input label="Secret Key" value={credentials.secretKey} disabled readOnly showToggle />
+
           <Disclosure title="Using Object Storage in Your App">
-            <h4 className="text-sm font-medium text-blue-800 mb-2">Using Object Storage in Your App</h4>
-            <p className="text-sm text-blue-700">
+            <p className="text-panel text-ink-muted mb-9">
               These environment variables are automatically available in your app:
             </p>
-            <div className="mt-2 bg-white p-3 rounded border border-blue-200">
-              <code className="text-sm">
-                MINIO_HOST<br />
-                MINIO_ACCESS_KEY<br />
-                MINIO_SECRET_KEY<br />
-                MINIO_BUCKET
-              </code>
+            <div className="bg-hover border border-line-token rounded-control p-11 font-mono text-meta text-ink mb-9">
+              MINIO_HOST<br />
+              MINIO_ACCESS_KEY<br />
+              MINIO_SECRET_KEY<br />
+              MINIO_BUCKET
             </div>
-            <p className="mt-2 text-sm text-blue-700">
+            <p className="text-panel text-ink-muted mb-9">
               You can use them to initialize the Minio client in your Node.js app:
             </p>
-            <div className="mt-2 bg-white p-3 rounded border border-blue-200">
-              <code className="text-sm">
-                import &#123; Client &#125; from 'minio';<br /><br />
-                const minioClient = new Client(&#123;<br />
-                &nbsp;&nbsp;endPoint: process.env.MINIO_HOST,<br />
-                &nbsp;&nbsp;useSSL: true,<br />
-                &nbsp;&nbsp;accessKey: process.env.MINIO_ACCESS_KEY,<br />
-                &nbsp;&nbsp;secretKey: process.env.MINIO_SECRET_KEY<br />
-                &#125;);
-              </code>
+            <div className="bg-hover border border-line-token rounded-control p-11 font-mono text-meta text-ink">
+              import &#123; Client &#125; from &apos;minio&apos;;<br /><br />
+              const minioClient = new Client(&#123;<br />
+              &nbsp;&nbsp;endPoint: process.env.MINIO_HOST,<br />
+              &nbsp;&nbsp;useSSL: true,<br />
+              &nbsp;&nbsp;accessKey: process.env.MINIO_ACCESS_KEY,<br />
+              &nbsp;&nbsp;secretKey: process.env.MINIO_SECRET_KEY<br />
+              &#125;);
             </div>
           </Disclosure>
         </div>
       ) : (
-        <div className="bg-gray-50 p-4 rounded-md">
-          <p className="text-sm text-gray-600">
-            Object storage is not enabled for this app. Enable it to get S3-compatible storage for your files.
-          </p>
-        </div>
+        <Callout tone="info">
+          Object storage is not enabled for this app. Enable it to get S3-compatible storage for your files.
+        </Callout>
       )}
     </div>
   );
-} 
+}

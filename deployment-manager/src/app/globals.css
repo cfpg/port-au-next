@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 @theme {
-  /* SPACING — 1px base, so every spacing/size utility is an exact px count.
+  /* SPACING - 1px base, so every spacing/size utility is an exact px count.
      p-6 = 6px, gap-10 = 10px, w-206 = 206px. The kit's scale is 2·4·6·8·10·12·16·20·24·32. */
   --spacing: 1px;
 
@@ -10,7 +10,7 @@
   --font-sans: "Hanken Grotesk", sans-serif;
   --font-mono: "IBM Plex Mono", monospace;
 
-  /* SURFACES — three only: canvas → paper → surface */
+  /* SURFACES - three only: canvas → paper → surface */
   --color-canvas: #F7F1E8;
   --color-paper: #FDFBF7;
   --color-surface: #FFFFFF;
@@ -25,7 +25,7 @@
   --color-line-dash: #E0D5C6;
   --color-line-token: #E3D9CB;
 
-  /* INK — never a hue, never signals importance */
+  /* INK - never a hue, never signals importance */
   --color-ink: #271F1A;
   --color-ink-soft: #5C4F45;
   --color-ink-muted: #6B5D52;
@@ -33,7 +33,7 @@
   --color-ink-ghost: #B9AC9D;
   --color-ink-wisp: #C7B8A8;
 
-  /* PRIMARY — Harbour Teal. The only action colour. */
+  /* PRIMARY - Harbour Teal. The only action colour. */
   --color-primary: #3E7C8C;
   --color-primary-hover: #33697A;
   --color-primary-active: #2A5663;
@@ -43,7 +43,7 @@
   --color-primary-line: #C7DCE1;
   --color-primary-line-strong: #A9CBD3;
 
-  /* DANGER — coral. Destructive only; no bg-coral utility exists. */
+  /* DANGER - coral. Destructive only; no bg-coral utility exists. */
   --color-danger: #E2553B;
   --color-danger-solid: #C2412B;
   --color-danger-ink: #A8341F;
@@ -121,7 +121,7 @@
   --shadow-focus: 0 0 0 2px #fff, 0 0 0 4px rgba(39,31,26,0.32);
   --shadow-focus-paper: 0 0 0 2px #FDFBF7, 0 0 0 4px rgba(39,31,26,0.32);
 
-  /* MOTION — only ever means in-progress */
+  /* MOTION - only ever means in-progress */
   --animate-dot: dotPulse 1.4s ease-in-out infinite;
   --animate-spin-fast: spin .7s linear infinite;
   --animate-shimmer: shimmer 1.2s linear infinite;

@@ -26,7 +26,7 @@ interface TableProps<T> {
 
 /**
  * The row-rendering primitive everything else in the kit's list views is
- * built on. Rows are hairline-separated, never striped — hover is the only
+ * built on. Rows are hairline-separated, never striped - hover is the only
  * row background. Long values are the caller's responsibility to truncate.
  */
 export default function Table<T>({

@@ -7,7 +7,7 @@ interface EmptyStateProps {
 }
 
 /**
- * Says what will fill it, and offers the action that does — no shrugging
+ * Says what will fill it, and offers the action that does - no shrugging
  * illustrations. Use inside a Panel's body (flush or padded).
  */
 export default function EmptyState({ icon, title, description, action, className }: EmptyStateProps) {

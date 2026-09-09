@@ -41,7 +41,7 @@ interface BadgeProps {
   tone?: BadgeTone;
   /** Shows the tone dot. Off by default for dense, dot-free rows. */
   withDot?: boolean;
-  /** Swaps the dot for a warning triangle — for a state that needs attention rather than one in progress. */
+  /** Swaps the dot for a warning triangle - for a state that needs attention rather than one in progress. */
   needsAttention?: boolean;
   className?: string;
 }

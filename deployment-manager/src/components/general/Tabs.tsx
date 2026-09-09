@@ -15,7 +15,7 @@ interface TabsProps {
 }
 
 /**
- * Switches views of one resource, never navigates elsewhere. 2-4 tabs —
+ * Switches views of one resource, never navigates elsewhere. 2-4 tabs -
  * more means a sidebar.
  */
 export default function Tabs({ items, defaultKey, className }: TabsProps) {

@@ -7,7 +7,7 @@ interface AppNavigationProps {
   appName: string;
 }
 
-/** Switches views of this one app — shares the kit Tabs' visual language. */
+/** Switches views of this one app - shares the kit Tabs' visual language. */
 export default function AppNavigation({ appName }: AppNavigationProps) {
   const pathname = usePathname();
 

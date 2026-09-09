@@ -9,15 +9,15 @@ const linkStyles = tv({
   base: 'transition-colors duration-150',
   variants: {
     variant: {
-      /** In-app navigation to a resource — mono, no underline. */
+      /** In-app navigation to a resource - mono, no underline. */
       default: 'font-mono text-field',
-      /** Leaves the app / points at a hostname the user owns — underlined. */
+      /** Leaves the app / points at a hostname the user owns - underlined. */
       hostname: 'font-mono text-field underline decoration-primary-line underline-offset-2',
       /** Quiet, for footers and secondary chrome. */
       quiet: 'text-ink-faint hover:text-ink-muted',
       /** Sidebar section item. */
       nav: 'flex items-center gap-9 rounded-control px-9 py-7 text-panel font-medium text-ink-muted hover:bg-hover',
-      /** Sidebar app entry — a hostname, so mono. */
+      /** Sidebar app entry - a hostname, so mono. */
       subNav: 'block rounded-control px-8 py-5 font-mono text-meta text-ink-muted truncate hover:bg-hover',
     },
     isActive: {
@@ -42,7 +42,7 @@ type LinkProps = Omit<ComponentProps<typeof NextLink>, 'className'> & {
   variant?: LinkVariant | 'button';
   isActive?: boolean;
   className?: string;
-  /** Only applies when variant="button" — matches Button's variant prop. */
+  /** Only applies when variant="button" - matches Button's variant prop. */
   tone?: ButtonTone;
   /** Only applies when variant="button". */
   size?: ButtonSize;

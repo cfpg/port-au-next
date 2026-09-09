@@ -5,7 +5,7 @@ interface KeyValueItem {
 
 interface KeyValueRowProps {
   title: string;
-  /** Goes in the header, next to the title — a StatusBadge, typically. Never on individual rows. */
+  /** Goes in the header, next to the title - a StatusBadge, typically. Never on individual rows. */
   status?: React.ReactNode;
   rows: KeyValueItem[];
   footer?: React.ReactNode;

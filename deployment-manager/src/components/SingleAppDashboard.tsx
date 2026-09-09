@@ -12,17 +12,14 @@ export default function SingleAppDashboard({ appId }: { appId: number }) {
 
   return (
     <>
-      {/* Active Preview Branches Section */}
       <Panel
-        className='bg-white text-black mb-8'
+        className="mb-24"
         title="Active Preview Branches"
         flush
-        content={app ? <ActivePreviewBranches app={app} /> : <div className="text-center py-4 text-gray-500">Loading…</div>}
+        content={app ? <ActivePreviewBranches app={app} /> : <div className="text-center py-24 text-ink-faint">Loading…</div>}
       />
 
-      {/* Deployment History Section */}
       <Panel
-        className='bg-white text-black mb-8'
         title="Deployment History"
         flush
         content={

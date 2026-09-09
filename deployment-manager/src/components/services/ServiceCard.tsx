@@ -11,7 +11,7 @@ interface ServiceCardProps {
 }
 
 /**
- * Read-only — reports, never offers restart or stop. Avatars are neutral,
+ * Read-only - reports, never offers restart or stop. Avatars are neutral,
  * one letter; a colour per service would compete with status colour and win.
  */
 export default function ServiceCard({ name, status, service, id }: ServiceCardProps) {

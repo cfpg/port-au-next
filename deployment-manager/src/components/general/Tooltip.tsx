@@ -9,7 +9,7 @@ interface TooltipProps {
 }
 
 /**
- * Explains, never informs — if the content is required to use a feature it
+ * Explains, never informs - if the content is required to use a feature it
  * belongs on the page, not in here. Mandatory on every icon-only button and
  * every disabled control.
  */

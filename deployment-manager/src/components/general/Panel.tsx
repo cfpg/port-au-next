@@ -22,18 +22,18 @@ const panel = tv({
 });
 
 interface PanelProps extends VariantProps<typeof panel> {
-  /** Simple text/node title — rendered in the panel's standard header style. */
+  /** Simple text/node title - rendered in the panel's standard header style. */
   title?: React.ReactNode;
   /** Full custom header content (e.g. title + status badge + actions). Takes precedence over `title`. */
   header?: React.ReactNode;
   content?: React.ReactNode;
-  /** Right-aligned footer — use when the panel holds unsaved work with a commit action. */
+  /** Right-aligned footer - use when the panel holds unsaved work with a commit action. */
   footer?: React.ReactNode;
   className?: string;
 }
 
 /**
- * The container everything else lives in. Every panel has a header bar — a
+ * The container everything else lives in. Every panel has a header bar - a
  * white box floating with no title is never a panel. Never nest a panel in
  * a panel; use a hairline-bordered group or Disclosure instead.
  */

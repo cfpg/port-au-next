@@ -16,6 +16,11 @@ import NginxLogTable from '~/components/deployments/NginxLogTable';
 import type { FileLogResponse } from '~/components/deployments/deploymentLogTypes';
 import Badge from '~/components/general/Badge';
 import Button from '~/components/general/Button';
+import Checkbox from '~/components/general/Checkbox';
+import DefinitionList from '~/components/general/DefinitionList';
+import Callout from '~/components/general/Callout';
+import EmptyState from '~/components/general/EmptyState';
+import { RefreshIcon } from '~/components/general/icons';
 import {
   extractBuildLogText,
   normalizeDeploymentLogMetadata,
@@ -260,64 +265,47 @@ export default function DeploymentLogViewer({
   const checkboxDisabled = activeTab === 'deploy' || activeTab === 'build';
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 h-full gap-4">
-      <div className="flex flex-col gap-2 shrink-0">
-        <h2 className="text-lg font-semibold">Deployment Details</h2>
-        <div className="grid grid-cols-2 gap-2">
-          <p className="text-sm text-gray-600">
-            <strong>App Name:</strong> {app.name}
-          </p>
-          <p className="text-sm text-gray-600">
-            <strong>Deployment ID:</strong> {deploymentId}
-          </p>
-          <p className="text-sm text-gray-600">
-            <strong>Deployment Date:</strong>{' '}
-            {new Date(app.deployed_at || '').toLocaleString()}
-          </p>
-          <p className="text-sm text-gray-600">
-            <strong>Status:</strong>{' '}
-            <Badge tone={getServiceStatusTone(app.status as ServiceStatus)} withDot>
-              {app.status}
-            </Badge>
-          </p>
-        </div>
+    <div className="flex flex-col flex-1 min-h-0 h-full gap-14">
+      <div className="flex flex-col gap-9 shrink-0">
+        <div className="font-display font-semibold text-panel">Deployment Details</div>
+        <DefinitionList
+          columns={2}
+          items={[
+            { label: 'App Name', value: app.name },
+            { label: 'Deployment ID', value: deploymentId },
+            { label: 'Deployment Date', value: new Date(app.deployed_at || '').toLocaleString() },
+            { label: 'Status', value: <Badge tone={getServiceStatusTone(app.status as ServiceStatus)} withDot>{app.status}</Badge> },
+          ]}
+        />
       </div>
 
-      <div className="flex items-center justify-between border-b border-gray-200 shrink-0 gap-4">
-        <div className="flex gap-1">
+      <div className="flex items-center justify-between border-b border-line shrink-0 gap-10 flex-wrap">
+        <div className="flex gap-2">
           {tabs.map((tab) => (
             <button
               key={tab.id}
               type="button"
               onClick={() => setActiveTab(tab.id)}
-              className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+              className={`px-13 py-7 font-display font-semibold text-field border-b-2 -mb-1 cursor-pointer transition-colors duration-100 ${
                 activeTab === tab.id
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-ink-muted hover:text-ink'
               }`}
             >
               {tab.label}
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-3 shrink-0 flex-wrap justify-end">
-          <span className="text-xs text-gray-500">{sortLabel}</span>
-          <label
-            className={`flex items-center gap-2 text-sm text-gray-600 select-none min-w-[10.5rem] ${
-              checkboxDisabled ? 'cursor-default opacity-80' : 'cursor-pointer'
-            }`}
-          >
-            <input
-              type="checkbox"
-              checked={checkboxDisabled ? false : autoRefresh}
-              disabled={checkboxDisabled}
-              onChange={(event) => setAutoRefresh(event.target.checked)}
-              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:opacity-50"
-            />
-            <span className="tabular-nums">{autoRefreshLabel}</span>
-          </label>
+        <div className="flex items-center gap-14 shrink-0 flex-wrap justify-end py-7">
+          <span className="font-mono text-micro text-ink-faint">{sortLabel}</span>
+          <Checkbox
+            checked={checkboxDisabled ? false : autoRefresh}
+            disabled={checkboxDisabled}
+            onChange={setAutoRefresh}
+            label={<span className="tabular-nums text-field">{autoRefreshLabel}</span>}
+          />
           <Button variant="secondary" size="sm" onClick={() => void refreshActive()}>
-            <i className="fas fa-sync-alt mr-2"></i>
+            <RefreshIcon />
             Refresh
           </Button>
         </div>
@@ -398,6 +386,14 @@ function LogScrollArea({
   );
 }
 
+function LiveIndicator() {
+  return (
+    <p className="font-mono text-micro text-primary shrink-0">
+      Live, updating every {AUTO_REFRESH_INTERVAL_SEC}s while deployment is in progress
+    </p>
+  );
+}
+
 function DeployTabContent({
   logs,
   loading,
@@ -412,26 +408,22 @@ function DeployTabContent({
   liveUpdating: boolean;
 }) {
   if (error) {
-    return <p className="text-red-500 text-center py-4">Error loading deploy logs.</p>;
+    return <Callout tone="danger">Error loading deploy logs.</Callout>;
   }
 
   if (loading) {
-    return <p className="text-gray-500 text-center py-4">Loading deploy logs...</p>;
+    return <div className="text-center py-24 text-ink-faint text-field">Loading deploy logs...</div>;
   }
 
   if (logs.length === 0) {
-    return <p className="text-gray-500 text-center py-4">No deploy logs found.</p>;
+    return <EmptyState title="No deploy logs found" />;
   }
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 h-full gap-2">
-      {liveUpdating && (
-        <p className="text-xs text-blue-600 shrink-0">
-          Live — updating every {AUTO_REFRESH_INTERVAL_SEC}s while deployment is in progress
-        </p>
-      )}
+    <div className="flex flex-col flex-1 min-h-0 h-full gap-9">
+      {liveUpdating && <LiveIndicator />}
       <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto">
-        <div className="space-y-4">
+        <div className="flex flex-col gap-14">
           {logs.map((log) => (
             <DeploymentLogEntry key={log.id} log={log} hideInlineBuildLog />
           ))}
@@ -459,17 +451,15 @@ function BuildTabContent({
   const content = data?.content ?? fallbackContent;
 
   if (loading && !content) {
-    return <p className="text-gray-500 text-center py-4">Loading build log...</p>;
+    return <div className="text-center py-24 text-ink-faint text-field">Loading build log...</div>;
   }
 
   if (!content) {
     return (
-      <div className="text-center py-4 space-y-2">
-        <p className="text-gray-500">Build log is written during the docker build phase.</p>
-        <p className="text-sm text-gray-400">
-          {error instanceof Error ? error.message : 'Log file not available yet.'}
-        </p>
-      </div>
+      <EmptyState
+        title="Build log is written during the docker build phase"
+        description={error instanceof Error ? error.message : 'Log file not available yet.'}
+      />
     );
   }
 
@@ -493,7 +483,7 @@ function BuildTabContent({
       renderContent={(fileContent) => (
         <>
           {!data?.content && fallbackContent && (
-            <p className="text-xs text-amber-700 px-2 py-1 bg-amber-50 border-b border-amber-100">
+            <p className="text-mini text-warning-ink px-9 py-6 bg-warning-tint border-b border-warning-line">
               Showing build output saved on the Deploy log (build file not found on disk).
             </p>
           )}
@@ -528,27 +518,20 @@ function FileLogTabContent({
   liveUpdating?: boolean;
 }) {
   if (loading) {
-    return <p className="text-gray-500 text-center py-4">Loading {label.toLowerCase()}...</p>;
+    return <div className="text-center py-24 text-ink-faint text-field">Loading {label.toLowerCase()}...</div>;
   }
 
   if (error) {
     return (
-      <div className="text-center py-4 space-y-2">
-        <p className="text-gray-500">{emptyHint}</p>
-        <p className="text-sm text-gray-400">
-          {error instanceof Error ? error.message : 'Log file not available yet.'}
-        </p>
-      </div>
+      <EmptyState
+        title={emptyHint}
+        description={error instanceof Error ? error.message : 'Log file not available yet.'}
+      />
     );
   }
 
   if (!data?.content) {
-    return (
-      <div className="text-center py-4 space-y-2">
-        <p className="text-gray-500">{emptyHint}</p>
-        <p className="text-sm text-gray-400">Log file not available yet.</p>
-      </div>
-    );
+    return <EmptyState title={emptyHint} description="Log file not available yet." />;
   }
 
   const truncatedNote = data.truncated
@@ -558,24 +541,20 @@ function FileLogTabContent({
     : null;
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 h-full gap-2">
-      {liveUpdating && (
-        <p className="text-xs text-blue-600 shrink-0">
-          Live — updating every {AUTO_REFRESH_INTERVAL_SEC}s while deployment is in progress
-        </p>
-      )}
-      <details className="text-xs text-gray-500 shrink-0">
-        <summary className="cursor-pointer hover:text-gray-700">File path</summary>
-        <code className="block mt-1 break-all">{data.path}</code>
+    <div className="flex flex-col flex-1 min-h-0 h-full gap-9">
+      {liveUpdating && <LiveIndicator />}
+      <details className="font-mono text-micro text-ink-faint shrink-0">
+        <summary className="cursor-pointer hover:text-ink-muted">File path</summary>
+        <span className="block mt-3 break-all">{data.path}</span>
         {data.truncated && (
-          <span className="block mt-1 text-amber-600">
+          <span className="block mt-3 text-warning-deep">
             Showing last portion of file ({data.sizeBytes.toLocaleString()} bytes total).
             {truncatedNote ? ` ${truncatedNote}` : null}
           </span>
         )}
       </details>
       <LogScrollArea onScrollPausedChange={onScrollPausedChange}>
-        <div className="rounded border border-gray-200 bg-white min-h-full">
+        <div className="rounded-control border border-line bg-surface min-h-full">
           {renderContent ? (
             renderContent(data.content)
           ) : (

@@ -42,7 +42,7 @@ interface ModalProps extends VariantProps<typeof modal> {
 }
 
 /**
- * For a decision or a short form — never for content you'd want to keep
+ * For a decision or a short form - never for content you'd want to keep
  * open while working. Escape and backdrop-click close it (destructive
  * confirmations should use ConfirmDialog instead, which disables both).
  */

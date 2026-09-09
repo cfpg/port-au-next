@@ -4,7 +4,7 @@ interface FieldGroupProps {
 }
 
 /**
- * Responsive field grid — two columns max in practice, since the min track
+ * Responsive field grid - two columns max in practice, since the min track
  * is 220px. A field that holds a path or URL should get `className="col-span-full"`
  * directly on the field (Input/Select both forward className to their wrapper).
  */

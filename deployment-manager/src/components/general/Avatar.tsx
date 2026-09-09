@@ -6,7 +6,7 @@ const avatar = tv({
     tone: {
       /** People. The only teal-tinted avatar. */
       user: 'bg-primary-tint border border-primary-line text-primary-active',
-      /** Services, containers, anything that isn't a person — one neutral tone, never a rainbow. */
+      /** Services, containers, anything that isn't a person - one neutral tone, never a rainbow. */
       neutral: 'bg-hover border border-line-strong text-ink-soft',
     },
     size: {

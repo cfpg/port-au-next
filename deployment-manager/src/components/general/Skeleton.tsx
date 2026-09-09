@@ -2,7 +2,7 @@ interface SkeletonProps {
   className?: string;
 }
 
-/** Structural loading — for tables and panels whose shape is already known. */
+/** Structural loading - for tables and panels whose shape is already known. */
 export default function Skeleton({ className = 'h-9 w-full' }: SkeletonProps) {
   return (
     <span

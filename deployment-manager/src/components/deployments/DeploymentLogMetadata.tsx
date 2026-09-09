@@ -18,20 +18,20 @@ export default function DeploymentLogMetadata({ metadata }: DeploymentLogMetadat
   }
 
   return (
-    <div className="mt-2 space-y-2">
+    <div className="mt-9 flex flex-col gap-9">
       {textBlocks.map((block) => (
         <div key={block.label}>
-          <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+          <span className="font-mono text-nano font-semibold uppercase tracking-caps text-ink-faint">
             {block.label}
           </span>
-          <pre className="text-xs mt-0.5 text-gray-800 whitespace-pre-wrap break-words font-mono bg-white/60 rounded p-2 border border-gray-200 max-h-[min(24rem,50vh)] overflow-y-auto">
+          <pre className="text-mini mt-2 text-ink-muted whitespace-pre-wrap break-words font-mono bg-surface/60 rounded-control p-9 border border-line max-h-[min(24rem,50vh)] overflow-y-auto">
             {block.text}
           </pre>
         </div>
       ))}
 
       {compact && (
-        <pre className="text-xs text-gray-600 whitespace-pre-wrap break-words font-mono">
+        <pre className="text-mini text-ink-muted whitespace-pre-wrap break-words font-mono">
           {JSON.stringify(compact, null, 2)}
         </pre>
       )}

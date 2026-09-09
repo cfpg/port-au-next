@@ -21,7 +21,7 @@ interface MenuProps {
 
 /**
  * Everything a row can do that isn't its primary action. Destructive item
- * last, below a separator, red text — never a red background. Max ~6 items;
+ * last, below a separator, red text - never a red background. Max ~6 items;
  * beyond that it's a settings page, not a menu.
  */
 export default function Menu({ items, align = 'right', ariaLabel = 'More actions', className }: MenuProps) {

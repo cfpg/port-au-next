@@ -10,7 +10,7 @@ interface DisclosureProps {
 }
 
 /**
- * Holds reference material — env var names, setup steps. Never hides a
+ * Holds reference material - env var names, setup steps. Never hides a
  * control the user needs. Starts closed, and is labelled with what's
  * inside, not "More".
  */

@@ -17,7 +17,7 @@ interface RouteStatusCardProps {
 }
 
 /**
- * A route's problem is stated in its own words — "CNAME missing", not a
+ * A route's problem is stated in its own words - "CNAME missing", not a
  * generic error. Its footer action's variant should match state: primary
  * when something is missing, secondary when already synced.
  */

@@ -103,7 +103,7 @@ export default function PrismaCard({ app }: PrismaCardProps) {
                 Grants CREATEDB on the app database user for Prisma shadow databases. When this app
                 has no custom Dockerfile in git, the platform maintains a generated Dockerfile
                 (Node 24, <span className="font-mono text-meta">prisma generate</span> at build) on
-                the next deploy. Commit your own Dockerfile to override — if you enable
+                the next deploy. Commit your own Dockerfile to override - if you enable
                 auto-migrate, add a <span className="font-mono text-meta">migrator</span> stage (see
                 README).
               </>

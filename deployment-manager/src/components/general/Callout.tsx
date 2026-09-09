@@ -50,7 +50,7 @@ interface CalloutProps {
 
 /**
  * States a consequence, never decorates. Three tones only. At most one
- * callout per panel — two stacked ones means neither gets read.
+ * callout per panel - two stacked ones means neither gets read.
  */
 export default function Callout({ tone = 'info', title, children, className }: CalloutProps) {
   const styles = callout({ tone });

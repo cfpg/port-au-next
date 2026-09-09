@@ -22,11 +22,11 @@ import { showToast } from '~/components/general/Toaster';
 
 interface DeploymentHistoryTableProps {
   deployments?: Deployment[];
-  /** "app" hides the App column and swaps two buttons for a single overflow menu — this app's own history is immutable, so actions only read or re-run it. */
+  /** "app" hides the App column and swaps two buttons for a single overflow menu - this app's own history is immutable, so actions only read or re-run it. */
   scope?: 'global' | 'app';
 }
 
-/** A DeploymentRow's ⋮ menu — view logs, redeploy this build, copy commit SHA. */
+/** A DeploymentRow's ⋮ menu - view logs, redeploy this build, copy commit SHA. */
 function DeploymentRowMenu({ deployment }: { deployment: Deployment }) {
   const pathname = usePathname();
   const [logsOpen, setLogsOpen] = useState(false);

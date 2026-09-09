@@ -6,7 +6,7 @@ interface SpinnerIconProps {
 }
 
 /**
- * The kit's inline loading ring — a bordered circle with one accented
+ * The kit's inline loading ring - a bordered circle with one accented
  * quadrant, spun via the `animate-spin-fast` utility. Not an SVG: matching
  * the kit's own markup keeps the border-driven look exact.
  */

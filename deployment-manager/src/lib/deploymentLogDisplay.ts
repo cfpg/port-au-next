@@ -165,13 +165,13 @@ export function metadataForCompactJson(
 export function getLogTypeClass(type: string): string {
   switch (normalizeDeploymentLogType(type)) {
     case 'error':
-      return 'bg-red-50 border-l-4 border-red-500';
+      return 'bg-danger-tint border-l-3 border-l-danger';
     case 'warning':
-      return 'bg-yellow-50 border-l-4 border-yellow-500';
+      return 'bg-warning-tint border-l-3 border-l-warning';
     case 'debug':
-      return 'bg-gray-50 border-l-4 border-gray-500';
+      return 'bg-idle-tint border-l-3 border-l-idle';
     default:
-      return 'bg-blue-50 border-l-4 border-blue-500';
+      return 'bg-primary-tint border-l-3 border-l-primary';
   }
 }
 
@@ -214,12 +214,12 @@ export function classifyBuildLogLine(line: string): BuildLogLineLevel {
 export function getBuildLineClass(level: BuildLogLineLevel): string {
   switch (level) {
     case 'error':
-      return 'bg-red-50 text-red-900';
+      return 'bg-danger-tint text-danger-ink';
     case 'warning':
-      return 'bg-yellow-50 text-yellow-900';
+      return 'bg-warning-tint text-warning-ink';
     case 'debug':
-      return 'bg-gray-50 text-gray-700';
+      return 'bg-hover text-ink-muted';
     default:
-      return 'text-gray-800';
+      return 'text-ink';
   }
 }

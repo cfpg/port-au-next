@@ -6,7 +6,7 @@ interface PageHeaderProps {
 }
 
 /**
- * Carries one primary action — the verb for the whole page. Row-level verbs
+ * Carries one primary action - the verb for the whole page. Row-level verbs
  * stay in rows. The title is the page's own name, never a restatement of
  * the nav item that led here.
  */

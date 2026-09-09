@@ -13,17 +13,18 @@ export default function SettingsAdminUser({ email }: SettingsAdminUserProps) {
 
   return (
     <>
-      <div className="flex items-center space-x-4">
-        <Avatar name="Admin User" size="lg" className="w-48 h-48" />
+      <div className="flex items-center gap-14">
+        <Avatar name="Admin User" size="lg" className="size-48 text-body" />
         <div>
-          <div className="text-lg font-medium">Admin User</div>
-          <div className="text-sm text-gray-500">{email}</div>
+          <div className="font-display font-semibold text-body">Admin User</div>
+          <div className="font-mono text-meta text-ink-muted">{email}</div>
         </div>
       </div>
-      <div className="mt-4">
+      <div className="mt-14">
         <button
+          type="button"
           onClick={() => setIsModalOpen(true)}
-          className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+          className="text-panel text-primary hover:text-primary-active cursor-pointer transition-colors duration-100"
         >
           Change Password
         </button>
@@ -34,4 +35,4 @@ export default function SettingsAdminUser({ email }: SettingsAdminUserProps) {
       />
     </>
   );
-} 
+}

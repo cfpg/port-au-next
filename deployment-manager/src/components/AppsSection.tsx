@@ -13,7 +13,7 @@ export default function AppsSection() {
   return (
     <>
       <Panel
-        className="bg-white mb-8"
+        className="mb-24"
         flush
         title="Applications"
         content={
@@ -24,7 +24,6 @@ export default function AppsSection() {
       />
 
       <Panel
-        className="bg-white"
         flush
         title="Deployment History"
         content={

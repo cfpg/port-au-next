@@ -11,7 +11,7 @@ interface SwitchProps {
 }
 
 /**
- * The single Enabled/Disabled control. Applies immediately — if a change
+ * The single Enabled/Disabled control. Applies immediately - if a change
  * needs a Save button, it belongs in a Checkbox instead.
  */
 export default function Switch({ checked, onChange, disabled, label, hint, className, ...aria }: SwitchProps) {

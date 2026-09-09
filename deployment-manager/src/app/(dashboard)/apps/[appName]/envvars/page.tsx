@@ -29,7 +29,6 @@ export default async function AppEnvVarsPage({
       }}
     >
       <Panel
-        className="bg-white text-black mb-8"
         title="Environment Variables"
         content={<EnvVarsSettings app={app} />}
       />

@@ -12,7 +12,7 @@ interface CopyFieldProps {
 }
 
 /**
- * For anything nobody would retype. The button confirms in place for 2s —
+ * For anything nobody would retype. The button confirms in place for 2s -
  * it never fires a toast.
  */
 export default function CopyField({ label, value, compact = false, className }: CopyFieldProps) {
