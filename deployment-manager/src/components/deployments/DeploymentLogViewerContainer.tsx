@@ -39,12 +39,12 @@ export default function DeploymentLogViewerContainer({
 
   if (error) {
     return (
-      <p className="text-red-500 text-center py-4">Error loading deployment logs.</p>
+      <p className="text-danger-ink text-center py-24 text-field">Error loading deployment logs.</p>
     );
   }
 
   if ((isLoading && !data) || !data?.app) {
-    return <p className="text-gray-500 text-center py-4">Loading logs...</p>;
+    return <p className="text-ink-faint text-center py-24 text-field">Loading logs...</p>;
   }
 
   return (

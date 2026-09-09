@@ -26,22 +26,22 @@ export default function DeploymentLogEntry({
     typeof metadata?.buildLogPath === 'string' ? metadata.buildLogPath : null;
 
   return (
-    <div className={`log-entry p-4 rounded ${getLogTypeClass(logType)}`}>
-      <div className="flex items-start justify-between gap-2">
-        <span className="font-mono text-xs text-gray-500 shrink-0">
+    <div className={`p-11 rounded-control ${getLogTypeClass(logType)}`}>
+      <div className="flex items-start justify-between gap-9">
+        <span className="font-mono text-mini text-ink-faint shrink-0">
           {new Date(log.created_at).toLocaleString()}
         </span>
-        <span className="uppercase text-xs font-semibold ml-2 shrink-0">{logType}</span>
+        <span className="font-mono text-mini font-semibold uppercase text-ink-muted shrink-0">{logType}</span>
       </div>
-      <div className="mt-1 whitespace-pre-wrap break-words">{log.message}</div>
+      <div className="mt-3 text-field text-ink whitespace-pre-wrap break-words">{log.message}</div>
 
       {skipMetadata && (
-        <p className="text-xs text-gray-500 mt-2">
-          Full build output is on the <strong>Build</strong> tab
+        <p className="text-mini text-ink-faint mt-9">
+          Full build output is on the <strong className="font-semibold text-ink-muted">Build</strong> tab
           {buildLogPath ? (
             <>
               {' '}
-              (<code className="break-all">{buildLogPath}</code>)
+              (<span className="font-mono text-micro break-all">{buildLogPath}</span>)
             </>
           ) : null}
           .

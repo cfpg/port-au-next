@@ -1,5 +1,5 @@
 import { fetchApp } from '../actions';
-import Card from '~/components/general/Card';
+import Panel from '~/components/general/Panel';
 import EnvVarsSettings from '~/components/env-vars/EnvVarsSettings';
 import { SWRConfig } from 'swr';
 import fetchAppEnvVars from '~/queries/fetchAppEnvVars';
@@ -28,10 +28,8 @@ export default async function AppEnvVarsPage({
         },
       }}
     >
-      <Card
-        className="bg-white text-black mb-8"
+      <Panel
         title="Environment Variables"
-        padding="content"
         content={<EnvVarsSettings app={app} />}
       />
     </SWRConfig>

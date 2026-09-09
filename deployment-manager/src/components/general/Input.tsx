@@ -1,35 +1,35 @@
 "use client";
 
-import { tv } from 'tailwind-variants';
+import { tv } from '~/lib/tv';
 import { useState } from 'react';
+import { EyeIcon, EyeOffIcon, AlertCircleIcon } from './icons';
 
 const input = tv({
   slots: {
     base: '',
     inputContainer: 'relative',
-    input: 'w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500',
-    label: 'block text-sm font-medium text-gray-700 mb-2',
-    toggleButton: 'absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none cursor-pointer',
-    error: 'mt-1 text-sm text-red-500',
+    input: [
+      'w-full font-mono text-field bg-surface text-ink border border-line-strong rounded-control px-10 py-7',
+      'transition-colors duration-150 hover:border-line-stronger placeholder:text-ink-ghost',
+      'focus:outline-none focus:border-primary focus:shadow-focus',
+    ],
+    label: 'text-label text-ink-muted mb-5 block',
+    toggleButton: [
+      'absolute right-0 top-0 bottom-0 inline-flex items-center justify-center w-32 bg-paper border-0 border-l border-line text-ink-muted cursor-pointer',
+      'transition-colors duration-150 hover:bg-hover hover:text-ink focus-ring',
+    ],
+    error: 'flex items-center gap-5 text-mini text-danger-ink mt-5',
+    hint: 'text-mini text-ink-faint mt-5',
   },
   variants: {
     hasToggle: {
-      true: {
-        input: 'pr-10',
-      },
-      false: {},
+      true: { input: 'pr-32' },
     },
     hasError: {
-      true: {
-        input: 'border-red-500 focus:ring-red-500 focus:border-red-500',
-      },
-      false: {},
+      true: { input: 'border-danger focus:border-danger' },
     },
     disabled: {
-      true: {
-        input: 'bg-gray-50 cursor-not-allowed',
-      },
-      false: {},
+      true: { input: 'bg-canvas text-ink-ghost cursor-not-allowed hover:border-line-strong' },
     },
   },
   defaultVariants: {
@@ -43,6 +43,7 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string;
   showToggle?: boolean;
   error?: string;
+  hint?: string;
 }
 
 export default function Input({
@@ -51,6 +52,7 @@ export default function Input({
   label: labelText,
   showToggle = false,
   error,
+  hint,
   disabled,
   ...props
 }: InputProps) {
@@ -82,12 +84,20 @@ export default function Input({
             onClick={() => setIsContentHidden(!isContentHidden)}
             className={styles.toggleButton()}
             tabIndex={-1}
+            aria-label={isContentHidden ? 'Show value' : 'Hide value'}
           >
-            <i className={`fas ${isContentHidden ? 'fa-eye' : 'fa-eye-slash'}`} />
+            {isContentHidden ? <EyeIcon /> : <EyeOffIcon />}
           </button>
         )}
       </div>
-      {error && <div className={styles.error()}>{error}</div>}
+      {error ? (
+        <div className={styles.error()}>
+          <AlertCircleIcon className="shrink-0" />
+          {error}
+        </div>
+      ) : hint ? (
+        <div className={styles.hint()}>{hint}</div>
+      ) : null}
     </div>
   );
-} 
+}

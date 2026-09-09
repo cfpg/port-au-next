@@ -13,9 +13,11 @@ interface AppDeployButtonProps {
   app: App;
   branch?: string;
   showDropdown?: boolean;
+  /** Which edge the split-button's dropdown aligns to. Flip to "right" near a container's right edge (e.g. a table's last column). */
+  dropdownAlign?: 'left' | 'right';
 }
 
-export default function AppDeployButton({ app, branch, showDropdown = false }: AppDeployButtonProps) {
+export default function AppDeployButton({ app, branch, showDropdown = false, dropdownAlign = 'left' }: AppDeployButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const pathname = usePathname();
@@ -48,12 +50,15 @@ export default function AppDeployButton({ app, branch, showDropdown = false }: A
   return (
     <>
       <Button
+        variant="primary"
         disabled={isLoading}
+        loading={isLoading}
         size="sm"
         onClick={() => handleDeploy(branch)}
         dropdown={dropdownItems}
+        dropdownAlign={dropdownAlign}
       >
-        <i className="fas fa-rocket mr-2" />
+        <i className="fas fa-rocket" />
         Deploy
       </Button>
       <DeployPreviewBranchModal

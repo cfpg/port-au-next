@@ -3,12 +3,15 @@
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Link from '~/components/general/Link';
-import UserAvatar from '~/components/general/UserAvatar';
+import Avatar from '~/components/general/Avatar';
+import Brand from '~/components/general/Brand';
+import { HomeIcon, GridIcon, GearIcon, PlusIcon, MenuIcon } from '~/components/general/icons';
 import getSingleAppPath from '~/utils/getSingleAppPath';
 import { useSession } from '~/lib/auth-client';
+import { App } from '~/types';
 
 interface SidebarProps {
-  apps: any[];
+  apps: App[];
 }
 
 export default function Sidebar({ apps }: SidebarProps) {
@@ -29,90 +32,62 @@ export default function Sidebar({ apps }: SidebarProps) {
     return pathname.startsWith(path);
   };
 
-  const getNavClassName = (path: string) => {
-    return isActive(path) ? 'bg-gray-100 text-blue-600' : '';
-  };
-
   return (
-    <nav className="p-4 h-auto flex flex-col">
-      <div className="flex justify-between items-center">
-        <h1 className="text-xl font-bold text-gray-800">Port-au-Next</h1>
-        <button onClick={() => setIsNavOpen(!isNavOpen)} className="md:hidden">
-          <i className="fas fa-bars" />
+    <nav className="flex flex-col h-full">
+      <div className="flex items-center justify-between gap-9 px-14 py-13 border-b border-line-soft">
+        <Brand />
+        <button
+          type="button"
+          onClick={() => setIsNavOpen(!isNavOpen)}
+          className="md:hidden inline-flex items-center justify-center size-26 bg-surface text-ink-muted border border-line-strong rounded-control cursor-pointer transition-colors duration-150 hover:bg-paper hover:text-ink focus-ring"
+          aria-label="Toggle navigation"
+        >
+          <MenuIcon size={15} />
         </button>
       </div>
-      
-      <ul className={`space-y-2 h-0 md:h-auto overflow-y-auto transition-all duration-300 ease-in-out mb-8  ${isNavOpen ? 'h-auto' : 'h-0'}`}>
-        <li className="mt-8">
-          <Link 
-            href="/" 
-            variant="nav"
-            color="primary"
-            className={getNavClassName('/')}
-          >
-            <i className="fas fa-home mr-3" />
-            Dashboard
+
+      <div className={`flex-1 overflow-y-auto p-8 ${isNavOpen ? 'block' : 'hidden'} md:block`}>
+        <Link href="/" variant="nav" isActive={isActive('/')}>
+          <HomeIcon />
+          Dashboard
+        </Link>
+        <Link href="/apps" variant="nav" isActive={isActive('/apps')} className="mt-2">
+          <GridIcon />
+          Applications
+        </Link>
+
+        <div className="mt-4 mb-2 ml-9 pl-9 border-l border-line-soft">
+          {apps.map((app) => (
+            <Link
+              key={app.id}
+              href={getSingleAppPath(app.name)}
+              variant="subNav"
+              isActive={isActive(getSingleAppPath(app.name))}
+            >
+              {app.domain || app.name}
+            </Link>
+          ))}
+          <Link href="/#new" variant="nav" className="mt-2 text-primary! hover:bg-primary-tint! hover:text-primary-active!">
+            <PlusIcon />
+            Add App
           </Link>
-        </li>
-        <li>
-          <Link 
-            href="/apps" 
-            variant="nav"
-            color="primary"
-            className={`mb-2 ${getNavClassName('/apps')}`}
-          >
-            <i className="fas fa-rocket mr-3" />
-            Applications
-          </Link>
-          <ul className="ml-6 hidden md:block space-y-2">
-            {apps.map((app) => (
-              <li key={app.id}>
-                <Link 
-                  href={getSingleAppPath(app.name)} 
-                  variant="subNav"
-                  color="gray"
-                  className={getNavClassName(getSingleAppPath(app.name))}
-                >
-                  {app.domain}
-                </Link>
-              </li>
-            ))}
-            <li>
-              <Link 
-                href="/#new" 
-                variant="nav"
-                color="gray"
-              >
-                <i className="fas fa-plus mr-3" />
-                Add App
-              </Link>
-            </li>
-          </ul>
-        </li>
-        <li>
-          <Link 
-            href="/settings" 
-            variant="nav"
-            color="primary"
-            className={getNavClassName('/settings')}
-          >
-            <i className="fas fa-gear mr-3" />
-            Settings
-          </Link>
-        </li>
-      </ul>
+        </div>
+
+        <Link href="/settings" variant="nav" isActive={isActive('/settings')} className="mt-6">
+          <GearIcon />
+          Settings
+        </Link>
+      </div>
 
       {data?.user && (
-        <div className="mt-auto pt-8 border-t border-gray-200">
-          <div className="flex items-center space-x-3">
-            <UserAvatar name={data.user.name} />
-            <div>
-              <div className="text-sm font-medium text-gray-900">{data.user.name}</div>
-              <div className="text-xs text-gray-500">{data.user.email}</div>
-            </div>
+        <div className="flex items-center gap-9 px-13 py-11 border-t border-line-soft">
+          <Avatar name={data.user.name} size="md" />
+          <div className="min-w-0">
+            <div className="font-display font-semibold text-label">{data.user.name}</div>
+            <div className="font-mono text-micro text-ink-faint truncate">{data.user.email}</div>
           </div>
         </div>
       )}
     </nav>
   );
-} 
+}

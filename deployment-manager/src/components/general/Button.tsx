@@ -1,188 +1,157 @@
 "use client";
 
-import { tv, VariantProps } from 'tailwind-variants';
-import { useState, useRef, useEffect } from 'react';
+import { tv } from '~/lib/tv';
+import { VariantProps } from 'tailwind-variants';
+import { useRef, useState } from 'react';
+import { ChevronDownIcon, SpinnerIcon } from './icons';
+import Popover from './Popover';
 
-const button = tv({
+export const buttonStyles = tv({
   slots: {
-    wrapper: 'inline-flex relative',
+    wrapper: 'inline-flex',
     base: [
-      'inline-flex items-center cursor-pointer justify-center font-medium',
-      'transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2',
-      'disabled:opacity-50 disabled:pointer-events-none'
-    ],
-    mainButton: [
-      'rounded-l-md rounded-r-md',
-      '[&.has-dropdown]:rounded-r-none'
+      'inline-flex items-center justify-center gap-6 font-display cursor-pointer whitespace-nowrap',
+      'rounded-control transition-colors duration-150 focus-ring',
+      'disabled:cursor-not-allowed disabled:bg-canvas disabled:text-ink-ghost disabled:border-line',
     ],
     dropdownButton: [
-      'rounded-r-md rounded-l-none border-l border-opacity-10',
-      'hover:bg-opacity-75'
+      'inline-flex items-center justify-center cursor-pointer',
+      'rounded-r-control transition-colors duration-150 focus-ring',
     ],
-    dropdownPanel: [
-      'absolute top-full right-0 w-48 rounded-md shadow-lg overflow-hidden',
-      'border border-gray-100 z-50',
-    ],
+    dropdownContent: 'min-w-190 bg-surface border border-line rounded-menu shadow-pop p-4 z-110',
     dropdownItem: [
-      'w-full text-left px-4 py-2 text-sm transition-colors cursor-pointer',
-      'first:rounded-t-md last:rounded-b-md',
-    ]
+      'w-full flex items-center gap-9 px-9 py-7 rounded-badge text-panel text-ink text-left cursor-pointer',
+      'transition-colors duration-100 hover:bg-hover active:bg-pressed',
+    ],
   },
   variants: {
-    color: {
+    variant: {
       primary: {
-        base: 'bg-indigo-600 text-white hover:bg-indigo-700 focus:ring-indigo-500',
-        dropdownButton: 'border-indigo-500 hover:bg-indigo-700',
-        dropdownPanel: 'bg-indigo-600 border-indigo-500',
-        dropdownItem: 'text-white hover:bg-indigo-700'
+        base: 'font-semibold bg-primary text-white border border-primary-hover hover:bg-primary-hover hover:border-primary-active active:bg-primary-active active:border-primary-active',
+        dropdownButton: 'bg-primary-hover text-white border border-primary-hover hover:bg-primary-active hover:border-primary-active active:bg-primary-pressed',
       },
-      blue: {
-        base: 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500',
-        dropdownButton: 'border-blue-500 hover:bg-blue-700',
-        dropdownPanel: 'bg-blue-600 border-blue-500',
-        dropdownItem: 'text-white hover:bg-blue-700'
+      secondary: {
+        base: 'font-medium bg-surface text-ink border border-line-strong hover:bg-paper hover:border-line-stronger active:bg-hover',
+        dropdownButton: 'bg-surface text-ink-muted border border-line-strong hover:bg-paper hover:border-line-stronger active:bg-hover',
       },
-      green: {
-        base: 'bg-green-600 text-white hover:bg-green-700 focus:ring-green-500',
-        dropdownButton: 'border-green-500 hover:bg-green-700',
-        dropdownPanel: 'bg-green-600 border-green-500',
-        dropdownItem: 'text-white hover:bg-green-700'
+      ghost: {
+        base: 'font-medium bg-transparent text-primary border border-transparent hover:bg-primary-tint hover:text-primary-active active:bg-primary-tint-hover disabled:bg-transparent',
+        dropdownButton: 'bg-transparent text-primary border border-transparent hover:bg-primary-tint hover:text-primary-active active:bg-primary-tint-hover',
       },
-      yellow: {
-        base: 'bg-yellow-600 text-white hover:bg-yellow-700 focus:ring-yellow-500',
-        dropdownButton: 'border-yellow-500 hover:bg-yellow-700',
-        dropdownPanel: 'bg-yellow-600 border-yellow-500',
-        dropdownItem: 'text-white hover:bg-yellow-700'
+      danger: {
+        base: 'font-medium bg-surface text-ink-muted border border-line-strong hover:bg-danger-tint hover:border-danger-line-strong hover:text-danger-ink active:bg-danger-tint-hover active:border-danger-line-stronger active:text-danger-pressed',
+        dropdownButton: 'bg-surface text-ink-muted border border-line-strong hover:bg-danger-tint hover:border-danger-line-strong hover:text-danger-ink active:bg-danger-tint-hover',
       },
-      red: {
-        base: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500',
-        dropdownButton: 'border-red-500 hover:bg-red-700',
-        dropdownPanel: 'bg-red-600 border-red-500',
-        dropdownItem: 'text-white hover:bg-red-700'
-      },
-      gray: {
-        base: 'bg-gray-600 text-white hover:bg-gray-700 focus:ring-gray-500',
-        dropdownButton: 'border-gray-500 hover:bg-gray-700',
-        dropdownPanel: 'bg-gray-600 border-gray-500',
-        dropdownItem: 'text-white hover:bg-gray-700'
-      },
-      'gray-light': {
-        base: 'bg-gray-200 text-gray-700 hover:bg-gray-300 focus:ring-gray-500',
-        dropdownButton: 'border-gray-400 hover:bg-gray-300',
-        dropdownPanel: 'bg-gray-200 border-gray-300',
-        dropdownItem: 'text-gray-700 hover:bg-gray-300'
-      },
-      white: {
-        base: 'bg-white text-gray-700 hover:bg-gray-100 focus:ring-gray-500',
-        dropdownButton: 'border-gray-300 hover:bg-gray-100',
-        dropdownPanel: 'bg-white border-gray-200',
-        dropdownItem: 'text-gray-700 hover:bg-gray-100'
-      },
-      transparent: {
-        base: 'bg-transparent text-gray-700 hover:bg-gray-100 focus:ring-gray-500',
-        dropdownButton: 'border-gray-300 hover:bg-gray-100',
-        dropdownPanel: 'bg-white border-gray-200',
-        dropdownItem: 'text-gray-700 hover:bg-gray-100'
+      'danger-solid': {
+        base: 'font-semibold bg-danger-solid text-white border border-danger-ink hover:bg-danger-pressed',
+        dropdownButton: 'bg-danger-solid text-white border border-danger-ink hover:bg-danger-pressed',
       },
     },
     size: {
-      sm: {
-        base: 'text-sm px-2 py-1',
-        dropdownButton: 'px-2 py-1'
-      },
-      md: {
-        base: 'text-sm px-3 py-2',
-        dropdownButton: 'px-2 py-2'
-      },
-      lg: {
-        base: 'text-base px-4 py-2',
-        dropdownButton: 'px-3 py-2'
-      },
+      sm: { base: 'text-label px-10 py-5', dropdownButton: 'px-7 py-5' },
+      md: { base: 'text-panel px-14 py-8', dropdownButton: 'px-8 py-8' },
     },
-    disabled: {
-      true: { base: "cursor-not-allowed" },
-    }
+    iconOnly: {
+      true: { base: 'size-26 p-0' },
+    },
+    hasDropdown: {
+      true: { base: 'rounded-r-none border-r-0' },
+    },
   },
   defaultVariants: {
-    color: 'primary',
-    size: 'sm',
+    variant: 'secondary',
+    size: 'md',
   },
 });
 
 interface DropdownItem {
   label: string;
   onClick: () => void;
+  icon?: React.ReactNode;
 }
 
-interface ButtonProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'color'>, VariantProps<typeof button> {
+interface ButtonProps
+  extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'color'>,
+    Omit<VariantProps<typeof buttonStyles>, 'hasDropdown'> {
   children: React.ReactNode;
   dropdown?: DropdownItem[];
+  /** Which edge the dropdown content aligns to. Flip to "right" near a container's right edge (e.g. a table's last column). */
+  dropdownAlign?: 'left' | 'right';
+  /** Shows an inline spinner in place of any leading icon; label stays put so the control doesn't resize. */
+  loading?: boolean;
 }
 
-export default function Button({ 
-  color, 
-  size, 
-  className, 
+export default function Button({
+  variant,
+  size,
+  iconOnly,
+  className,
   children,
   disabled,
+  loading,
   dropdown,
+  dropdownAlign = 'left',
   onClick,
-  ...props 
+  ...props
 }: ButtonProps) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsDropdownOpen(false);
-      }
-    }
-
-    if (isDropdownOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isDropdownOpen]);
-
-  const styles = button({ color, size, className, disabled });
+  const isDisabled = disabled || loading;
+  const styles = buttonStyles({ variant, size, iconOnly });
+  const spinnerClassName = variant === 'primary' || variant === 'danger-solid'
+    ? 'border-white/35 border-t-white'
+    : 'border-line-strong border-t-ink-muted';
 
   if (!dropdown) {
     return (
-      <button className={styles.base({ className: styles.mainButton() })} disabled={disabled} onClick={onClick} {...props}>
+      <button
+        className={styles.base({ className })}
+        disabled={isDisabled}
+        onClick={onClick}
+        {...props}
+      >
+        {loading ? <SpinnerIcon className={spinnerClassName} /> : null}
         {children}
       </button>
     );
   }
 
   return (
-    <div className={styles.wrapper()} ref={dropdownRef}>
-      <button 
-        className={styles.base({ className: [styles.mainButton(), 'has-dropdown'] })}
-        disabled={disabled} 
+    <div className={styles.wrapper({ className })} ref={wrapperRef}>
+      <button
+        className={buttonStyles({ variant, size, hasDropdown: true }).base()}
+        disabled={isDisabled}
         onClick={onClick}
         {...props}
       >
+        {loading ? <SpinnerIcon className={spinnerClassName} /> : null}
         {children}
       </button>
       <button
-        className={styles.base({ className: styles.dropdownButton() })}
+        type="button"
+        className={styles.dropdownButton()}
         onClick={(e) => {
           e.stopPropagation();
-          setIsDropdownOpen(!isDropdownOpen);
+          setIsDropdownOpen((v) => !v);
         }}
-        disabled={disabled}
+        disabled={isDisabled}
+        aria-label="More deploy options"
+        aria-expanded={isDropdownOpen}
       >
-        <i className="fas fa-chevron-down" />
+        <ChevronDownIcon size={13} />
       </button>
-      {isDropdownOpen && (
-        <div className={styles.dropdownPanel()}>
+      <Popover
+        open={isDropdownOpen}
+        onOpenChange={setIsDropdownOpen}
+        anchorRef={wrapperRef}
+        placement={dropdownAlign === 'right' ? 'bottom-end' : 'bottom-start'}
+      >
+        <div className={styles.dropdownContent()}>
           {dropdown.map((item, index) => (
             <button
               key={index}
+              type="button"
               onClick={() => {
                 item.onClick();
                 setIsDropdownOpen(false);
@@ -190,11 +159,12 @@ export default function Button({
               className={styles.dropdownItem()}
               role="menuitem"
             >
+              {item.icon}
               {item.label}
             </button>
           ))}
         </div>
-      )}
+      </Popover>
     </div>
   );
 }

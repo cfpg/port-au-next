@@ -6,6 +6,7 @@ import { EnvVarsForm } from '~/components/EnvVarsForm';
 import ImportEnvVarsModal from '~/components/env-vars/ImportEnvVarsModal';
 import Select from '~/components/general/Select';
 import Button from '~/components/general/Button';
+import Callout from '~/components/general/Callout';
 import fetcher from '~/utils/fetcher';
 import { App } from '~/types';
 import { AppEnvVar } from '~/queries/fetchAppEnvVars';
@@ -35,7 +36,7 @@ export default function EnvVarsSettings({ app }: EnvVarsSettingsProps) {
       revalidateOnReconnect: false,
     }
   );
-  
+
   const { data: previewEnvVars, error: previewError, mutate: mutatePreview } = useSWR(
     `/api/apps/${app.id}/env-vars?isPreview=true`,
     fetcher,
@@ -56,17 +57,17 @@ export default function EnvVarsSettings({ app }: EnvVarsSettingsProps) {
 
   // Use the appropriate error based on the selected environment
   const error = isPreview ? previewError : productionError;
-  const isLoading = isPreview 
-    ? previewEnvVars === undefined && !previewError 
+  const isLoading = isPreview
+    ? previewEnvVars === undefined && !previewError
     : productionEnvVars === undefined && !productionError;
 
   // Handlers for the EnvVarsForm
   const handleAdd = () => {
-    setEnvVars([...envVars, { 
-      key: '', 
-      value: '', 
+    setEnvVars([...envVars, {
+      key: '',
+      value: '',
       branch: null,
-      is_preview: isPreview 
+      is_preview: isPreview
     }]);
     setUnsavedChanges(true);
   };
@@ -78,8 +79,8 @@ export default function EnvVarsSettings({ app }: EnvVarsSettingsProps) {
 
   const handleChange = (index: number, field: 'key' | 'value', value: string) => {
     const newEnvVars = [...envVars];
-    newEnvVars[index] = { 
-      ...newEnvVars[index], 
+    newEnvVars[index] = {
+      ...newEnvVars[index],
       [field]: value,
       is_preview: isPreview
     };
@@ -114,7 +115,7 @@ export default function EnvVarsSettings({ app }: EnvVarsSettingsProps) {
           envVars: envVarsMap,
         }),
       });
-      
+
       const result = await response.json();
 
       if (result.success) {
@@ -176,12 +177,12 @@ export default function EnvVarsSettings({ app }: EnvVarsSettingsProps) {
   };
 
   if (error) {
-    return <div className="text-red-500">Failed to load environment variables</div>;
+    return <Callout tone="danger">Failed to load environment variables.</Callout>;
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-end gap-4">
+    <div className="flex flex-col gap-16">
+      <div className="flex flex-wrap items-end gap-10">
         <Select
           id="env-type"
           label="Environment Type"
@@ -191,10 +192,10 @@ export default function EnvVarsSettings({ app }: EnvVarsSettingsProps) {
             { value: 'Production', label: 'Production' },
             { value: 'Preview', label: 'Preview' },
           ]}
-          className="w-48"
+          className="w-190"
         />
-        <Button type="button" color="blue" onClick={() => setImportModalOpen(true)}>
-          <i className="fas fa-file-import mr-2" />
+        <Button type="button" variant="secondary" onClick={() => setImportModalOpen(true)}>
+          <i className="fas fa-file-import" />
           Import from .env
         </Button>
       </div>
@@ -210,7 +211,7 @@ export default function EnvVarsSettings({ app }: EnvVarsSettingsProps) {
       />
 
       {isLoading ? (
-        <div className="text-gray-500">Loading environment variables...</div>
+        <div className="text-panel text-ink-faint">Loading environment variables...</div>
       ) : (
         <EnvVarsForm
           envVars={envVars}
@@ -223,22 +224,19 @@ export default function EnvVarsSettings({ app }: EnvVarsSettingsProps) {
         />
       )}
 
-      <div className="rounded-md border border-gray-200 bg-gray-50 p-4 space-y-3">
+      <div className="border border-line rounded-menu bg-paper p-14 flex flex-col gap-11">
         <div>
-          <h3 className="text-sm font-semibold text-gray-900">
-            System Environment Variables
-          </h3>
-          <p className="text-sm text-gray-600">
-            The full set of variables injected into the deployed{' '}
-            <span className="font-medium">production</span> container, including
+          <div className="font-display font-semibold text-panel">System Environment Variables</div>
+          <p className="text-field text-ink-muted mt-3">
+            The full set of variables injected into the deployed <strong className="font-semibold text-ink">production</strong> container, including
             platform-managed secrets (Postgres, MinIO, etc.). Useful for local
             development against platform services.
           </p>
         </div>
 
-        <fieldset className="space-y-1">
-          <legend className="text-sm font-medium text-gray-700">Export for</legend>
-          <div className="flex flex-wrap gap-4 text-sm text-gray-700">
+        <fieldset className="flex flex-col gap-7">
+          <legend className="font-display font-semibold text-label text-ink mb-2">Export for</legend>
+          <div className="flex flex-wrap gap-14 text-field text-ink">
             {(
               [
                 { value: 'postgres', label: 'Deployed', hint: 'postgres' },
@@ -250,18 +248,18 @@ export default function EnvVarsSettings({ app }: EnvVarsSettingsProps) {
                 },
               ] as { value: ExportPostgresHost; label: string; hint: string }[]
             ).map((option) => (
-              <label key={option.value} className="flex items-center gap-2">
+              <label key={option.value} className="flex items-center gap-6 cursor-pointer">
                 <input
                   type="radio"
                   name="export-host"
                   value={option.value}
                   checked={exportHost === option.value}
                   onChange={() => handleChangeHost(option.value)}
-                  className="border-gray-300"
+                  className="accent-primary"
                 />
                 <span>
                   {option.label}{' '}
-                  <code className="text-xs text-gray-500">({option.hint})</code>
+                  <span className="font-mono text-micro text-ink-faint">({option.hint})</span>
                 </span>
               </label>
             ))}
@@ -270,34 +268,35 @@ export default function EnvVarsSettings({ app }: EnvVarsSettingsProps) {
 
         <Button
           type="button"
-          color="gray"
+          variant="secondary"
           onClick={() => fetchExport(exportHost)}
-          disabled={exportLoading}
+          loading={exportLoading}
+          className="self-start"
         >
-          <i className="fas fa-file-export mr-2" />
-          {exportLoading ? 'Loading…' : exportVisible ? 'Refresh' : 'Show variables'}
+          <i className="fas fa-file-export" />
+          {exportVisible ? 'Refresh' : 'Show variables'}
         </Button>
 
         {exportVisible && (
-          <div className="space-y-2">
+          <div className="flex flex-col gap-9">
             <textarea
               readOnly
               value={exportText}
               onFocus={(e) => e.target.select()}
-              className="w-full h-64 font-mono text-xs border border-gray-300 rounded-md p-3 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full h-190 font-mono text-meta border border-line-strong rounded-control p-11 bg-surface focus:outline-none focus:border-primary focus:shadow-focus"
             />
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-xs text-amber-700">
-                <i className="fas fa-triangle-exclamation mr-1" />
+            <div className="flex items-center justify-between gap-10 flex-wrap">
+              <p className="text-mini text-warning-ink flex items-center gap-5">
+                <i className="fas fa-triangle-exclamation" />
                 Contains plaintext secrets. Handle with care.
               </p>
-              <div className="flex gap-3">
-                <Button type="button" color="gray" onClick={() => setExportVisible(false)}>
-                  <i className="fas fa-xmark mr-2" />
+              <div className="flex gap-7">
+                <Button type="button" variant="secondary" size="sm" onClick={() => setExportVisible(false)}>
+                  <i className="fas fa-xmark" />
                   Hide
                 </Button>
-                <Button type="button" color="blue" onClick={handleCopyExport}>
-                  <i className="fas fa-copy mr-2" />
+                <Button type="button" variant="primary" size="sm" onClick={handleCopyExport}>
+                  <i className="fas fa-copy" />
                   Copy to clipboard
                 </Button>
               </div>

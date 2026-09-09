@@ -3,6 +3,8 @@
 import { useMemo, useState } from 'react';
 import Modal from '~/components/general/Modal';
 import Button from '~/components/general/Button';
+import Callout from '~/components/general/Callout';
+import Badge from '~/components/general/Badge';
 import { isReservedAppEnvKey } from '~/constants/reservedAppEnvKeys';
 import { parseDotEnv } from '~/utils/parseDotEnv';
 import { AppEnvVar } from '~/queries/fetchAppEnvVars';
@@ -134,33 +136,33 @@ export default function ImportEnvVarsModal({
       isOpen={isOpen}
       onClose={handleClose}
       title="Import from .env file"
-      size="3xl"
+      size="lg"
     >
       {step === 'paste' && (
-        <div className="space-y-4">
-          <p className="text-sm text-gray-600">
-            Paste the contents of a <code className="text-xs">.env</code> file for the{' '}
+        <div className="flex flex-col gap-14">
+          <p className="text-field text-ink-muted">
+            Paste the contents of a <span className="font-mono text-meta bg-hover border border-line-token rounded-badge px-5 py-1">.env</span> file for the{' '}
             {isPreview ? 'preview' : 'production'} environment. Existing keys are not
             overwritten. Platform-managed keys (database URL, MinIO, etc.) are ignored.
           </p>
           <textarea
-            className="w-full h-64 font-mono text-sm border border-gray-300 rounded-md p-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full h-190 font-mono text-meta border border-line-strong rounded-control p-11 focus:outline-none focus:border-primary focus:shadow-focus"
             placeholder={'RESEND_API_KEY=re_...\nNEXT_PUBLIC_APP_URL=https://example.com'}
             value={pasteContent}
             onChange={(e) => setPasteContent(e.target.value)}
           />
           {parseErrors.length > 0 && (
-            <div className="rounded-md bg-red-50 border border-red-200 p-3 text-sm text-red-800 space-y-1">
+            <Callout tone="danger">
               {parseErrors.map((err) => (
                 <p key={err}>{err}</p>
               ))}
-            </div>
+            </Callout>
           )}
-          <div className="flex justify-end gap-3">
-            <Button type="button" color="gray" onClick={handleClose}>
+          <div className="flex justify-end gap-7">
+            <Button type="button" variant="secondary" onClick={handleClose}>
               Cancel
             </Button>
-            <Button type="button" color="blue" onClick={handleContinue}>
+            <Button type="button" variant="primary" onClick={handleContinue}>
               Continue
             </Button>
           </div>
@@ -168,48 +170,42 @@ export default function ImportEnvVarsModal({
       )}
 
       {step === 'review' && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-3 gap-3 text-sm">
-            <div className="rounded-md bg-green-50 border border-green-200 p-3">
-              <span className="font-semibold text-green-900">{toImport.length}</span>
-              <span className="text-green-800"> to import</span>
+        <div className="flex flex-col gap-14">
+          <div className="grid grid-cols-3 gap-9">
+            <div className="rounded-control bg-success-tint border border-success-line px-11 py-9">
+              <span className="font-semibold text-success-ink">{toImport.length}</span>
+              <span className="text-success-ink text-field"> to import</span>
             </div>
-            <div className="rounded-md bg-gray-50 border border-gray-200 p-3">
-              <span className="font-semibold">{skipExists.length}</span>
-              <span className="text-gray-600"> already set (skipped)</span>
+            <div className="rounded-control bg-idle-tint border border-idle-line px-11 py-9">
+              <span className="font-semibold text-idle-ink">{skipExists.length}</span>
+              <span className="text-idle-ink text-field"> already set (skipped)</span>
             </div>
-            <div className="rounded-md bg-amber-50 border border-amber-200 p-3">
-              <span className="font-semibold text-amber-900">{skipReserved.length}</span>
-              <span className="text-amber-800"> platform keys (skipped)</span>
+            <div className="rounded-control bg-warning-tint border border-warning-line px-11 py-9">
+              <span className="font-semibold text-warning-ink">{skipReserved.length}</span>
+              <span className="text-warning-ink text-field"> platform keys (skipped)</span>
             </div>
           </div>
 
-          <div className="max-h-96 overflow-y-auto border border-gray-200 rounded-md">
-            <table className="min-w-full text-sm">
-              <thead className="bg-gray-50 sticky top-0">
+          <div className="max-h-380 overflow-y-auto border border-line rounded-menu">
+            <table className="min-w-full text-field">
+              <thead className="bg-paper sticky top-0">
                 <tr>
-                  <th className="text-left px-3 py-2 font-medium">Key</th>
-                  <th className="text-left px-3 py-2 font-medium">Value</th>
-                  <th className="text-left px-3 py-2 font-medium">Action</th>
+                  <th className="text-left px-11 py-8 font-mono text-nano tracking-caps uppercase text-ink-faint font-medium">Key</th>
+                  <th className="text-left px-11 py-8 font-mono text-nano tracking-caps uppercase text-ink-faint font-medium">Value</th>
+                  <th className="text-left px-11 py-8 font-mono text-nano tracking-caps uppercase text-ink-faint font-medium">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-line-soft">
                 {reviewRows.map((row) => (
                   <tr key={row.key}>
-                    <td className="px-3 py-2 font-mono text-xs">{row.key}</td>
-                    <td className="px-3 py-2 font-mono text-xs truncate max-w-xs" title={row.value}>
-                      {row.value.length > 48 ? `${row.value.slice(0, 48)}…` : row.value}
+                    <td className="px-11 py-7 font-mono text-meta text-ink">{row.key}</td>
+                    <td className="px-11 py-7 font-mono text-meta text-ink-muted truncate max-w-190" title={row.value}>
+                      {row.value.length > 48 ? `${row.value.slice(0, 48)}...` : row.value}
                     </td>
-                    <td className="px-3 py-2">
-                      {row.status === 'import' && (
-                        <span className="text-green-700">Import</span>
-                      )}
-                      {row.status === 'skip_exists' && (
-                        <span className="text-gray-500">Skip (exists)</span>
-                      )}
-                      {row.status === 'skip_reserved' && (
-                        <span className="text-amber-700">Skip (platform)</span>
-                      )}
+                    <td className="px-11 py-7">
+                      {row.status === 'import' && <Badge tone="success" withDot={false}>import</Badge>}
+                      {row.status === 'skip_exists' && <Badge tone="idle" withDot={false}>skip - exists</Badge>}
+                      {row.status === 'skip_reserved' && <Badge tone="warning" withDot={false}>skip - platform</Badge>}
                     </td>
                   </tr>
                 ))}
@@ -217,21 +213,22 @@ export default function ImportEnvVarsModal({
             </table>
           </div>
 
-          <div className="flex justify-between gap-3">
-            <Button type="button" color="gray" onClick={() => setStep('paste')} disabled={isSaving}>
+          <div className="flex justify-between gap-7">
+            <Button type="button" variant="secondary" onClick={() => setStep('paste')} disabled={isSaving}>
               Back
             </Button>
-            <div className="flex gap-3">
-              <Button type="button" color="gray" onClick={handleClose} disabled={isSaving}>
+            <div className="flex gap-7">
+              <Button type="button" variant="secondary" onClick={handleClose} disabled={isSaving}>
                 Cancel
               </Button>
               <Button
                 type="button"
-                color="green"
+                variant="primary"
                 onClick={handleSave}
+                loading={isSaving}
                 disabled={isSaving || toImport.length === 0}
               >
-                {isSaving ? 'Saving…' : `Save ${toImport.length} variable${toImport.length === 1 ? '' : 's'}`}
+                {`Save ${toImport.length} variable${toImport.length === 1 ? '' : 's'}`}
               </Button>
             </div>
           </div>

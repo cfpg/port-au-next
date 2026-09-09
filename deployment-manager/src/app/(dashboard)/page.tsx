@@ -1,5 +1,6 @@
 import AppsSection from '~/components/AppsSection';
 import AppRegistrationForm from '~/components/AppRegistrationForm';
+import PageHeader from '~/components/general/PageHeader';
 import { fetchApps, fetchRecentDeployments } from '~/app/(dashboard)/actions';
 import { SWRConfig } from 'swr';
 
@@ -22,10 +23,10 @@ export default async function Home() {
         },
       }}
     >
-      <main className="">
-        <h1 className="text-3xl font-bold mb-8">Dashboard</h1>
+      <main>
+        <PageHeader title="Dashboard" />
 
-        <div className="grid grid-cols-12 gap-8">
+        <div className="grid grid-cols-12 gap-24">
           <div className="col-span-12">
             <AppsSection />
           </div>
