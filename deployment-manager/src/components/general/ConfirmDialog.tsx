@@ -15,6 +15,7 @@ interface ConfirmDialogProps {
   confirmLabel: string;
   /** When set, the confirm button stays disabled until the user types this exact value. */
   confirmText?: string;
+  confirmVariant?: 'primary' | 'danger-solid';
   isLoading?: boolean;
   error?: string;
 }
@@ -32,6 +33,7 @@ export default function ConfirmDialog({
   description,
   confirmLabel,
   confirmText,
+  confirmVariant = 'danger-solid',
   isLoading = false,
   error,
 }: ConfirmDialogProps) {
@@ -71,7 +73,7 @@ export default function ConfirmDialog({
             Cancel
           </Button>
           <Button
-            variant="danger-solid"
+            variant={confirmVariant}
             onClick={onConfirm}
             disabled={!canConfirm}
             loading={isLoading}

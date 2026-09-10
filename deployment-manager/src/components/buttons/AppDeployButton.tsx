@@ -8,6 +8,7 @@ import { usePathname } from "next/navigation";
 import DeployPreviewBranchModal from "~/components/modals/DeployPreviewBranchModal";
 import { App } from "~/types";
 import { useSWRConfig } from "swr";
+import ConfirmDialog from "~/components/general/ConfirmDialog";
 
 interface AppDeployButtonProps {
   app: App;
@@ -20,14 +21,25 @@ interface AppDeployButtonProps {
 export default function AppDeployButton({ app, branch, showDropdown = false, dropdownAlign = 'left' }: AppDeployButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [branchToConfirm, setBranchToConfirm] = useState<string | null>(null);
   const pathname = usePathname();
   const { mutate } = useSWRConfig();
 
-  const handleDeploy = async (targetBranch?: string) => {
+  const handleDeploy = async (targetBranch?: string, confirmConcurrent = false) => {
+    const resolvedBranch = targetBranch || app.branch;
     try {
       setIsLoading(true);
-      const result = await triggerDeployment(app.name, { pathname, branch: targetBranch || app.branch });
+      const result = await triggerDeployment(app.name, {
+        pathname,
+        branch: resolvedBranch,
+        confirmConcurrent,
+      });
+      if (result?.requiresConfirmation) {
+        setBranchToConfirm(resolvedBranch);
+        return;
+      }
       if (result?.error) throw new Error(result.error);
+      setBranchToConfirm(null);
       showToast(`Deployment started successfully for ${app.name}`, 'success');
     } catch (error) {
       console.error(`Deployment failed for ${app.name}:`, error);
@@ -66,6 +78,16 @@ export default function AppDeployButton({ app, branch, showDropdown = false, dro
         appId={app.id}
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
+      />
+      <ConfirmDialog
+        isOpen={branchToConfirm !== null}
+        onClose={() => setBranchToConfirm(null)}
+        onConfirm={() => branchToConfirm ? handleDeploy(branchToConfirm, true) : undefined}
+        isLoading={isLoading}
+        title="Deploy branch again?"
+        confirmLabel="Deploy again"
+        confirmVariant="primary"
+        description="That branch is currently deploying and building. Are you sure you want to deploy it again?"
       />
     </>
   );

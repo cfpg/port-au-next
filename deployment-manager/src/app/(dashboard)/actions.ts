@@ -33,7 +33,14 @@ export const fetchRecentDeployments = withAuth(async () => {
   return deployments;
 });
 
-export const triggerDeployment = withAuth(async (appName: string, { pathname, branch }: { pathname?: string; branch?: string } = {}) => {
+export const triggerDeployment = withAuth(async (
+  appName: string,
+  {
+    pathname,
+    branch,
+    confirmConcurrent = false,
+  }: { pathname?: string; branch?: string; confirmConcurrent?: boolean } = {}
+) => {
   let deploymentId: number;
   try {
     // Get app details
@@ -51,6 +58,26 @@ export const triggerDeployment = withAuth(async (appName: string, { pathname, br
     const targetBranch = branch || app.branch;
     const isPreviewBranch = !!(branch && branch !== app.branch);
     let previewBranch = null;
+
+    if (!confirmConcurrent) {
+      const inProgressDeployment = await pool.query(
+        `SELECT id
+         FROM deployments
+         WHERE app_id = $1
+           AND branch = $2
+           AND status IN ('pending', 'building', 'preflight', 'migrating')
+         LIMIT 1`,
+        [app.id, targetBranch]
+      );
+
+      if (inProgressDeployment.rows.length > 0) {
+        return {
+          success: false,
+          requiresConfirmation: true,
+          branch: targetBranch,
+        };
+      }
+    }
 
     // If this is a preview branch deployment, check if preview branches are enabled
     if (isPreviewBranch) {
