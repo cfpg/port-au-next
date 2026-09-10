@@ -1,7 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-import pool from '~/services/database';
 import logger from '~/services/logger';
 import { App } from '~/types';
 import {
@@ -32,6 +31,12 @@ import {
   getDeploymentNetworkAlias,
 } from '~/lib/deploymentRouting';
 import type { NginxApplyResult } from '~/services/nginx';
+import {
+  getBugsinkAppCredentials,
+  getBugsinkDashboardUrl,
+} from '~/services/bugsink';
+import { requireBugsinkApiToken } from '~/services/bugsinkToken';
+import type { BugsinkSourceMapBuild } from '~/services/docker';
 
 const networkName = APPLICATION_DOCKER_NETWORK;
 
@@ -72,8 +77,31 @@ export async function runReleasePipeline(
   await logger.info('Phase: build — preparing application', { phase: 'build', version, branch, projectDir });
 
   assertAppProjectLayout(projectDir);
-  await ensureDockerfile(projectDir, app.id);
-  await modifyNextConfig(projectDir);
+  const isManagedDockerfile = await ensureDockerfile(projectDir, app.id);
+
+  let bugsinkSourceMaps: BugsinkSourceMapBuild | undefined;
+  if (!isPreview) {
+    const bugsinkCredentials = await getBugsinkAppCredentials(app.id);
+    if (bugsinkCredentials && isManagedDockerfile) {
+      bugsinkSourceMaps = {
+        url: getBugsinkDashboardUrl(),
+        projectSlug: bugsinkCredentials.projectSlug,
+        authToken: await requireBugsinkApiToken(),
+      };
+      await logger.info('Phase: source-maps — Bugsink browser upload enabled', {
+        phase: 'source-maps',
+        projectSlug: bugsinkCredentials.projectSlug,
+      });
+    } else if (bugsinkCredentials) {
+      await logger.warning('Bugsink source maps skipped for application-owned Dockerfile', {
+        phase: 'source-maps',
+      });
+    }
+  }
+
+  await modifyNextConfig(projectDir, {
+    bugsinkSourceMaps: Boolean(bugsinkSourceMaps),
+  });
 
   const envFilePath = path.join(projectDir, '.env');
   const envFileContent = Object.entries(appEnv)
@@ -88,7 +116,8 @@ export async function runReleasePipeline(
     version,
     buildMigrator,
     deploymentId,
-    projectDir
+    projectDir,
+    bugsinkSourceMaps
   );
 
   const timestamp = Date.now();

@@ -16,6 +16,12 @@ export function getActiveRedactionSecrets(): string[] {
   return activeSecrets;
 }
 
+export function withAdditionalRedactionSecrets(secrets: string[]): string[] {
+  return [...new Set([...activeSecrets, ...secrets].filter(Boolean))].sort(
+    (a, b) => b.length - a.length
+  );
+}
+
 export function collectSecretValues(env: Record<string, string>): string[] {
   return [...new Set(Object.values(env).filter((value) => value.length > 0))].sort(
     (a, b) => b.length - a.length

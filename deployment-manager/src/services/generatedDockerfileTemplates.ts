@@ -20,6 +20,34 @@ ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN npm run build
 
+FROM builder AS source-map-publisher
+ARG BUGSINK_SOURCEMAPS=false
+ARG BUGSINK_URL
+ARG BUGSINK_PROJECT_SLUG
+
+RUN --mount=type=secret,id=bugsink_auth_token,required=false \\
+  if [ "$BUGSINK_SOURCEMAPS" = "true" ]; then \\
+    set -eu; \\
+    test -s /run/secrets/bugsink_auth_token; \\
+    test -n "$BUGSINK_URL"; \\
+    test -n "$BUGSINK_PROJECT_SLUG"; \\
+    find .next/static -type f -name '*.map' -print -quit | grep -q .; \\
+    find .next/static -type f -name '*.map' -exec grep -q '"sourcesContent"' {} \\; -print -quit | grep -q .; \\
+    npm install --global @sentry/cli@2.58.6; \\
+    sentry-cli --version; \\
+    export SENTRY_AUTH_TOKEN="$(cat /run/secrets/bugsink_auth_token)"; \\
+    echo "Phase: source-maps — injecting browser debug IDs"; \\
+    sentry-cli sourcemaps inject .next/static; \\
+    grep -R -l 'debugId' .next/static | grep -q .; \\
+    echo "Phase: source-maps — uploading browser artifacts"; \\
+    sentry-cli --url "$BUGSINK_URL" sourcemaps \\
+      --org bugsinkhasnoorgs \\
+      --project "$BUGSINK_PROJECT_SLUG" \\
+      upload .next/static; \\
+    find .next/static -type f -name '*.map' -delete; \\
+    echo "Phase: source-maps — upload complete; browser maps removed"; \\
+  fi
+
 FROM base AS runner
 WORKDIR /app
 
@@ -31,7 +59,7 @@ RUN adduser -S nextjs -u 1001
 
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=source-map-publisher --chown=nextjs:nodejs /app/.next/static ./.next/static
 
 ENV HOSTNAME="0.0.0.0"
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -96,6 +124,34 @@ WORKDIR /app
 COPY --from=builder /migrate-artifacts/ ./
 ENV NODE_ENV=production
 
+FROM builder AS source-map-publisher
+ARG BUGSINK_SOURCEMAPS=false
+ARG BUGSINK_URL
+ARG BUGSINK_PROJECT_SLUG
+
+RUN --mount=type=secret,id=bugsink_auth_token,required=false \\
+  if [ "$BUGSINK_SOURCEMAPS" = "true" ]; then \\
+    set -eu; \\
+    test -s /run/secrets/bugsink_auth_token; \\
+    test -n "$BUGSINK_URL"; \\
+    test -n "$BUGSINK_PROJECT_SLUG"; \\
+    find .next/static -type f -name '*.map' -print -quit | grep -q .; \\
+    find .next/static -type f -name '*.map' -exec grep -q '"sourcesContent"' {} \\; -print -quit | grep -q .; \\
+    npm install --global @sentry/cli@2.58.6; \\
+    sentry-cli --version; \\
+    export SENTRY_AUTH_TOKEN="$(cat /run/secrets/bugsink_auth_token)"; \\
+    echo "Phase: source-maps — injecting browser debug IDs"; \\
+    sentry-cli sourcemaps inject .next/static; \\
+    grep -R -l 'debugId' .next/static | grep -q .; \\
+    echo "Phase: source-maps — uploading browser artifacts"; \\
+    sentry-cli --url "$BUGSINK_URL" sourcemaps \\
+      --org bugsinkhasnoorgs \\
+      --project "$BUGSINK_PROJECT_SLUG" \\
+      upload .next/static; \\
+    find .next/static -type f -name '*.map' -delete; \\
+    echo "Phase: source-maps — upload complete; browser maps removed"; \\
+  fi
+
 FROM base AS runner
 WORKDIR /app
 
@@ -107,7 +163,7 @@ RUN addgroup -g 1001 -S nodejs && adduser -S nextjs -u 1001
 
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=source-map-publisher --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /prisma-runtime-stage/ ./
 

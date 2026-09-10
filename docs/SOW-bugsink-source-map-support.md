@@ -2,7 +2,7 @@
 
 **Project:** Port-Au-Next — build-time source-map generation, debug-ID injection, and artifact upload  
 **Date:** 2026-09-10  
-**Status:** Proposed; implementation not started  
+**Status:** POC implemented on development branch; application-level end-to-end symbolication pending
 **Initial framework scope:** Next.js applications using a Port-Au-Next-managed Dockerfile  
 **Depends on:** Existing Bugsink provisioning, generated Next.js Dockerfiles, BuildKit image builds, and the green-deployment release pipeline
 
@@ -727,7 +727,6 @@ The POC explicitly excludes:
 - Framework adapter and generic uploader abstractions.
 - Upload retries.
 - Project-scoped token provisioning.
-- Automatic mutation of `withSentryConfig` options.
 
 There is deliberately no POC activation mechanism. On this branch, a production deployment using a managed Dockerfile uploads source maps whenever Bugsink credentials are present. A Bugsink-disabled app follows the existing build path without a secret or upload.
 
@@ -738,30 +737,35 @@ Prisma does not affect Next.js source-map generation or Bugsink upload. The only
 1. A normal/default build for the application runner.
 2. A second build with `--target migrator` for the migration image.
 
-The POC passes the source-map arguments and BuildKit secret only to the runner build. The migrator build receives neither, so its conditional source-map step skips. BuildKit should reuse the expensive application build layers where possible.
+The POC passes the source-map arguments and BuildKit secret only to the runner build. Both generated Dockerfiles branch into a dedicated `source-map-publisher` stage after the application build. The Prisma `migrator` stage branches directly from `builder`, so a targeted migrator build cannot reach the publisher stage or receive the upload token. BuildKit should reuse the expensive application build layers where possible.
 
 ```text
 runner docker build
   → npm run build
+  → source-map-publisher validates the pinned CLI
   → inject + upload + delete browser maps
-  → runner copies injected assets
+  → runner copies browser assets from source-map-publisher
 
 migrator docker build --target migrator
   → npm run build layer is normally cached
-  → source-map step has no enable input and skips
+  → build stops at migrator; source-map-publisher is unreachable
   → migrator image is produced normally
 ```
 
-The key POC assertion is that the combined runner and migrator logs contain exactly one upload. A more elaborate stage graph can be considered later, but it is not required to prove symbolication.
+The key POC assertion is that the combined runner and migrator logs contain exactly one upload.
 
 ### 15.3 Required cooperating application configuration
 
-The selected application is allowed to cooperate explicitly. Before the POC deployment, its `@sentry/nextjs` configuration must retain source maps for the platform step:
+The selected application must use `withSentryConfig` and expose an explicit `sourcemaps` block. During a managed Bugsink build, Port-Au-Next rewrites the build copy to use native Next.js browser source maps and disables Sentry's competing build-time source-map processing:
 
 ```ts
+const nextConfig = {
+  productionBrowserSourceMaps: true,
+};
+
 export default withSentryConfig(nextConfig, {
   sourcemaps: {
-    disable: false,
+    disable: true,
     deleteSourcemapsAfterUpload: false,
   },
   telemetry: false,
@@ -769,9 +773,9 @@ export default withSentryConfig(nextConfig, {
 });
 ```
 
-The exact options must be checked against the version installed by the selected application. The POC does not alter this file automatically and does not add the future `PORT_AU_NEXT_BUGSINK_SOURCEMAPS` contract.
+The rewrite applies only to the deployment worktree and is performed only when a managed production build has Bugsink credentials. It does not add the future `PORT_AU_NEXT_BUGSINK_SOURCEMAPS` contract.
 
-If `@sentry/nextjs` attempts its own upload because a token or organization setting is present in the application, disable that automatic upload. The POC must have one debug-ID authority: the explicit post-build `sentry-cli inject` and `upload` sequence. Two integrations may overwrite debug IDs or upload different artifacts.
+If `@sentry/nextjs` attempts its own upload because a token or organization setting is present in the application, disable that automatic upload. Port-Au-Next is the authoritative final artifact processor: the publisher always runs the pinned CLI injection immediately before uploading the exact browser artifacts that will be copied into the runtime image. It does not infer injection state from JavaScript source text.
 
 ### 15.4 Simplified build flow
 
@@ -786,7 +790,8 @@ runReleasePipeline
     → create a temporary secret file outside the build context
     → default docker build receives URL, slug, enable argument, and secret
       → npm run build
-      → sentry-cli sourcemaps inject .next/static
+      → install and execute the pinned sentry-cli in the publisher stage
+      → inject Debug IDs into the final browser artifacts
       → sentry-cli sourcemaps upload .next/static
       → delete .next/static/**/*.map
       → copy injected .next/static into runner
@@ -850,16 +855,20 @@ Migration to argument-array process execution remains required before general ro
 
 ### 15.7 Generated Dockerfile step
 
-Both generated templates participate. Conceptually, each builder gets the same conditional step immediately after `npm run build`:
+Both generated templates participate. Each gets a dedicated publisher stage after `npm run build`; the runtime copies `.next/static` from this stage:
 
 ```Dockerfile
 ARG BUGSINK_SOURCEMAPS=false
 ARG BUGSINK_URL
 ARG BUGSINK_PROJECT_SLUG
 
+FROM builder AS source-map-publisher
+
 RUN --mount=type=secret,id=bugsink_auth_token,required=false \
     if [ "$BUGSINK_SOURCEMAPS" = "true" ]; then \
       test -s /run/secrets/bugsink_auth_token && \
+      npm install --global @sentry/cli@2.58.6 && \
+      sentry-cli --version && \
       export SENTRY_AUTH_TOKEN="$(cat /run/secrets/bugsink_auth_token)" && \
       sentry-cli sourcemaps inject .next/static && \
       sentry-cli --url "$BUGSINK_URL" sourcemaps \
@@ -879,7 +888,7 @@ This is conceptual syntax, not the final patch. Before implementation, verify:
 - That `inject` modifies the exact files copied by the existing runner instruction.
 - That source-map deletion does not remove a runtime-required asset.
 
-With no enable argument, the step does nothing. A Bugsink-enabled runner build receives the enable argument and secret. The later Prisma migrator build receives neither and skips the step. The runner copies the injected assets produced by its own build.
+With no enable argument, the step does nothing. A Bugsink-enabled runner build receives the enable argument and secret. The Prisma migrator derives directly from `builder` and never reaches this stage. The runner copies the processed browser assets from `source-map-publisher`; the CLI and token are never copied into the runtime image.
 
 ### 15.8 Secret handling for the POC
 

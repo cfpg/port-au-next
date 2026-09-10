@@ -1,4 +1,5 @@
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 
 import { getActiveDeployments, updateDeploymentContainer, deduplicateActiveDeployments, cleanupStaleBuildingDeployments, cleanupOrphanedPreviewDeployments } from '~/services/database';
@@ -23,7 +24,10 @@ import {
   getBuildLogPath,
 } from '~/lib/logPaths';
 import { readLogTail } from '~/lib/readLogFile';
-import { redactLogText } from '~/lib/redactLogs';
+import {
+  redactLogText,
+  withAdditionalRedactionSecrets,
+} from '~/lib/redactLogs';
 import {
   assertAppProjectLayout,
   getAppProjectDir,
@@ -50,7 +54,7 @@ interface ContainerInfo {
 const APPS_DIR: string = getAppsDir();
 const networkName: string = APPLICATION_DOCKER_NETWORK;
 
-async function ensureDockerfile(appDir: string, appId: number): Promise<void> {
+async function ensureDockerfile(appDir: string, appId: number): Promise<boolean> {
   const dockerfilePath = path.join(appDir, 'Dockerfile');
   const usesPrisma = await isUsesPrismaEnabled(appId);
   const markerLine = buildDesiredGeneratedDockerfileMarker(usesPrisma);
@@ -62,7 +66,7 @@ async function ensureDockerfile(appDir: string, appId: number): Promise<void> {
       marker: markerLine,
     });
     fs.writeFileSync(dockerfilePath, dockerfileContent);
-    return;
+    return true;
   }
 
   const existingContent = fs.readFileSync(dockerfilePath, 'utf8');
@@ -70,14 +74,14 @@ async function ensureDockerfile(appDir: string, appId: number): Promise<void> {
 
   if (!parsed) {
     await logger.debug('Using existing Dockerfile (not platform-managed)');
-    return;
+    return false;
   }
 
   if (!shouldRegenerateGeneratedDockerfile(parsed, usesPrisma)) {
     await logger.debug('Using existing platform-managed Dockerfile', {
       marker: parsed.raw,
     });
-    return;
+    return true;
   }
 
   await logger.info('Regenerating platform-managed Dockerfile', {
@@ -86,6 +90,13 @@ async function ensureDockerfile(appDir: string, appId: number): Promise<void> {
     marker: markerLine,
   });
   fs.writeFileSync(dockerfilePath, dockerfileContent);
+  return true;
+}
+
+export interface BugsinkSourceMapBuild {
+  url: string;
+  projectSlug: string;
+  authToken: string;
 }
 
 interface BuildImageOptions {
@@ -94,6 +105,11 @@ interface BuildImageOptions {
   deploymentId?: number;
   buildVariant?: 'build' | 'build-migrate';
   projectDir?: string;
+  bugsinkSourceMaps?: BugsinkSourceMapBuild;
+}
+
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, `'"'"'`)}'`;
 }
 
 async function buildImage(
@@ -108,18 +124,38 @@ async function buildImage(
   const buildVariant = options.buildVariant ?? 'build';
   ensureDeploymentBuildLogDir(appName, options.deploymentId);
   const logFile = getBuildLogPath(appName, options.deploymentId, buildVariant);
+  let secretDir: string | undefined;
 
   try {
     const imageTag = options.imageTag ?? `${appName}:${version}`;
     const projectDir = options.projectDir ?? path.join(getAppsDir(), appName);
     const dockerfilePath = path.join(projectDir, 'Dockerfile');
     const targetArg = options.target ? ` --target ${options.target}` : '';
+    let sourceMapArgs = '';
+
+    if (options.bugsinkSourceMaps) {
+      secretDir = fs.mkdtempSync(path.join(os.tmpdir(), 'port-au-next-bugsink-'));
+      fs.chmodSync(secretDir, 0o700);
+      const secretPath = path.join(secretDir, 'auth-token');
+      fs.writeFileSync(secretPath, options.bugsinkSourceMaps.authToken, {
+        encoding: 'utf8',
+        mode: 0o600,
+      });
+
+      sourceMapArgs = [
+        ` --secret id=bugsink_auth_token,src=${shellQuote(secretPath)}`,
+        ' --build-arg BUGSINK_SOURCEMAPS=true',
+        ` --build-arg BUGSINK_URL=${shellQuote(options.bugsinkSourceMaps.url)}`,
+        ` --build-arg BUGSINK_PROJECT_SLUG=${shellQuote(options.bugsinkSourceMaps.projectSlug)}`,
+      ].join('');
+    }
 
     await logger.info('Building Docker image', { imageTag, target: options.target, projectDir });
     await logger.info('Build log file', { buildLogPath: logFile });
 
     await execCommand(
-      `DOCKER_BUILDKIT=1 docker build${targetArg} -t ${imageTag} -f ${dockerfilePath} ${projectDir} &> ${logFile}`
+      `DOCKER_BUILDKIT=1 docker build${targetArg}${sourceMapArgs} -t ${shellQuote(imageTag)} -f ${shellQuote(dockerfilePath)} ${shellQuote(projectDir)} &> ${shellQuote(logFile)}`,
+      { redactionSecrets: options.bugsinkSourceMaps ? [options.bugsinkSourceMaps.authToken] : [] }
     );
 
     const buildOutput = fs.readFileSync(logFile, 'utf8');
@@ -144,12 +180,24 @@ async function buildImage(
     await logger.error(`Error building image`, error as Error);
     throw error;
   } finally {
+    if (secretDir) {
+      fs.rmSync(secretDir, { recursive: true, force: true });
+    }
     if (fs.existsSync(logFile)) {
       const { content, sizeBytes } = readLogTail(logFile, BUILD_LOG_TAIL_MAX_BYTES);
       await logger.info('Docker build log', {
         buildLogPath: logFile,
         sizeBytes,
-        tailRedacted: content ? redactLogText(content) : undefined,
+        tailRedacted: content
+          ? redactLogText(
+              content,
+              options.bugsinkSourceMaps
+                ? withAdditionalRedactionSecrets([
+                    options.bugsinkSourceMaps.authToken,
+                  ])
+                : undefined
+            )
+          : undefined,
       });
     }
   }
@@ -160,9 +208,14 @@ async function buildReleaseImages(
   version: string,
   buildMigrator: boolean,
   deploymentId: number,
-  projectDir: string
+  projectDir: string,
+  bugsinkSourceMaps?: BugsinkSourceMapBuild
 ): Promise<{ runnerTag: string; migratorTag?: string }> {
-  const runnerTag = await buildImage(appName, version, { deploymentId, projectDir });
+  const runnerTag = await buildImage(appName, version, {
+    deploymentId,
+    projectDir,
+    bugsinkSourceMaps,
+  });
 
   if (!buildMigrator) {
     return { runnerTag };

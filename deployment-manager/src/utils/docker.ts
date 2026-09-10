@@ -3,6 +3,7 @@ import logger from '~/services/logger';
 import {
   getActiveRedactionSecrets,
   redactLogText,
+  withAdditionalRedactionSecrets,
 } from '~/lib/redactLogs';
 
 function getPlatformSecrets(): string[] {
@@ -23,19 +24,35 @@ function getPlatformSecrets(): string[] {
   ].filter((value): value is string => Boolean(value));
 }
 
-export async function execCommand(command: string) {
-  const redactedCommand = redactLogText(command, [
+export async function execCommand(
+  command: string,
+  options: { redactionSecrets?: string[] } = {}
+) {
+  const redactionSecrets = withAdditionalRedactionSecrets([
     ...getActiveRedactionSecrets(),
     ...getPlatformSecrets(),
+    ...(options.redactionSecrets ?? []),
   ]);
+  const redactedCommand = redactLogText(command, redactionSecrets);
 
   return new Promise((resolve, reject) => {
     logger.debug('Executing command', { command: redactedCommand });
     exec(command, (error: Error | null, stdout: string, stderr: string) => {
       if (error) {
-        logger.error('Command execution failed', error);
-        logger.error('Command execution failed', new Error(stderr));
-        reject(error);
+        const redactedError = new Error(
+          redactLogText(error.message, redactionSecrets)
+        ) as Error & { code?: string };
+        redactedError.name = error.name;
+        redactedError.stack = error.stack
+          ? redactLogText(error.stack, redactionSecrets)
+          : undefined;
+        redactedError.code = (error as Error & { code?: string }).code;
+        logger.error('Command execution failed', redactedError);
+        logger.error(
+          'Command execution failed',
+          new Error(redactLogText(stderr, redactionSecrets))
+        );
+        reject(redactedError);
       } else {
         resolve(stdout);
       }
