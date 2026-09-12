@@ -1,8 +1,11 @@
-import { exec } from 'child_process';
+import { exec, execFile as execFileCb } from 'child_process';
+import { promisify } from 'util';
 import path from 'path';
 import fs from 'fs';
 import logger from '~/services/logger';
 import getAppsDir from '~/utils/getAppsDir';
+
+const execFile = promisify(execFileCb);
 
 // Instead of using __dirname, we'll go up from the deployment-manager directory
 const APPS_DIR = getAppsDir();
@@ -60,96 +63,87 @@ export async function cloneRepository(appName: string, repoUrl: string, branch: 
   }
 }
 
-export async function pullLatestChanges(appName: string, branch: string = 'main') {
-  const appDir = path.join(APPS_DIR, appName);
-
-  try {
-    // Check if directory exists
-    if (!fs.existsSync(appDir)) {
-      const error = new Error(`App directory ${appDir} does not exist`);
-      await logger.error('Directory check failed', error);
-      throw error;
-    }
-
-    await logger.info(`Pulling latest changes for branch ${branch}`);
-    
-    // First fetch all changes
-    await new Promise((resolve, reject) => {
-      exec(`cd ${appDir} && git fetch origin`, (error: Error | null, stdout: string) => {
-        if (error) {
-          logger.error(`Error fetching changes`, error);
-          reject(error);
-        } else {
-          resolve(stdout);
-        }
-      });
-    });
-
-    // Check if branch exists locally
-    const branchExists = await new Promise<boolean>((resolve) => {
-      exec(`cd ${appDir} && git branch --list ${branch}`, (error: Error | null, stdout: string) => {
-        resolve(!!stdout.trim());
-      });
-    });
-
-    // Check if branch exists remotely
-    const remoteBranchExists = await new Promise<boolean>((resolve) => {
-      exec(`cd ${appDir} && git ls-remote --heads origin ${branch}`, (error: Error | null, stdout: string) => {
-        resolve(!!stdout.trim());
-      });
-    });
-
-    if (!branchExists && !remoteBranchExists) {
-      throw new Error(`Branch ${branch} does not exist locally or remotely`);
-    }
-
-    // If branch doesn't exist locally but exists remotely, create it
-    if (!branchExists && remoteBranchExists) {
-      await new Promise((resolve, reject) => {
-        exec(`cd ${appDir} && git stash && git checkout -b ${branch} origin/${branch}`, (error: Error | null, stdout: string) => {
-          if (error) {
-            logger.error(`Error creating local branch`, error);
-            reject(error);
-          } else {
-            resolve(stdout);
-          }
-        });
-      });
-    }
-    
-    // Checkout and pull the branch
-    return new Promise((resolve, reject) => {
-      exec(`cd ${appDir} && git stash && git checkout ${branch} && git pull origin ${branch}`, (error: Error | null, stdout: string) => {
-        if (error) {
-          logger.error(`Error pulling latest changes`, error);
-          reject(error);
-        } else {
-          logger.info(`Successfully pulled latest changes for branch ${branch}`, { stdout: stdout.trim() });
-          resolve(stdout);
-        }
-      });
-    });
-  } catch (error) {
-    await logger.error(`Error in pullLatestChanges`, error as Error);
-    throw error;
+export class CommitNotFoundError extends Error {
+  constructor(branch: string, requestedSha: string, actualSha: string) {
+    super(
+      `Requested commit ${requestedSha} for branch ${branch} was not found after fetch ` +
+      `(branch now resolves to ${actualSha} - it may have been force-pushed past the requested commit)`
+    );
+    this.name = 'CommitNotFoundError';
   }
 }
 
-export async function getLatestCommit(appName: string, branch: string = 'main') {
+/**
+ * Fetches `branch`, then lands the checkout on an exact commit: `requestedSha` if given,
+ * otherwise the branch's current tip (resolved here, once, not left to a later `git pull`
+ * to land wherever the branch happens to be by then).
+ *
+ * Follows the same shape as the old pullLatestChanges(): stash first so any local drift
+ * (e.g. a previous deploy's .env write or Next.js config patch) is preserved in git's
+ * stash rather than silently discarded, then check out the target branch - required
+ * because this checkout is shared across every branch of the app, so switching from
+ * whatever was checked out last is necessary, not optional. The final `reset --hard` to
+ * the exact target commit is the one destructive step this function can't avoid (a plain
+ * `pull` can't land on an arbitrary historical SHA), but by that point local changes are
+ * already safely stashed and we're confirmed to be on the right branch.
+ */
+export async function prepareWorkspaceAtCommit(
+  appName: string,
+  branch: string,
+  requestedSha?: string
+): Promise<{ commitSha: string }> {
+  if (appName.includes('/') || appName.includes('..')) {
+    throw new Error('Invalid app name');
+  }
   const appDir = path.join(APPS_DIR, appName);
+  if (!appDir.startsWith(APPS_DIR)) {
+    throw new Error('Invalid app directory path');
+  }
 
-  return new Promise<string>((resolve, reject) => {
-    exec(`cd ${appDir} && git rev-parse ${branch}`, (error: Error | null, stdout: string) => {
-      if (error) {
-        logger.error(`Error getting latest commit for branch ${branch}`, error);
-        reject(error);
-      } else {
-        const commitId = stdout.trim();
-        logger.debug(`Got latest commit for branch ${branch}`, { commitId });
-        resolve(commitId);
-      }
-    });
-  });
+  if (!fs.existsSync(appDir)) {
+    const error = new Error(`App directory ${appDir} does not exist`);
+    await logger.error('Directory check failed', error);
+    throw error;
+  }
+
+  // The final reset below is destructive and must only ever run inside a checkout this
+  // platform itself owns. Require appDir to have its OWN .git (not one git would find by
+  // walking up to a parent directory) - git commands run with `-C appDir` still search
+  // upward for a repo if appDir isn't one itself.
+  if (!(await isGitRepo(appDir))) {
+    throw new Error(`${appDir} is not a git repository - refusing to run destructive git operations here`);
+  }
+
+  try {
+    await logger.info(`Fetching branch ${branch}`, { appDir });
+    await execFile('git', ['-C', appDir, 'fetch', 'origin', branch]);
+
+    // `git stash` exits 0 with "No local changes to save" when there's nothing to stash,
+    // so this is always safe to run.
+    await execFile('git', ['-C', appDir, 'stash']);
+
+    try {
+      await execFile('git', ['-C', appDir, 'checkout', branch]);
+    } catch {
+      await execFile('git', ['-C', appDir, 'checkout', '-b', branch, `origin/${branch}`]);
+    }
+
+    const targetRef = requestedSha ?? `origin/${branch}`;
+    await execFile('git', ['-C', appDir, 'reset', '--hard', targetRef]);
+
+    const { stdout } = await execFile('git', ['-C', appDir, 'rev-parse', 'HEAD']);
+    const commitSha = stdout.trim();
+
+    if (requestedSha && commitSha !== requestedSha) {
+      throw new CommitNotFoundError(branch, requestedSha, commitSha);
+    }
+
+    await logger.info(`Workspace prepared at commit ${commitSha}`, { branch, commitSha });
+    return { commitSha };
+  } catch (error) {
+    await logger.error('Error preparing workspace', error as Error);
+    throw error;
+  }
 }
 
 export async function deleteRepository(appName: string) {

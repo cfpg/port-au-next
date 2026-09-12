@@ -1,11 +1,10 @@
-import pool from './database';
+import pool, { withTransaction } from './database';
 import { setupAppDatabase, deleteAppDatabase } from './database';
 import logger from './logger';
 import { updateNginxConfig, deletePreviewBranchConfig } from './nginx';
 import { stopContainer } from './docker';
 import { runReleasePipeline } from './releasePipeline';
-import { pullLatestChanges, getLatestCommit } from './git';
-import { getPreviewBranchSubdomain, sanitizeBranchForSubdomain } from '~/utils/previewBranches';
+import { getPreviewBranchSubdomain, slugifyBranchForResourceName } from '~/utils/previewBranches';
 
 interface PreviewBranchSetup {
   appId: number;
@@ -24,112 +23,178 @@ export async function isPreviewBranchesEnabled(appId: number): Promise<boolean> 
 }
 
 export async function enablePreviewBranches(appId: number, previewDomain: string) {
-  await pool.query('BEGIN');
   try {
-    // Update app with preview domain
-    await pool.query(
-      'UPDATE apps SET preview_domain = $1 WHERE id = $2',
-      [previewDomain, appId]
-    );
+    await withTransaction(async (client) => {
+      await client.query(
+        'UPDATE apps SET preview_domain = $1 WHERE id = $2',
+        [previewDomain, appId]
+      );
 
-    // Create or update feature flag
-    await pool.query(`
-      INSERT INTO app_features (app_id, feature, enabled, config)
-      VALUES ($1, 'preview_branches', true, '{}')
-      ON CONFLICT (app_id, feature)
-      DO UPDATE SET enabled = true, updated_at = CURRENT_TIMESTAMP
-    `, [appId]);
-
-    await pool.query('COMMIT');
+      await client.query(`
+        INSERT INTO app_features (app_id, feature, enabled, config)
+        VALUES ($1, 'preview_branches', true, '{}')
+        ON CONFLICT (app_id, feature)
+        DO UPDATE SET enabled = true, updated_at = CURRENT_TIMESTAMP
+      `, [appId]);
+    });
     await logger.info('Preview branches enabled', { appId, previewDomain });
   } catch (error) {
-    await pool.query('ROLLBACK');
     await logger.error('Failed to enable preview branches', error as Error);
     throw error;
   }
 }
 
 export async function setupPreviewBranch({ appId, appName, branch, previewDomain }: PreviewBranchSetup) {
-  await pool.query('BEGIN');
+  const existingBranch = await pool.query(
+    'SELECT id FROM preview_branches WHERE app_id = $1 AND branch = $2',
+    [appId, branch]
+  );
+  if (existingBranch.rows.length > 0) {
+    throw new Error(`Preview branch ${branch} already exists for app ${appName}`);
+  }
+
+  // CREATE DATABASE can't run inside a SQL transaction, so this step is necessarily
+  // outside the one below - if the row insert doesn't commit, we compensate manually.
+  const dbPrefix = `${appName}_${slugifyBranchForResourceName(branch)}`;
+  const { dbUser, dbName, dbPassword } = await setupAppDatabase(dbPrefix);
+
   try {
-    // Check if preview branch already exists
-    const existingBranch = await pool.query(
-      'SELECT * FROM preview_branches WHERE app_id = $1 AND branch = $2',
-      [appId, branch]
-    );
-
-    if (existingBranch.rows.length > 0) {
-      throw new Error(`Preview branch ${branch} already exists for app ${appName}`);
-    }
-
-    // Create database for preview branch
-    const dbPrefix = `${appName}_${sanitizeBranchForSubdomain(branch)}`;
-    const { dbUser, dbName, dbPassword } = await setupAppDatabase(dbPrefix);
-
-    // Create preview branch record
-    const result = await pool.query(
-      `INSERT INTO preview_branches 
-       (app_id, branch, subdomain, db_name, db_user, db_password, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
-       RETURNING id`,
-      [appId, branch, getPreviewBranchSubdomain(branch, previewDomain), dbName, dbUser, dbPassword, 'created']
-    );
-
-    await pool.query('COMMIT');
-    await logger.info('Preview branch setup completed', { 
-      appName, 
-      branch,
-      previewBranchId: result.rows[0].id 
+    const row = await withTransaction(async (client) => {
+      const result = await client.query(
+        `INSERT INTO preview_branches
+         (app_id, branch, subdomain, db_name, db_user, db_password, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         RETURNING id`,
+        [appId, branch, getPreviewBranchSubdomain(branch, previewDomain), dbName, dbUser, dbPassword, 'created']
+      );
+      return result.rows[0];
     });
 
-    return result.rows[0];
+    await logger.info('Preview branch setup completed', {
+      appName,
+      branch,
+      previewBranchId: row.id
+    });
+
+    return row;
   } catch (error) {
-    await pool.query('ROLLBACK');
+    try {
+      await deleteAppDatabase(dbName, dbUser);
+    } catch (cleanupError) {
+      await logger.error(
+        'Failed to clean up orphaned preview database after failed setup',
+        cleanupError as Error
+      );
+    }
     await logger.error('Failed to setup preview branch', error as Error);
     throw error;
   }
 }
 
-export async function deletePreviewBranch(appId: number, branch: string) {
-  await pool.query('BEGIN');
-  try {
-    // Get preview branch details
-    const branchResult = await pool.query(
-      'SELECT * FROM preview_branches WHERE app_id = $1 AND branch = $2',
-      [appId, branch]
-    );
+interface PreviewBranchResourceRow {
+  id: number;
+  branch: string;
+  container_id: string | null;
+  db_name: string | null;
+  db_user: string | null;
+}
 
-    if (branchResult.rows.length === 0) {
-      throw new Error('Preview branch not found');
-    }
+export interface PreviewBranchCleanupResult {
+  success: boolean;
+  errors: string[];
+}
 
-    const previewBranch = branchResult.rows[0];
+/**
+ * Stops the container, removes the nginx config, and drops the database for a preview
+ * branch, WITHOUT touching its `preview_branches` row. Shared by `deletePreviewBranch`
+ * and app deletion (`deleteAppRecord`), which must clean up resources before the row can
+ * be safely deleted (deployments still reference it until they're deleted first).
+ *
+ * Returns which steps failed rather than swallowing them - a caller that deletes the row
+ * (and with it the credentials/metadata needed to retry) regardless of the result would
+ * turn a failed database drop into a permanently unreachable orphaned database.
+ */
+export async function cleanupPreviewBranchResources(
+  previewBranch: PreviewBranchResourceRow,
+  appName: string
+): Promise<PreviewBranchCleanupResult> {
+  const errors: string[] = [];
 
-    // Stop and remove container if exists
-    if (previewBranch.container_id) {
+  if (previewBranch.container_id) {
+    try {
       await stopContainer(previewBranch.container_id);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      errors.push(`container: ${message}`);
+      await logger.warning('Failed to stop preview branch container during cleanup', {
+        previewBranchId: previewBranch.id,
+        error: message,
+      });
+    }
+  }
+
+  try {
+    await deletePreviewBranchConfig(appName, previewBranch.branch);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    errors.push(`nginx config: ${message}`);
+    await logger.warning('Failed to remove preview branch nginx config during cleanup', {
+      previewBranchId: previewBranch.id,
+      error: message,
+    });
+  }
+
+  if (previewBranch.db_name && previewBranch.db_user) {
+    try {
+      await deleteAppDatabase(previewBranch.db_name, previewBranch.db_user);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      errors.push(`database: ${message}`);
+      await logger.warning('Failed to delete preview branch database during cleanup', {
+        previewBranchId: previewBranch.id,
+        error: message,
+      });
+    }
+  }
+
+  return { success: errors.length === 0, errors };
+}
+
+export async function deletePreviewBranch(appId: number, branch: string) {
+  const branchResult = await pool.query(
+    'SELECT * FROM preview_branches WHERE app_id = $1 AND branch = $2',
+    [appId, branch]
+  );
+  if (branchResult.rows.length === 0) {
+    throw new Error('Preview branch not found');
+  }
+  const previewBranch = branchResult.rows[0];
+
+  // Refuse rather than tear down a container/database an enqueued-or-running deploy job
+  // might still be using. (Not airtight against a job enqueued in the instant after this
+  // check - closing that fully is follow-up work, not something this refactor needs.)
+  const activeJob = await pool.query(
+    `SELECT id FROM deploy_queue_jobs WHERE app_id = $1 AND branch = $2 AND status IN ('queued', 'running') LIMIT 1`,
+    [appId, branch]
+  );
+  if (activeJob.rows.length > 0) {
+    throw new Error('An active or queued deployment exists for this preview branch. Wait for it to finish before deleting.');
+  }
+
+  try {
+    const appResult = await pool.query('SELECT name FROM apps WHERE id = $1', [appId]);
+    const appName = appResult.rows[0]?.name;
+
+    const cleanup = await cleanupPreviewBranchResources(previewBranch, appName);
+    if (!cleanup.success) {
+      // Don't delete the row - it still holds the container/db credentials a retry needs.
+      throw new Error(`Preview branch cleanup incomplete, record retained for retry: ${cleanup.errors.join('; ')}`);
     }
 
-    // Remove nginx config
-    const appResult = await pool.query(
-      'SELECT name FROM apps WHERE id = $1',
-      [appId]
-    );
-    await deletePreviewBranchConfig(appResult.rows[0].name, branch);
+    await pool.query('DELETE FROM preview_branches WHERE id = $1', [previewBranch.id]);
 
-    // Delete database
-    await deleteAppDatabase(previewBranch.db_name, previewBranch.db_user);
-
-    // Delete preview branch record
-    await pool.query(
-      'DELETE FROM preview_branches WHERE id = $1',
-      [previewBranch.id]
-    );
-
-    await pool.query('COMMIT');
     await logger.info('Preview branch deleted', { appId, branch });
   } catch (error) {
-    await pool.query('ROLLBACK');
     await logger.error('Failed to delete preview branch', error as Error);
     throw error;
   }
@@ -141,6 +206,40 @@ export async function getPreviewBranch(appId: number, branch: string) {
     [appId, branch]
   );
   return result.rows[0] || null;
+}
+
+/**
+ * Gets-or-creates (or restores, if soft-deleted) the preview_branches row for a branch.
+ * Must run BEFORE a deployments row is created for that branch - `deployments.is_preview
+ * = true` requires a non-null `preview_branch_id` (CHECK constraint), so provisioning
+ * can't happen after the fact inside the executor.
+ */
+export async function ensurePreviewBranch(
+  app: { id: number; name: string; preview_domain?: string },
+  branch: string
+) {
+  const enabled = await isPreviewBranchesEnabled(app.id);
+  if (!enabled) {
+    throw new Error('Preview branches are not enabled for this app');
+  }
+  if (!app.preview_domain) {
+    throw new Error('Preview domain is not configured');
+  }
+
+  let previewBranch = await getPreviewBranch(app.id, branch);
+  if (!previewBranch) {
+    previewBranch = await setupPreviewBranch({
+      appId: app.id,
+      appName: app.name,
+      branch,
+      previewDomain: app.preview_domain,
+    });
+  } else if (previewBranch.deleted_at) {
+    await pool.query('UPDATE preview_branches SET deleted_at = NULL WHERE id = $1', [previewBranch.id]);
+    await logger.info('Restored soft-deleted preview branch', { branch, previewBranchId: previewBranch.id });
+  }
+
+  return previewBranch;
 }
 
 export async function updatePreviewBranchStatus(id: number, status: string, containerId?: string) {
@@ -156,6 +255,7 @@ export async function deployPreviewBranch(
   appId: number,
   branch: string,
   deploymentId: number,
+  commitSha: string,
   version?: string
 ) {
   try {
@@ -180,9 +280,7 @@ export async function deployPreviewBranch(
     // Update status to deploying
     await updatePreviewBranchStatus(previewBranch.id, 'deploying');
 
-    // Pull latest changes
-    await pullLatestChanges(app.name, branch);
-    const commitId = await getLatestCommit(app.name, branch);
+    const commitId = commitSha;
 
     const releaseVersion =
       version ?? new Date().toISOString().replace(/[^0-9]/g, '');
@@ -200,6 +298,7 @@ export async function deployPreviewBranch(
       app,
       version: releaseVersion,
       branch,
+      commitSha,
       appEnv,
       deploymentId,
       switchTraffic: async (_id, depId, routingHostname) =>

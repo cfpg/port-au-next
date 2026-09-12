@@ -236,6 +236,22 @@ export const deleteApp = withAuth(async (appName: string): Promise<{ success: bo
     }
 
     const app = appResult.rows[0];
+
+    // App deletion tears down containers/checkout/database that a running deploy job
+    // might still be using - refuse rather than race it. (Not airtight against a job
+    // enqueued in the instant after this check; closing that fully is follow-up work,
+    // not something this refactor needs to solve.)
+    const activeJob = await pool.query(
+      `SELECT id FROM deploy_queue_jobs WHERE app_id = $1 AND status IN ('queued', 'running') LIMIT 1`,
+      [app.id]
+    );
+    if (activeJob.rows.length > 0) {
+      return {
+        success: false,
+        message: 'An active or queued deployment exists for this app. Wait for it to finish before deleting.',
+      };
+    }
+
     await logger.info(`Starting deletion process for app ${appName}`);
 
     // Delete app data from each service, continuing even if individual steps fail
@@ -368,6 +384,20 @@ export const deletePreviewBranch = withAuth(async (appId: number, branch: string
     }
 
     const previewBranch = branchResult.rows[0];
+
+    // Refuse rather than tear down a container/database an enqueued-or-running deploy
+    // job might still be using (same simple guard as deleteApp()'s).
+    const activeJob = await pool.query(
+      `SELECT id FROM deploy_queue_jobs WHERE app_id = $1 AND branch = $2 AND status IN ('queued', 'running') LIMIT 1`,
+      [appId, branch]
+    );
+    if (activeJob.rows.length > 0) {
+      return {
+        success: false,
+        message: 'An active or queued deployment exists for this preview branch. Wait for it to finish before deleting.',
+      };
+    }
+
     await logger.info(`Starting deletion process for preview branch ${branch} of app ${appId}`);
 
     try {

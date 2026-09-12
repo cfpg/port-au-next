@@ -373,6 +373,37 @@ export async function migrate() {
       )
     `);
 
+    // Single unified queue for manual and (future) webhook-triggered deployments.
+    // See docs/SOW-github-autodeploy.md - 'webhook' source lands in a later phase.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS deploy_queue_jobs (
+        id SERIAL PRIMARY KEY,
+        app_id INTEGER NOT NULL REFERENCES apps(id) ON DELETE CASCADE,
+        source TEXT NOT NULL CHECK (source IN ('manual', 'webhook')),
+        branch TEXT NOT NULL,
+        requested_sha TEXT,
+        requested_by_user_id TEXT,
+        installation_id BIGINT,
+        github_delivery_id TEXT,
+        status TEXT NOT NULL DEFAULT 'queued' CHECK (status IN ('queued','running','done','failed')),
+        deployment_id INTEGER REFERENCES deployments(id) ON DELETE SET NULL,
+        error TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        started_at TIMESTAMP WITH TIME ZONE,
+        finished_at TIMESTAMP WITH TIME ZONE
+      )
+    `);
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_deploy_queue_jobs_pending
+      ON deploy_queue_jobs (id) WHERE status = 'queued'
+    `);
+
+    await pool.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS uq_deploy_queue_jobs_delivery
+      ON deploy_queue_jobs (app_id, github_delivery_id) WHERE github_delivery_id IS NOT NULL
+    `);
+
     await pool.query('COMMIT');
     console.log('Database migration completed successfully');
   } catch (error) {

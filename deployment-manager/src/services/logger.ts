@@ -5,6 +5,7 @@ import {
   redactLogText,
   redactMetadata,
   setActiveRedactionSecrets,
+  withAdditionalRedactionSecrets,
 } from '~/lib/redactLogs';
 
 class Logger {
@@ -24,7 +25,10 @@ class Logger {
   }
 
   setRedactionContext(env: Record<string, string>) {
-    setActiveRedactionSecrets(collectSecretValues(env));
+    // Additive: merges into whatever secrets are already active for this job (e.g. a git
+    // credential registered separately) instead of clobbering them. Cleared in bulk by
+    // clearDeploymentContext() at the end of each job.
+    setActiveRedactionSecrets(withAdditionalRedactionSecrets(collectSecretValues(env)));
   }
 
   async log(type: string, message: string, metadata: Record<string, unknown> = {}) {

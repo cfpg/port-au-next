@@ -40,7 +40,7 @@ export default function AppDeployButton({ app, branch, showDropdown = false, dro
       }
       if (result?.error) throw new Error(result.error);
       setBranchToConfirm(null);
-      showToast(`Deployment started successfully for ${app.name}`, 'success');
+      showToast('Deployment queued.', 'success');
     } catch (error) {
       console.error(`Deployment failed for ${app.name}:`, error);
       showToast(`Failed to start deployment for ${app.name}`, 'error');
@@ -49,6 +49,11 @@ export default function AppDeployButton({ app, branch, showDropdown = false, dro
       mutate(`/api/apps/${app.id}`);
       mutate(`/api/apps/${app.id}/deployments`);
       mutate(`/api/apps/${app.id}/preview-branches`);
+      // Global keys: the homepage Applications table, global Deployment History, and the
+      // sidebar (which polls '/api/apps' too) all need to see this request promptly, not
+      // just this app's own page.
+      mutate('/api/apps');
+      mutate('/api/apps/deployments');
     };
   }
 
@@ -84,10 +89,10 @@ export default function AppDeployButton({ app, branch, showDropdown = false, dro
         onClose={() => setBranchToConfirm(null)}
         onConfirm={() => branchToConfirm ? handleDeploy(branchToConfirm, true) : undefined}
         isLoading={isLoading}
-        title="Deploy branch again?"
-        confirmLabel="Deploy again"
+        title="Queue another deployment?"
+        confirmLabel="Queue another"
         confirmVariant="primary"
-        description="That branch is currently deploying and building. Are you sure you want to deploy it again?"
+        description="This branch already has a queued or running deployment. Queue another?"
       />
     </>
   );

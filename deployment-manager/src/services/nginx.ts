@@ -430,6 +430,43 @@ async function updateNginxConfig(
   }
 }
 
+/**
+ * Reads the desired nginx config for an app/preview-branch off disk and checks whether
+ * `routingHostname` is the upstream it currently points traffic at. Used by startup
+ * recovery to tell a genuinely-interrupted deployment apart from one whose traffic switch
+ * actually completed before a crash - recovery no longer needs to guess based on status
+ * alone (see `recoverContainers()` in docker.ts).
+ */
+async function isRoutingHostnameCurrentlyConfigured(
+  appName: string,
+  domain: string,
+  previewBranch: string | undefined,
+  routingHostname: string
+): Promise<boolean> {
+  const configPath = previewBranch
+    ? path.join(NGINX_CONFIG_DIR, `preview-${appName}.conf`)
+    : path.join(NGINX_CONFIG_DIR, `app-${domain}.conf`);
+
+  if (!fs.existsSync(configPath)) {
+    return false;
+  }
+
+  let contents = fs.readFileSync(configPath, 'utf8');
+
+  if (previewBranch) {
+    const markers = getBranchMarkers(previewBranch);
+    const startIndex = contents.indexOf(markers.start);
+    const endIndex = contents.indexOf(markers.end);
+    if (startIndex === -1 || endIndex === -1) {
+      return false;
+    }
+    contents = contents.substring(startIndex, endIndex);
+  }
+
+  const upstreamServer = `${routingHostname}:3000`;
+  return contents.includes(`set $deployment_upstream ${upstreamServer};`);
+}
+
 async function validateNginxConfigurationInOneOffContainer(): Promise<NginxApplyResult | null> {
   try {
     await execCompose('run --rm --no-deps nginx nginx -t');
@@ -703,4 +740,5 @@ export {
   deleteAppConfig,
   deletePreviewBranchConfig,
   createServiceVhostConfig,
+  isRoutingHostnameCurrentlyConfigured,
 };

@@ -36,8 +36,9 @@ function matchesStatusFilter(status: string, filter: StatusFilter): boolean {
   if (filter === 'all') return true;
   const s = status.toLowerCase();
   if (filter === 'active') return ['running', 'success', 'active'].includes(s);
-  if (filter === 'building') return ['pending', 'building', 'preflight', 'migrating'].includes(s);
-  return !['running', 'success', 'active', 'pending', 'building', 'preflight', 'migrating'].includes(s);
+  // 'queued' groups with "building" - a waiting request reads as in-progress, not inactive.
+  if (filter === 'building') return ['pending', 'building', 'preflight', 'migrating', 'queued'].includes(s);
+  return !['running', 'success', 'active', 'pending', 'building', 'preflight', 'migrating', 'queued'].includes(s);
 }
 
 export default function AppsTable({ apps }: AppsTableProps) {

@@ -11,7 +11,7 @@ import { formatDockerEnvString } from '~/utils/dockerEnv';
 import { isAutoMigrateEnabled } from '~/services/appFeatures';
 import { runPrismaMigrations } from '~/services/prismaMigrate';
 import { modifyNextConfig } from '~/services/nextConfig';
-import { updateDeploymentStatus } from '~/services/deploymentStatus';
+import { updateDeploymentStatus, recordDeploymentContainer } from '~/services/deploymentStatus';
 import {
   getNginxContainerAccessLogPath,
   getNginxContainerErrorLogPath,
@@ -44,6 +44,7 @@ export interface RunReleasePipelineParams {
   app: App;
   version: string;
   branch: string;
+  commitSha: string;
   appEnv: Record<string, string>;
   deploymentId: number;
   switchTraffic: (
@@ -66,7 +67,7 @@ async function setDeploymentStatus(
 export async function runReleasePipeline(
   params: RunReleasePipelineParams
 ): Promise<{ containerId: string }> {
-  const { app, version, branch, deploymentId, switchTraffic } = params;
+  const { app, version, branch, commitSha, deploymentId, switchTraffic } = params;
   const isPreview = branch !== app.branch;
   const appEnv = await mergeAppEnv(app, branch, params.appEnv, { isPreview });
 
@@ -143,6 +144,11 @@ export async function runReleasePipeline(
     );
     greenContainerId = containerId;
 
+    // Persisted BEFORE the traffic switch so a crash on either side of it leaves this
+    // deployment row with a real container id for recovery to reconcile against -
+    // recovery no longer has to infer this from status alone.
+    await recordDeploymentContainer(deploymentId, commitSha, containerId);
+
     await setDeploymentStatus(deploymentId, 'preflight');
     await logger.info('Phase: preflight — waiting for container process', {
       phase: 'preflight',
@@ -179,6 +185,7 @@ export async function runReleasePipeline(
       );
     }
     trafficSwitched = true;
+    await updateDeploymentStatus(deploymentId, 'active');
 
     const accessLogPath = getNginxContainerAccessLogPath(app.name, deploymentId);
     const errorLogPath = getNginxContainerErrorLogPath(app.name, deploymentId);

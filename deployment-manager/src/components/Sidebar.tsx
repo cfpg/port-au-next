@@ -2,6 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import useSWR from 'swr';
 import Link from '~/components/general/Link';
 import Avatar from '~/components/general/Avatar';
 import Brand from '~/components/general/Brand';
@@ -9,15 +10,28 @@ import { HomeIcon, GridIcon, GearIcon, PlusIcon, MenuIcon } from '~/components/g
 import getSingleAppPath from '~/utils/getSingleAppPath';
 import { useSession } from '~/lib/auth-client';
 import { App } from '~/types';
+import fetcher from '~/utils/fetcher';
 
 interface SidebarProps {
+  /** Server-rendered fallback for the first paint - kept fresh afterward via SWR below. */
   apps: App[];
 }
 
-export default function Sidebar({ apps }: SidebarProps) {
+export default function Sidebar({ apps: initialApps }: SidebarProps) {
   const pathname = usePathname();
   const { data } = useSession();
   const [isNavOpen, setIsNavOpen] = useState(false);
+
+  // The layout that renders this is a server component, refetched only on navigation - it
+  // wouldn't otherwise pick up a deployment queued from another tab, or one just queued on
+  // the current page, while sitting still. Polling the same '/api/apps' key the homepage
+  // Applications table already uses keeps ordering/activity in sync with that surface, and
+  // a deploy-trigger's mutate('/api/apps') call (see AppDeployButton, etc.) refreshes it
+  // immediately rather than waiting out the interval.
+  const { data: apps = initialApps } = useSWR<App[]>('/api/apps', fetcher, {
+    fallbackData: initialApps,
+    refreshInterval: 10000,
+  });
 
   useEffect(() => {
     if (window.innerWidth > 768) {
