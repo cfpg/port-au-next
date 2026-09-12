@@ -10,6 +10,7 @@ interface RelativeTimeProps {
   showRelative?: boolean;
   className?: string;
   relativeClassName?: string;
+  refreshInterval?: number;
 }
 
 /**
@@ -21,15 +22,24 @@ export default function RelativeTime({
   showRelative = false,
   className = 'font-mono text-meta text-ink-muted',
   relativeClassName = 'text-ink-ghost',
+  refreshInterval = 30_000,
 }: RelativeTimeProps) {
   const absolute = formatDateTimeStable(value);
   const [relative, setRelative] = useState('');
 
   useEffect(() => {
-    if (showRelative && value) {
-      setRelative(getRelativeTime(value));
+    if (!showRelative || !value) {
+      setRelative('');
+      return;
     }
-  }, [value, showRelative]);
+
+    const updateRelativeTime = () => setRelative(getRelativeTime(value));
+
+    updateRelativeTime();
+    const intervalId = window.setInterval(updateRelativeTime, refreshInterval);
+
+    return () => window.clearInterval(intervalId);
+  }, [value, showRelative, refreshInterval]);
 
   if (!absolute) {
     return null;

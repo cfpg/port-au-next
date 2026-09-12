@@ -13,6 +13,7 @@ import Link from '~/components/general/Link';
 import AppDeployButton from '~/components/buttons/AppDeployButton';
 import EmptyState from '~/components/general/EmptyState';
 import Menu from '~/components/general/Menu';
+import Button from '~/components/general/Button';
 import Modal from '~/components/general/Modal';
 import DeploymentLogViewerContainer from '~/components/deployments/DeploymentLogViewerContainer';
 import { EyeIcon, RefreshIcon, ClipboardIcon, CheckIcon } from '~/components/general/icons';
@@ -21,12 +22,12 @@ import { showToast } from '~/components/general/Toaster';
 
 interface DeploymentHistoryTableProps {
   deployments?: Deployment[];
-  /** "app" hides the App column and swaps two buttons for a single overflow menu - this app's own history is immutable, so actions only read or re-run it. */
+  /** "app" hides the App column and exposes logs as the row's primary action. */
   scope?: 'global' | 'app';
 }
 
 /** A DeploymentRow's ⋮ menu - view logs, redeploy this build, copy commit SHA. */
-function DeploymentRowMenu({ deployment }: { deployment: Deployment }) {
+function DeploymentRowMenu({ deployment, includeViewLogs = true }: { deployment: Deployment; includeViewLogs?: boolean }) {
   const pathname = usePathname();
   const [logsOpen, setLogsOpen] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -53,7 +54,9 @@ function DeploymentRowMenu({ deployment }: { deployment: Deployment }) {
       <Menu
         ariaLabel={`Actions for ${deployment.version}`}
         items={[
-          { label: 'View logs', icon: <EyeIcon className="text-ink-muted" />, onClick: () => setLogsOpen(true) },
+          ...(includeViewLogs
+            ? [{ label: 'View logs', icon: <EyeIcon className="text-ink-muted" />, onClick: () => setLogsOpen(true) }]
+            : []),
           { label: 'Redeploy this build', icon: <RefreshIcon className="text-ink-muted" />, onClick: handleRedeploy },
           ...(deployment.commit_id
             ? [{
@@ -64,6 +67,27 @@ function DeploymentRowMenu({ deployment }: { deployment: Deployment }) {
             : []),
         ]}
       />
+      <Modal
+        isOpen={logsOpen}
+        onClose={() => setLogsOpen(false)}
+        title={`Deployment Logs - ${deployment.app_name}`}
+        size="logs"
+      >
+        <DeploymentLogViewerContainer appName={deployment.app_name} deploymentId={deployment.id} enabled={logsOpen} />
+      </Modal>
+    </>
+  );
+}
+
+function DeploymentLogAction({ deployment }: { deployment: Deployment }) {
+  const [logsOpen, setLogsOpen] = useState(false);
+
+  return (
+    <>
+      <Button variant="secondary" size="sm" onClick={() => setLogsOpen(true)}>
+        <EyeIcon />
+        View logs
+      </Button>
       <Modal
         isOpen={logsOpen}
         onClose={() => setLogsOpen(false)}
@@ -125,16 +149,25 @@ export default function DeploymentHistoryTable({
       key: 'deployedAt',
       header: 'deployed at',
       width: '1.7fr',
-      render: (d) => (d.deployed_at ? <RelativeTime value={d.deployed_at} showRelative /> : <span className="font-mono text-meta text-ink-ghost">N/A</span>),
+      render: (d) => (d.deployed_at ? (
+        <RelativeTime
+          value={d.deployed_at}
+          showRelative
+          refreshInterval={d.status.toLowerCase() === 'building' ? 1_000 : 30_000}
+        />
+      ) : <span className="font-mono text-meta text-ink-ghost">N/A</span>),
     },
     {
       key: 'actions',
       header: 'actions',
-      width: scope === 'app' ? '66px' : '88px',
+      width: scope === 'app' ? '132px' : '88px',
       align: 'right',
       render: (d) =>
         scope === 'app' ? (
-          <DeploymentRowMenu deployment={d} />
+          <>
+            <DeploymentLogAction deployment={d} />
+            <DeploymentRowMenu deployment={d} includeViewLogs={false} />
+          </>
         ) : (
           <>
             <AppDeployButton app={{ name: d.app_name, id: d.app_id } as App} branch={d.branch} />
