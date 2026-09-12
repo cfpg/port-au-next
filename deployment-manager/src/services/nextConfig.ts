@@ -44,7 +44,41 @@ export function getOutputStandaloneConfig() {
   return `output: "${NEXT_CONFIG.output}",`;
 }
 
-export async function modifyNextConfig(appDir: string) {
+function disableSentrySourceMapProcessing(configContent: string): string {
+  if (!configContent.includes('withSentryConfig')) {
+    throw new Error(
+      'Bugsink source maps require @sentry/nextjs withSentryConfig in the application Next.js config.'
+    );
+  }
+
+  const sourcemapsRegex = /sourcemaps\s*:\s*{[\s\S]*?}/;
+  const sourcemapsMatch = configContent.match(sourcemapsRegex);
+  if (!sourcemapsMatch) {
+    throw new Error(
+      'Bugsink source maps require an explicit sourcemaps block in withSentryConfig so platform injection can disable competing Sentry Debug IDs.'
+    );
+  }
+
+  let sourcemapsConfig = sourcemapsMatch[0];
+  if (/disable\s*:/.test(sourcemapsConfig)) {
+    sourcemapsConfig = sourcemapsConfig.replace(
+      /disable\s*:\s*[^,\n}]+/,
+      'disable: true'
+    );
+  } else {
+    sourcemapsConfig = sourcemapsConfig.replace(
+      /sourcemaps\s*:\s*{/,
+      'sourcemaps: {\n    disable: true,'
+    );
+  }
+
+  return configContent.replace(sourcemapsRegex, sourcemapsConfig);
+}
+
+export async function modifyNextConfig(
+  appDir: string,
+  options: { bugsinkSourceMaps?: boolean } = {}
+) {
   try {
     let configPath = path.join(appDir, 'next.config.js');
     let configContent;
@@ -71,11 +105,25 @@ export async function modifyNextConfig(appDir: string) {
     let modifiedContent = configContent;
 
     // First check for exported variable pattern
+    const wrappedExportMatch = configContent.match(
+      /export\s+default\s+withSentryConfig\s*\(\s*(\w+)\s*,/
+    );
+    const wrappedCommonJsMatch = configContent.match(
+      /module\.exports\s*=\s*withSentryConfig\s*\(\s*(\w+)\s*,/
+    );
     const exportMatch = configContent.match(/export\s+default\s+(\w+)/);
-    let configStartRegex: string | RegExp = "";
+    let configStartRegex: RegExp | null = null;
     let configStartReplacement;
 
-    if (exportMatch) {
+    if (wrappedExportMatch) {
+      const configVar = wrappedExportMatch[1];
+      configStartRegex = new RegExp(`const\\s+(${configVar})(?:\\s*:\\s*[\\w<>{}\\[\\]]+)?\\s*=\\s*{`);
+      configStartReplacement = `const $1 = {`;
+    } else if (wrappedCommonJsMatch) {
+      const configVar = wrappedCommonJsMatch[1];
+      configStartRegex = new RegExp(`(const|let|var)\\s+(${configVar})\\s*=\\s*{`);
+      configStartReplacement = '$1 $2 = {';
+    } else if (exportMatch) {
       // Found a variable being exported
       const configVar = exportMatch[1];
       configStartRegex = new RegExp(`const\\s+(${configVar})(?:\\s*:\\s*[\\w<>{}\\[\\]]+)?\\s*=\\s*{`);
@@ -122,8 +170,27 @@ export async function modifyNextConfig(appDir: string) {
       }
     }
 
+    if (options.bugsinkSourceMaps) {
+      const browserSourceMapsRegex = /productionBrowserSourceMaps\s*:\s*(?:true|false)/;
+      if (browserSourceMapsRegex.test(modifiedContent)) {
+        modifiedContent = modifiedContent.replace(
+          browserSourceMapsRegex,
+          'productionBrowserSourceMaps: true'
+        );
+      } else {
+        configInsertions.push('productionBrowserSourceMaps: true,');
+      }
+
+      modifiedContent = disableSentrySourceMapProcessing(modifiedContent);
+    }
+
     // If we have new configurations to add and haven't modified the content yet
     if (configInsertions.length > 0) {
+      if (!configStartRegex || !configStartRegex.test(modifiedContent)) {
+        throw new Error(
+          'Could not safely locate the exported Next.js configuration object for platform-managed settings.'
+        );
+      }
       modifiedContent = modifiedContent.replace(
         configStartRegex,
         `${configStartReplacement}
@@ -137,6 +204,7 @@ export async function modifyNextConfig(appDir: string) {
       configPath,
       isTypeScript,
       cloudflareEnabled: cloudflare.enabled,
+      bugsinkSourceMaps: Boolean(options.bugsinkSourceMaps),
     });
 
   } catch (error) {
