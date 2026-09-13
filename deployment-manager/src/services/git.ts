@@ -73,6 +73,28 @@ export class CommitNotFoundError extends Error {
   }
 }
 
+export interface GitAuthEnv {
+  /** Credential-free origin URL, e.g. https://x-access-token@github.com/owner/repo.git */
+  cloneUrl: string;
+  askpassPath: string;
+  token: string;
+}
+
+function buildAuthenticatedExecEnv(auth: GitAuthEnv | undefined): NodeJS.ProcessEnv {
+  // A NEW object passed only to this one subprocess call - never assigned onto
+  // process.env, so the token never becomes visible to any other code running in this
+  // process (including, notably, the app-build step's own env-string construction).
+  if (!auth) {
+    return process.env;
+  }
+  return {
+    ...process.env,
+    GIT_ASKPASS: auth.askpassPath,
+    GIT_TOKEN: auth.token,
+    GIT_TERMINAL_PROMPT: '0',
+  };
+}
+
 /**
  * Fetches `branch`, then lands the checkout on an exact commit: `requestedSha` if given,
  * otherwise the branch's current tip (resolved here, once, not left to a later `git pull`
@@ -86,11 +108,19 @@ export class CommitNotFoundError extends Error {
  * the exact target commit is the one destructive step this function can't avoid (a plain
  * `pull` can't land on an arbitrary historical SHA), but by that point local changes are
  * already safely stashed and we're confirmed to be on the right branch.
+ *
+ * `auth`, when given (a GitHub-App-connected app), does two things: (1) if the directory
+ * doesn't exist yet (a deferred clone - app created before GitHub access was connected),
+ * performs the initial `git clone` here instead of throwing; (2) refreshes `origin` to
+ * `auth.cloneUrl` (credential-free - safe to persist) and supplies the token only to the
+ * network-touching calls (clone/fetch) via GIT_ASKPASS, per-subprocess. An app with no
+ * `auth` behaves exactly as before - unconnected SSH/public-repo deploys are unaffected.
  */
 export async function prepareWorkspaceAtCommit(
   appName: string,
   branch: string,
-  requestedSha?: string
+  requestedSha?: string,
+  auth?: GitAuthEnv
 ): Promise<{ commitSha: string }> {
   if (appName.includes('/') || appName.includes('..')) {
     throw new Error('Invalid app name');
@@ -100,23 +130,40 @@ export async function prepareWorkspaceAtCommit(
     throw new Error('Invalid app directory path');
   }
 
-  if (!fs.existsSync(appDir)) {
-    const error = new Error(`App directory ${appDir} does not exist`);
-    await logger.error('Directory check failed', error);
-    throw error;
-  }
-
-  // The final reset below is destructive and must only ever run inside a checkout this
-  // platform itself owns. Require appDir to have its OWN .git (not one git would find by
-  // walking up to a parent directory) - git commands run with `-C appDir` still search
-  // upward for a repo if appDir isn't one itself.
-  if (!(await isGitRepo(appDir))) {
-    throw new Error(`${appDir} is not a git repository - refusing to run destructive git operations here`);
-  }
+  const execEnv = buildAuthenticatedExecEnv(auth);
 
   try {
+    if (!fs.existsSync(appDir)) {
+      if (!auth) {
+        const error = new Error(`App directory ${appDir} does not exist`);
+        await logger.error('Directory check failed', error);
+        throw error;
+      }
+
+      // Deferred clone: this app was created before a GitHub connection existed, so no
+      // clone happened at creation time. Do it now, authenticated.
+      await logger.info('Performing deferred initial clone', { appDir });
+      fs.mkdirSync(appDir, { recursive: true });
+      await execFile('git', ['clone', '--branch', branch, auth.cloneUrl, appDir], { env: execEnv });
+    }
+
+    // The reset below is destructive and must only ever run inside a checkout this
+    // platform itself owns. Require appDir to have its OWN .git (not one git would find by
+    // walking up to a parent directory) - git commands run with `-C appDir` still search
+    // upward for a repo if appDir isn't one itself.
+    if (!(await isGitRepo(appDir))) {
+      throw new Error(`${appDir} is not a git repository - refusing to run destructive git operations here`);
+    }
+
+    if (auth) {
+      // Credential-free - safe to persist in .git/config. Refreshed every call so a
+      // change to the app's repo_url (rare) or a stale origin from before this app was
+      // connected doesn't silently keep fetching from the wrong place.
+      await execFile('git', ['-C', appDir, 'remote', 'set-url', 'origin', auth.cloneUrl]);
+    }
+
     await logger.info(`Fetching branch ${branch}`, { appDir });
-    await execFile('git', ['-C', appDir, 'fetch', 'origin', branch]);
+    await execFile('git', ['-C', appDir, 'fetch', 'origin', branch], { env: execEnv });
 
     // `git stash` exits 0 with "No local changes to save" when there's nothing to stash,
     // so this is always safe to run.

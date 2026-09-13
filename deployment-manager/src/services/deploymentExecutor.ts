@@ -7,6 +7,7 @@ import cloudflare from '~/services/cloudflare';
 import { prepareWorkspaceAtCommit } from '~/services/git';
 import { updateDeploymentStatus, markDeploymentInactiveByContainerId } from '~/services/deploymentStatus';
 import { deployPreviewBranch } from '~/services/previewBranches';
+import { resolveGitAuth } from '~/services/resolveGitAuth';
 import { App } from '~/types';
 
 export interface ExecuteDeploymentParams {
@@ -41,11 +42,14 @@ export async function executeDeployment({
   // NOT NULL-checked column when is_preview is true, so the branch must already exist by
   // the time we get here.
 
+  const gitAuth = await resolveGitAuth(app);
+
   await logger.info(`Preparing workspace for branch ${targetBranch}`);
   const { commitSha } = await prepareWorkspaceAtCommit(
     app.name,
     targetBranch,
-    job.requested_sha ?? undefined
+    job.requested_sha ?? undefined,
+    gitAuth
   );
 
   // Backfill so the queue table shows exactly what a manual deploy (requested_sha=NULL,

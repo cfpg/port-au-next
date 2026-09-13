@@ -138,12 +138,20 @@ export const createApp = withAuth(async ({
   branch,
   domain,
   root_path,
+  defer_github_clone,
 }: {
   name: string;
   repo_url: string;
   branch: string;
   domain: string;
   root_path?: string;
+  /**
+   * True for a private repo whose access will come from a GitHub App connection made
+   * after this app exists (the connect flow needs an app_id to bind its state to). The
+   * initial clone happens later, authenticated, inside the queue worker's normal git
+   * workspace preparation - see git.ts's prepareWorkspaceAtCommit and its `auth` param.
+   */
+  defer_github_clone?: boolean;
 }) => {
   const normalizedRootPath = normalizeRootPath(root_path);
 
@@ -169,18 +177,22 @@ export const createApp = withAuth(async ({
         ]);
       }
     }
-    
-    try {
-      await cloneRepository(name, repo_url, branch);
-      await logger.info(`Repository cloned for app ${name}`);
 
-      const projectDir = getAppProjectDir(name, normalizedRootPath);
-      assertAppProjectLayout(projectDir);
-    } catch (error) {
-      await logger.error(`Failed to clone repository for app ${name}`, error as Error);
-      throw error;
+    if (defer_github_clone) {
+      await logger.info(`Deferring initial clone for app ${name} until GitHub is connected`);
+    } else {
+      try {
+        await cloneRepository(name, repo_url, branch);
+        await logger.info(`Repository cloned for app ${name}`);
+
+        const projectDir = getAppProjectDir(name, normalizedRootPath);
+        assertAppProjectLayout(projectDir);
+      } catch (error) {
+        await logger.error(`Failed to clone repository for app ${name}`, error as Error);
+        throw error;
+      }
     }
-    
+
     // Set up the database (idempotent)
     try {
       const dbSetup = await setupAppDatabase(name);
