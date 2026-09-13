@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { execFileMock, existsSyncMock, accessMock } = vi.hoisted(() => ({
+const { execFileMock, existsSyncMock, accessMock, readdirSyncMock } = vi.hoisted(() => ({
   execFileMock: vi.fn(),
   existsSyncMock: vi.fn(),
   accessMock: vi.fn((_path: string, _mode: number, cb: (err: Error | null) => void) => cb(null)),
+  readdirSyncMock: vi.fn((): string[] => []),
 }));
 
 vi.mock('child_process', () => ({
@@ -25,6 +26,7 @@ vi.mock('fs', () => {
   const mod = {
     existsSync: existsSyncMock,
     mkdirSync: vi.fn(),
+    readdirSync: readdirSyncMock,
     access: accessMock,
     constants: { F_OK: 0 },
     promises: { rm: vi.fn() },
@@ -74,6 +76,8 @@ function callsContaining(needle: string) {
 beforeEach(() => {
   execFileMock.mockReset();
   existsSyncMock.mockReset();
+  readdirSyncMock.mockReset();
+  readdirSyncMock.mockReturnValue(['.git']); // non-empty by default; individual tests opt into an empty dir
   execFileMock.mockImplementation((_file: string, argv: string[]) => stdoutFor(argv));
 });
 
@@ -88,6 +92,7 @@ describe('prepareWorkspaceAtCommit - unconnected app (no auth)', () => {
     expect(callsContaining('set-url')).toHaveLength(0);
 
     const fetchCall = callsContaining('fetch')[0];
+    expect(fetchCall[1]).not.toContain('credential.helper='); // unconnected apps keep their own git config untouched
     const fetchOptions = fetchCall[2] as { env?: NodeJS.ProcessEnv } | undefined;
     expect(fetchOptions?.env?.GIT_ASKPASS).toBeUndefined();
     expect(fetchOptions?.env?.GIT_TOKEN).toBeUndefined();
@@ -115,13 +120,58 @@ describe('prepareWorkspaceAtCommit - GitHub-connected app (auth given)', () => {
     const cloneCall = callsContaining('clone')[0];
     expect(cloneCall).toBeDefined();
     const [, cloneArgv, cloneOptions] = cloneCall as [string, string[], { env?: NodeJS.ProcessEnv }];
-    expect(cloneArgv).toEqual(['clone', '--branch', 'main', AUTH.cloneUrl, '/apps-test/myapp']);
+    expect(cloneArgv).toEqual([
+      '-c',
+      'credential.helper=',
+      'clone',
+      '--branch',
+      'main',
+      AUTH.cloneUrl,
+      '/apps-test/myapp',
+    ]);
     expect(cloneOptions.env?.GIT_ASKPASS).toBe(AUTH.askpassPath);
     expect(cloneOptions.env?.GIT_TOKEN).toBe(SECRET_TOKEN);
 
     // The token must never appear as a literal argv value - only ever via env.
     expect(allArgvFlat()).not.toContain(SECRET_TOKEN);
     expect(cloneArgv.some((arg) => arg.includes(SECRET_TOKEN))).toBe(false);
+  });
+
+  it('retries the clone into a directory left empty by a previously failed deferred clone', async () => {
+    existsSyncMock.mockReturnValue(true); // the directory itself was created by the failed attempt
+    readdirSyncMock.mockReturnValue([]); // but nothing is in it - the clone never completed
+
+    await prepareWorkspaceAtCommit('myapp', 'main', undefined, AUTH);
+
+    expect(callsContaining('clone')).toHaveLength(1);
+  });
+
+  it('refuses to clone into an existing, non-empty directory that is not a git repository', async () => {
+    existsSyncMock.mockReturnValue(true);
+    readdirSyncMock.mockReturnValue(['some-unrelated-file']); // non-empty, and not a git repo (accessMock below)
+    accessMock.mockImplementationOnce((_path: string, _mode: number, cb: (err: Error | null) => void) =>
+      cb(new Error('ENOENT'))
+    );
+
+    await expect(prepareWorkspaceAtCommit('myapp', 'main', undefined, AUTH)).rejects.toThrow(
+      /not a git repository/
+    );
+    expect(callsContaining('clone')).toHaveLength(0);
+  });
+
+  it('disables the git credential helper only for the authenticated fetch, not for local operations', async () => {
+    existsSyncMock.mockReturnValue(true);
+
+    await prepareWorkspaceAtCommit('myapp', 'main', undefined, AUTH);
+
+    const fetchCall = callsContaining('fetch')[0];
+    expect(fetchCall[1]).toEqual(['-c', 'credential.helper=', '-C', '/apps-test/myapp', 'fetch', 'origin', 'main']);
+
+    for (const localOp of ['stash', 'checkout', 'reset', 'rev-parse', 'set-url']) {
+      for (const call of callsContaining(localOp)) {
+        expect(call[1]).not.toContain('credential.helper=');
+      }
+    }
   });
 
   it('refreshes origin to the credential-free URL and authenticates only the fetch call', async () => {

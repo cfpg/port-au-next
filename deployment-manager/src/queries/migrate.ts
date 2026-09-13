@@ -404,6 +404,16 @@ export async function migrate() {
       ON deploy_queue_jobs (app_id, github_delivery_id) WHERE github_delivery_id IS NOT NULL
     `);
 
+    // Push-triggered auto-deploy: a webhook job records the installation AND repository it
+    // was accepted against (not just installation_id), so the worker can detect - before
+    // doing any git/credential work - that the app's GitHub connection changed or was
+    // removed while the job sat in the queue, and refuse rather than silently deploy
+    // through a different repository or fall back to unauthenticated credentials.
+    await pool.query(`
+      ALTER TABLE deploy_queue_jobs
+      ADD COLUMN IF NOT EXISTS repo_id BIGINT
+    `);
+
     // GitHub App milestone: configuration, per-app installation mapping, and short-lived
     // connect-flow state. No webhook/auto-deploy schema here - deploy_queue_jobs already
     // carries installation_id/github_delivery_id from the earlier queue migration, unused

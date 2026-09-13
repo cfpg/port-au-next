@@ -18,6 +18,15 @@ export async function isGitRepo(dir: string) {
   });
 }
 
+/** True if `dir` exists and contains no entries. False (not "empty") if it doesn't exist. */
+function isEmptyDirectory(dir: string): boolean {
+  try {
+    return fs.readdirSync(dir).length === 0;
+  } catch {
+    return false;
+  }
+}
+
 export async function cloneRepository(appName: string, repoUrl: string, branch: string = 'main') {
   const appDir = path.join(APPS_DIR, appName);
 
@@ -95,6 +104,16 @@ function buildAuthenticatedExecEnv(auth: GitAuthEnv | undefined): NodeJS.Process
   };
 }
 
+// Prepended to the argv of any authenticated network-touching git call (clone, fetch).
+// GIT_ASKPASS only controls how git OBTAINS a credential - a configured credential helper
+// (e.g. `store`, `osxkeychain`) can still independently persist the token it receives to
+// disk once authentication succeeds. Disabling the helper for just these two invocations
+// (via a one-off `-c`, not a repo-wide `git config` write) means the token this platform
+// hands to git never has a code path that writes it to disk, regardless of what credential
+// helper the host happens to have configured. Unconnected apps never pass `auth`, so this
+// never runs for them - their existing git configuration (helper included) is untouched.
+const DISABLE_CREDENTIAL_HELPER_ARGS = ['-c', 'credential.helper='];
+
 /**
  * Fetches `branch`, then lands the checkout on an exact commit: `requestedSha` if given,
  * otherwise the branch's current tip (resolved here, once, not left to a later `git pull`
@@ -110,11 +129,19 @@ function buildAuthenticatedExecEnv(auth: GitAuthEnv | undefined): NodeJS.Process
  * already safely stashed and we're confirmed to be on the right branch.
  *
  * `auth`, when given (a GitHub-App-connected app), does two things: (1) if the directory
- * doesn't exist yet (a deferred clone - app created before GitHub access was connected),
- * performs the initial `git clone` here instead of throwing; (2) refreshes `origin` to
+ * doesn't exist yet, or exists but is empty (a deferred clone - either the app was created
+ * before GitHub access was connected, or a previous deferred-clone attempt created the
+ * directory and then failed before `git clone` completed), performs the initial `git clone`
+ * here instead of throwing - so a failed first clone doesn't permanently strand the app with
+ * an empty, non-git directory that every subsequent deploy would otherwise skip cloning into
+ * and then fail against with "not a git repository"; (2) refreshes `origin` to
  * `auth.cloneUrl` (credential-free - safe to persist) and supplies the token only to the
- * network-touching calls (clone/fetch) via GIT_ASKPASS, per-subprocess. An app with no
- * `auth` behaves exactly as before - unconnected SSH/public-repo deploys are unaffected.
+ * network-touching calls (clone/fetch) via GIT_ASKPASS, per-subprocess, with the host's
+ * configured git credential helper disabled for those same two calls so nothing besides
+ * this platform's own in-memory cache can ever persist the token to disk. An app with no
+ * `auth` behaves exactly as before - unconnected SSH/public-repo deploys are unaffected. A
+ * directory that exists, is non-empty, and isn't a git repo is still refused untouched (the
+ * `isGitRepo` check below throws before any destructive operation runs against it).
  */
 export async function prepareWorkspaceAtCommit(
   appName: string,
@@ -133,18 +160,26 @@ export async function prepareWorkspaceAtCommit(
   const execEnv = buildAuthenticatedExecEnv(auth);
 
   try {
-    if (!fs.existsSync(appDir)) {
-      if (!auth) {
-        const error = new Error(`App directory ${appDir} does not exist`);
-        await logger.error('Directory check failed', error);
-        throw error;
-      }
+    const dirExists = fs.existsSync(appDir);
 
-      // Deferred clone: this app was created before a GitHub connection existed, so no
-      // clone happened at creation time. Do it now, authenticated.
+    if (!dirExists && !auth) {
+      const error = new Error(`App directory ${appDir} does not exist`);
+      await logger.error('Directory check failed', error);
+      throw error;
+    }
+
+    if (auth && (!dirExists || isEmptyDirectory(appDir))) {
+      // Deferred clone: either this app was created before a GitHub connection existed, or
+      // a previous deferred-clone attempt got as far as creating appDir and then failed
+      // before `git clone` completed. Either way there's nothing here yet worth preserving
+      // - (re)do the clone now, authenticated.
       await logger.info('Performing deferred initial clone', { appDir });
       fs.mkdirSync(appDir, { recursive: true });
-      await execFile('git', ['clone', '--branch', branch, auth.cloneUrl, appDir], { env: execEnv });
+      await execFile(
+        'git',
+        [...DISABLE_CREDENTIAL_HELPER_ARGS, 'clone', '--branch', branch, auth.cloneUrl, appDir],
+        { env: execEnv }
+      );
     }
 
     // The reset below is destructive and must only ever run inside a checkout this
@@ -163,7 +198,11 @@ export async function prepareWorkspaceAtCommit(
     }
 
     await logger.info(`Fetching branch ${branch}`, { appDir });
-    await execFile('git', ['-C', appDir, 'fetch', 'origin', branch], { env: execEnv });
+    await execFile(
+      'git',
+      [...(auth ? DISABLE_CREDENTIAL_HELPER_ARGS : []), '-C', appDir, 'fetch', 'origin', branch],
+      { env: execEnv }
+    );
 
     // `git stash` exits 0 with "No local changes to save" when there's nothing to stash,
     // so this is always safe to run.

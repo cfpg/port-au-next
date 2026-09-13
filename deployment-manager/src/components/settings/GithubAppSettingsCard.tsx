@@ -71,11 +71,14 @@ export default function GithubAppSettingsCard() {
     }
   };
 
+  const webhookUrl = typeof window !== 'undefined' ? `${window.location.origin}/api/webhooks/github` : '';
+
   return (
     <div className="flex flex-col gap-24">
       <Callout tone="warning">
-        Manual deployment only in this release - a connected app&apos;s Deploy button can pull a
-        private repository, but pushing to GitHub does not trigger anything yet.
+        Connecting an app to GitHub only lets the manual Deploy button pull a private repository -
+        it does not deploy anything by itself. A push only triggers a deployment for an app that
+        also has Auto-deploy explicitly enabled on that app&apos;s settings page.
       </Callout>
 
       {!connected ? (
@@ -98,29 +101,53 @@ export default function GithubAppSettingsCard() {
                 </p>
               </div>
               <div>
-                <div className="font-display font-semibold text-ink mb-3">2. Set permissions</div>
+                <div className="font-display font-semibold text-ink mb-3">2. Set the Setup URL</div>
+                <p>
+                  Under <strong className="font-semibold text-ink">Identifying and authorizing users</strong>, set{' '}
+                  <strong className="font-semibold text-ink">Setup URL</strong> to{' '}
+                  <span className="font-mono text-meta bg-surface border border-line-token rounded-badge px-5 py-1">
+                    https://&lt;your-deployment-manager-host&gt;/api/github/installations/callback
+                  </span>
+                  , and check <strong className="font-semibold text-ink">Redirect on update</strong>. Without
+                  this, GitHub has nowhere to send the browser back to after an install (or a change to
+                  an existing install&apos;s repository access) completes, and the connection here will
+                  never see it. This is separate from any OAuth &quot;Callback URL&quot; field on the same
+                  page - this release doesn&apos;t use OAuth user login, only the App installation itself.
+                </p>
+              </div>
+              <div>
+                <div className="font-display font-semibold text-ink mb-3">3. Set permissions</div>
                 <ul className="list-disc list-inside flex flex-col gap-3">
                   <li>Repository permissions &rarr; Contents: Read-only</li>
                   <li>Repository permissions &rarr; Metadata: Read-only</li>
                 </ul>
-                <p className="mt-9">No webhook subscription is required yet - this release only supports manual deploys.</p>
               </div>
               <div>
-                <div className="font-display font-semibold text-ink mb-3">3. Generate a private key</div>
+                <div className="font-display font-semibold text-ink mb-3">4. Enable webhook delivery</div>
+                <p>
+                  This step is what makes push-triggered Auto-deploy possible at all - skip it and
+                  Auto-deploy has nothing to react to, even once enabled per-app. Under{' '}
+                  <strong className="font-semibold text-ink">Webhook</strong>, check{' '}
+                  <strong className="font-semibold text-ink">Active</strong>, set{' '}
+                  <strong className="font-semibold text-ink">Webhook URL</strong> to{' '}
+                  <span className="font-mono text-meta bg-surface border border-line-token rounded-badge px-5 py-1">
+                    {webhookUrl || 'https://<your-deployment-manager-host>/api/webhooks/github'}
+                  </span>
+                  {' '}(a different URL from the Setup URL above), and set a{' '}
+                  <strong className="font-semibold text-ink">Webhook secret</strong> - paste that same
+                  secret into the field below, since this platform verifies every delivery&apos;s
+                  signature against it before doing anything with it. Under{' '}
+                  <strong className="font-semibold text-ink">Permissions &amp; events &rarr; Subscribe to events</strong>,
+                  check <strong className="font-semibold text-ink">Push</strong>.
+                </p>
+              </div>
+              <div>
+                <div className="font-display font-semibold text-ink mb-3">5. Generate a private key</div>
                 <p>
                   On the App&apos;s page, scroll to <strong className="font-semibold text-ink">Private keys</strong> and click{' '}
                   <strong className="font-semibold text-ink">Generate a private key</strong> - this downloads a
                   <span className="font-mono text-meta bg-surface border border-line-token rounded-badge px-5 py-1 mx-3">.pem</span>
                   file. Paste its full contents below.
-                </p>
-              </div>
-              <div>
-                <div className="font-display font-semibold text-ink mb-3">4. Set a webhook secret</div>
-                <p>
-                  Even without a webhook enabled yet, set a{' '}
-                  <strong className="font-semibold text-ink">Webhook secret</strong> on the App now (any
-                  random string) and paste the same value below - the next release will verify
-                  incoming webhook signatures against it.
                 </p>
               </div>
               <div>
@@ -201,6 +228,11 @@ export default function GithubAppSettingsCard() {
           </div>
           <p className="text-field text-ink-muted">
             Connect individual apps to a repository from that app&apos;s settings page.
+          </p>
+          <p className="text-field text-ink-muted">
+            Webhook URL: <CodeToken>{webhookUrl || '/api/webhooks/github'}</CodeToken> - subscribed to{' '}
+            <CodeToken>push</CodeToken> events, signed with the webhook secret above. Set on the App&apos;s
+            page under <strong className="font-semibold text-ink">Webhook</strong>.
           </p>
         </div>
       )}

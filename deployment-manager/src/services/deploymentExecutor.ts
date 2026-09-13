@@ -12,7 +12,14 @@ import { App } from '~/types';
 
 export interface ExecuteDeploymentParams {
   app: App;
-  job: { id: number; branch: string; requested_sha: string | null };
+  job: {
+    id: number;
+    branch: string;
+    requested_sha: string | null;
+    source?: 'manual' | 'webhook';
+    installation_id?: string | null;
+    repo_id?: string | null;
+  };
   deploymentId: number;
   isPreviewBranch: boolean;
   version: string;
@@ -42,7 +49,18 @@ export async function executeDeployment({
   // NOT NULL-checked column when is_preview is true, so the branch must already exist by
   // the time we get here.
 
-  const gitAuth = await resolveGitAuth(app);
+  // A webhook job carries the exact installation/repository it was accepted against, so
+  // resolveGitAuth can detect - before any git/credential work runs - that the app's
+  // connection changed while the job was waiting in the queue (see
+  // resolveGitAuth.ts's GithubConnectionChangedError). Manual jobs have no such captured
+  // identity and use the plain (repo_url-only) check, exactly as before.
+  const gitAuth =
+    job.source === 'webhook'
+      ? await resolveGitAuth(app, {
+          installationId: job.installation_id ?? '',
+          repoId: job.repo_id ?? '',
+        })
+      : await resolveGitAuth(app);
 
   await logger.info(`Preparing workspace for branch ${targetBranch}`);
   const { commitSha } = await prepareWorkspaceAtCommit(

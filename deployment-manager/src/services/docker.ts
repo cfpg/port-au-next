@@ -680,9 +680,11 @@ async function recoverContainers(): Promise<void> {
             const allEnv = await mergeAppEnv(deployment, targetBranch, dbEnv, {
               isPreview: targetBranch !== deployment.branch,
             });
-            const envString = Object.entries(allEnv)
-              .map(([key, value]) => `"-e${key}=${value}"`)
-              .join(' ');
+            // Shared helper (not a re-inlined copy) so this recovery path gets the same
+            // shell-escaping as the normal deploy path - targetBranch here is whatever
+            // branch was already recorded for this deployment, which for a webhook-
+            // triggered one is the same untrusted-until-escaped value.
+            const envString = formatDockerEnvString(allEnv);
 
             const timestamp = new Date().getTime();
             const containerName = `${deployment.name}_${deployment.version}_${timestamp}`;

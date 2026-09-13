@@ -7,8 +7,10 @@ import Button from '~/components/general/Button';
 import Link from '~/components/general/Link';
 import Callout from '~/components/general/Callout';
 import CodeToken from '~/components/general/CodeToken';
+import Switch from '~/components/general/Switch';
 import { showToast } from '~/components/general/Toaster';
 import getSingleAppPath from '~/utils/getSingleAppPath';
+import { AppFeature } from '~/types/appFeatures';
 import { App } from '~/types';
 import fetcher from '~/utils/fetcher';
 
@@ -21,6 +23,7 @@ interface AppGithubStatus {
   accountLogin?: string;
   repoFullName?: string;
   hasLocalCheckout?: boolean;
+  autoDeployEnabled?: boolean;
 }
 
 export default function GithubAppCard({ app }: GithubAppCardProps) {
@@ -74,6 +77,25 @@ export default function GithubAppCard({ app }: GithubAppCardProps) {
     }
   };
 
+  const handleToggleAutoDeploy = async (next: boolean) => {
+    setIsBusy(true);
+    try {
+      const response = await fetch(`/api/apps/${app.id}/features`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ feature: AppFeature.AUTO_DEPLOY, enabled: next }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || 'Failed to update Auto-deploy');
+      await mutate();
+      showToast(`Auto-deploy ${next ? 'enabled' : 'disabled'}`, 'success');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Failed to update Auto-deploy', 'error');
+    } finally {
+      setIsBusy(false);
+    }
+  };
+
   const handleDisconnect = async () => {
     setIsBusy(true);
     try {
@@ -96,8 +118,9 @@ export default function GithubAppCard({ app }: GithubAppCardProps) {
     <div className="flex flex-col gap-14">
       <p className="text-panel text-ink-muted">
         Connect this app to a GitHub repository so the manual Deploy button can pull it with
-        short-lived credentials - useful for private repositories. Pushing to GitHub does not
-        trigger a deployment yet.
+        short-lived credentials - useful for private repositories. Connecting alone does not
+        trigger deployments; enable Auto-deploy below once connected to also queue a deployment
+        whenever GitHub delivers a push.
       </p>
 
       {!data?.connected ? (
@@ -137,6 +160,27 @@ export default function GithubAppCard({ app }: GithubAppCardProps) {
               the first time.
             </Callout>
           )}
+
+          <div className="border border-line rounded-menu overflow-hidden">
+            <div className="flex items-start justify-between gap-16 px-14 py-12 bg-surface">
+              <Switch
+                checked={data.autoDeployEnabled ?? false}
+                onChange={handleToggleAutoDeploy}
+                disabled={isBusy}
+                label="Auto-deploy"
+                hint={
+                  <>
+                    A push to <CodeToken>{app.branch}</CodeToken> queues a normal deployment. A
+                    push to any other branch queues an isolated preview deployment, but only when
+                    Preview Branches is enabled for this app with a preview domain configured -
+                    otherwise that push is ignored. Every deployment (manual or automatic) shares
+                    the same global queue, so it may wait behind other work. Disabling this stops
+                    new pushes from being queued; a push already accepted keeps running.
+                  </>
+                }
+              />
+            </div>
+          </div>
         </div>
       )}
     </div>

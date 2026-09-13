@@ -1,9 +1,13 @@
+import type { PoolClient } from 'pg';
 import pool, { withTransaction } from '~/services/database';
 import logger from '~/services/logger';
 import { executeDeployment } from '~/services/deploymentExecutor';
 import { updateDeploymentStatus } from '~/services/deploymentStatus';
 import { ensurePreviewBranch } from '~/services/previewBranches';
 import { redactLogText } from '~/lib/redactLogs';
+import { normalizeGithubRepoFullName } from '~/utils/githubRepoMatch';
+import { AppFeature } from '~/types/appFeatures';
+import { assertWebhookConnectionUnchanged } from '~/services/resolveGitAuth';
 
 interface DeployQueueJob {
   id: number;
@@ -13,6 +17,7 @@ interface DeployQueueJob {
   requested_sha: string | null;
   requested_by_user_id: string | null;
   installation_id: string | null;
+  repo_id: string | null;
   github_delivery_id: string | null;
 }
 
@@ -76,7 +81,7 @@ export function kick(): void {
 async function claimNextJob(): Promise<DeployQueueJob | null> {
   return withTransaction(async (client) => {
     const result = await client.query(
-      `SELECT id, app_id, source, branch, requested_sha, requested_by_user_id, installation_id, github_delivery_id
+      `SELECT id, app_id, source, branch, requested_sha, requested_by_user_id, installation_id, repo_id, github_delivery_id
        FROM deploy_queue_jobs
        WHERE status = 'queued'
        ORDER BY id ASC
@@ -122,7 +127,10 @@ async function fetchApp(appId: number) {
   return result.rows[0];
 }
 
-async function runJob(job: DeployQueueJob): Promise<void> {
+// Exported (only drainQueue calls it in production) so it's directly unit-testable without
+// having to drive it through kick()'s fire-and-forget async drain loop, which has no
+// promise a test can await.
+export async function runJob(job: DeployQueueJob): Promise<void> {
   // Tracked outside the try so the catch block can mark the deployment itself failed, not
   // just the queue row - without this, a build/git/readiness failure left the deployment
   // stuck at 'building'/'preflight' forever (only a restart's recovery pass would touch it).
@@ -132,6 +140,26 @@ async function runJob(job: DeployQueueJob): Promise<void> {
     const app = await fetchApp(job.app_id);
     const isPreviewBranch = job.branch !== app.branch;
     const version = new Date().toISOString().replace(/[^0-9]/g, '');
+
+    // For a webhook job, reject a since-changed GitHub connection (installation, repo id,
+    // OR the app's repo_url) BEFORE provisioning anything - ensurePreviewBranch() below
+    // creates a real database/subdomain, and resolveGitAuth() (called later, inside
+    // executeDeployment) checking this same thing is too late to prevent that: it would
+    // only stop the git/deploy step, after a stale job already left behind preview
+    // infrastructure for a connection that no longer applies. This is its own read,
+    // separate from the one resolveGitAuth() does later - not reused across that gap in
+    // time, but each individual check reads its own consistent snapshot rather than
+    // splitting "validate" and "use" across two reads (see resolveGitAuth.ts's own
+    // comment on why that specific split was the actual bug). installation_id/repo_id are
+    // only ever missing here if the row was somehow inserted without them, which
+    // enqueueGithubPushEvent never does - treated as a mismatch (fail closed) rather than
+    // skipping the check.
+    if (job.source === 'webhook') {
+      await assertWebhookConnectionUnchanged(app, {
+        installationId: job.installation_id ?? '',
+        repoId: job.repo_id ?? '',
+      });
+    }
 
     // `deployments.preview_branch_id` is required (by CHECK constraint) whenever
     // is_preview is true, so the preview branch must be provisioned/restored BEFORE the
@@ -271,4 +299,118 @@ export async function enqueueManualDeployment(
 
   kick();
   return { queueJobId: result.rows[0].id };
+}
+
+export interface GithubPushEventInput {
+  installationId: number;
+  repoId: number;
+  branch: string;
+  sha: string;
+  deliveryId: string;
+}
+
+export interface EnqueueGithubPushEventResult {
+  /** Apps eligible for this installation/repo/branch, regardless of whether their job was a fresh insert or a dedup no-op. */
+  eligibleAppIds: number[];
+  /** Apps for which a NEW queue row was actually inserted by this call. */
+  insertedJobIds: number[];
+}
+
+interface EligibleAppCandidateRow {
+  id: number;
+  branch: string;
+  repo_url: string;
+  preview_domain: string | null;
+  repo_full_name: string;
+  previews_enabled: boolean;
+}
+
+/**
+ * Durably enqueues a webhook-triggered deployment for every app eligible for this exact
+ * push - never just the first match, since the schema allows more than one platform app to
+ * connect to the same repository (see githubInstallationsQuery.ts: `github_installations`
+ * is only unique per app_id, not per installation/repo). All eligibility checks and all
+ * inserts for this one delivery happen inside a SINGLE transaction, so a delivery that
+ * matches several apps is accepted for all of them or none - never a partial subset if
+ * something fails partway through.
+ *
+ * Eligibility, per candidate app connected to this installation_id+repo_id:
+ *   - Auto-deploy must be explicitly enabled (app_features) - connecting GitHub alone
+ *     never triggers this.
+ *   - The app's CURRENT repo_url must still normalize to the connected installation's
+ *     repo_full_name - an app whose repo_url has since diverged from its connection is
+ *     skipped here for the same reason resolveGitAuth() refuses it at execution time
+ *     (GithubRepoMismatchError): never deploy through a connection that no longer matches
+ *     what the app is configured for.
+ *   - A push to a branch other than the app's configured production branch additionally
+ *     requires Preview Branches enabled AND a preview domain configured - this only reads
+ *     that state, it never enables previews or provisions any infrastructure itself (that
+ *     stays exactly where it already was: ensurePreviewBranch(), called by the worker only
+ *     for a job that was actually queued).
+ *
+ * Deduplication is the existing partial unique index on (app_id, github_delivery_id) -
+ * `ON CONFLICT ... DO NOTHING` here repeats its exact predicate (Postgres requires that to
+ * match), and rows are never deleted, so a delivery redelivered after its job already
+ * finished (done or failed) still conflicts and is not re-queued. This is a first-writer-
+ * wins conflict Postgres itself resolves atomically, so concurrent deliveries of the same
+ * event race safely with no extra locking needed here.
+ *
+ * FIFO order is queue ACCEPTANCE order (ascending id, per drainQueue's claimNextJob) - this
+ * function does no reordering or coalescing, and does not assume GitHub delivers push
+ * events in the order they occurred.
+ */
+export async function enqueueGithubPushEvent(input: GithubPushEventInput): Promise<EnqueueGithubPushEventResult> {
+  const result = await withTransaction(async (client: PoolClient) => {
+    const candidates = await client.query<EligibleAppCandidateRow>(
+      `SELECT
+         a.id,
+         a.branch,
+         a.repo_url,
+         a.preview_domain,
+         gi.repo_full_name,
+         COALESCE(pf.enabled, FALSE) AS previews_enabled
+       FROM apps a
+       JOIN github_installations gi ON gi.app_id = a.id
+       JOIN app_features adf ON adf.app_id = a.id AND adf.feature = $1 AND adf.enabled = TRUE
+       LEFT JOIN app_features pf ON pf.app_id = a.id AND pf.feature = $2
+       WHERE gi.installation_id = $3 AND gi.repo_id = $4`,
+      [AppFeature.AUTO_DEPLOY, AppFeature.PREVIEW_BRANCHES, input.installationId, input.repoId]
+    );
+
+    const eligibleAppIds: number[] = [];
+    const insertedJobIds: number[] = [];
+
+    for (const candidate of candidates.rows) {
+      const normalizedRepoUrl = normalizeGithubRepoFullName(candidate.repo_url);
+      if (!normalizedRepoUrl || normalizedRepoUrl !== candidate.repo_full_name.toLowerCase()) {
+        continue; // repo_url has diverged from the connected installation - not eligible
+      }
+
+      const isPreviewBranch = input.branch !== candidate.branch;
+      if (isPreviewBranch && (!candidate.previews_enabled || !candidate.preview_domain)) {
+        continue; // preview prerequisites not met - never provisioned from here regardless
+      }
+
+      eligibleAppIds.push(candidate.id);
+
+      const insertResult = await client.query<{ id: number }>(
+        `INSERT INTO deploy_queue_jobs
+           (app_id, source, branch, requested_sha, installation_id, repo_id, github_delivery_id)
+         VALUES ($1, 'webhook', $2, $3, $4, $5, $6)
+         ON CONFLICT (app_id, github_delivery_id) WHERE github_delivery_id IS NOT NULL DO NOTHING
+         RETURNING id`,
+        [candidate.id, input.branch, input.sha, input.installationId, input.repoId, input.deliveryId]
+      );
+      if (insertResult.rows[0]) {
+        insertedJobIds.push(insertResult.rows[0].id);
+      }
+    }
+
+    return { eligibleAppIds, insertedJobIds };
+  });
+
+  if (result.insertedJobIds.length > 0) {
+    kick();
+  }
+  return result;
 }
