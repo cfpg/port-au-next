@@ -85,10 +85,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   let webhookSecret: string;
   try {
     webhookSecret = (await requireGithubAppConfig()).webhookSecret;
-  } catch {
+  } catch (error) {
     // Configuration failure, not a delivery problem - never treat this as an accepted
-    // delivery. In a correctly set-up instance this can't happen: an installation (and
-    // therefore any real delivery) can't exist before the App itself is configured.
+    // delivery. Logged (never with the secret itself - requireGithubAppConfig's own
+    // errors don't carry it) so a decrypt/config failure is actually diagnosable instead
+    // of surfacing only as a generic 500 with nothing in the server logs.
+    await logger.error('Failed to resolve GitHub App config for webhook delivery', error as Error);
     return NextResponse.json({ error: 'GitHub App is not configured' }, { status: 500 });
   }
 

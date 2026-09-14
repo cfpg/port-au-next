@@ -2,9 +2,10 @@ import { createHmac } from 'crypto';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
-const { requireGithubAppConfigMock, enqueueGithubPushEventMock } = vi.hoisted(() => ({
+const { requireGithubAppConfigMock, enqueueGithubPushEventMock, loggerErrorMock } = vi.hoisted(() => ({
   requireGithubAppConfigMock: vi.fn(),
   enqueueGithubPushEventMock: vi.fn(),
+  loggerErrorMock: vi.fn(),
 }));
 
 vi.mock('~/services/githubApp', () => ({
@@ -14,7 +15,7 @@ vi.mock('~/services/deployQueue', () => ({
   enqueueGithubPushEvent: enqueueGithubPushEventMock,
 }));
 vi.mock('~/services/logger', () => ({
-  default: { info: vi.fn(), error: vi.fn() },
+  default: { info: vi.fn(), error: loggerErrorMock },
 }));
 
 import { POST } from './route';
@@ -62,6 +63,7 @@ const validPushBody = JSON.stringify({
 beforeEach(() => {
   requireGithubAppConfigMock.mockReset();
   enqueueGithubPushEventMock.mockReset();
+  loggerErrorMock.mockReset();
   requireGithubAppConfigMock.mockResolvedValue({
     appId: '1',
     privateKeyPem: 'unused',
@@ -179,13 +181,18 @@ describe('POST /api/webhooks/github', () => {
     expect(enqueueGithubPushEventMock).not.toHaveBeenCalled();
   });
 
-  it('responds 500 without enqueueing when the GitHub App is not configured', async () => {
-    requireGithubAppConfigMock.mockRejectedValue(new Error('not configured'));
+  it('responds 500 without enqueueing when the GitHub App is not configured, and logs the real underlying error', async () => {
+    // Regression: this path used to be a bare `catch {}` that swallowed the actual error
+    // (e.g. a decrypt failure), leaving the server logs with nothing to diagnose it from -
+    // a generic 500 was the only signal an operator ever saw.
+    const underlyingError = new Error('Unsupported state or unable to authenticate data');
+    requireGithubAppConfigMock.mockRejectedValue(underlyingError);
 
     const response = await POST(makeRequest(validPushBody));
 
     expect(response.status).toBe(500);
     expect(enqueueGithubPushEventMock).not.toHaveBeenCalled();
+    expect(loggerErrorMock).toHaveBeenCalledWith(expect.any(String), underlyingError);
   });
 
   it('responds 500 (not a false 2xx acceptance) when enqueueing fails', async () => {

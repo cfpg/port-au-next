@@ -8,6 +8,7 @@ import Textarea from '~/components/general/Textarea';
 import { showToast } from '~/components/general/Toaster';
 import Disclosure from '~/components/general/Disclosure';
 import CodeToken from '~/components/general/CodeToken';
+import CopyableCode from '~/components/general/CopyableCode';
 import Callout from '~/components/general/Callout';
 import fetcher from '~/utils/fetcher';
 
@@ -72,6 +73,14 @@ export default function GithubAppSettingsCard() {
   };
 
   const webhookUrl = typeof window !== 'undefined' ? `${window.location.origin}/api/webhooks/github` : '';
+  const setupCallbackUrl =
+    typeof window !== 'undefined' ? `${window.location.origin}/api/github/installations/callback` : '';
+  // Once the App is registered here, its slug lets us link straight to that App's own
+  // settings page on GitHub (where the webhook/permissions fields below actually live)
+  // instead of only the generic "create a new App" page.
+  const githubAppPageUrl = config?.appSlug
+    ? `https://github.com/settings/apps/${config.appSlug}`
+    : 'https://github.com/settings/apps/new';
 
   return (
     <div className="flex flex-col gap-24">
@@ -81,87 +90,115 @@ export default function GithubAppSettingsCard() {
         also has Auto-deploy explicitly enabled on that app&apos;s settings page.
       </Callout>
 
+      {/* Kept visible whether or not the App is configured yet - useful as a running
+          reference when reconfiguring, rotating the webhook secret, or connecting a new
+          app later, not just during the initial one-time setup. */}
+      <Disclosure title="GitHub App setup reference">
+        <div className="flex flex-col gap-14 text-panel text-ink-muted">
+          <div>
+            <a
+              href={githubAppPageUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary underline hover:text-primary-active"
+            >
+              {connected ? `Open ${config?.appSlug} on GitHub` : 'Create a new GitHub App'} &#8599;
+            </a>
+          </div>
+          <div>
+            <div className="font-display font-semibold text-ink mb-3">1. Create the App</div>
+            <p>
+              Go to{' '}
+              <strong className="font-semibold text-ink">
+                GitHub Settings &rarr; Developer settings &rarr; GitHub Apps &rarr; New GitHub App
+              </strong>
+              . Any owner account works (personal or org). Under{' '}
+              <strong className="font-semibold text-ink">Where can this GitHub App be installed?</strong>,
+              choose &quot;Only on this account&quot; or &quot;Any account&quot; depending on whether the
+              repositories you&apos;ll connect live under your own account or an organization.
+            </p>
+          </div>
+          <div>
+            <div className="font-display font-semibold text-ink mb-3">2. Set the Setup URL</div>
+            <p>
+              Under <strong className="font-semibold text-ink">Identifying and authorizing users</strong>, set{' '}
+              <strong className="font-semibold text-ink">Setup URL</strong> to{' '}
+              <CopyableCode
+                value={setupCallbackUrl || 'https://<your-deployment-manager-host>/api/github/installations/callback'}
+              />
+              , and check <strong className="font-semibold text-ink">Redirect on update</strong>. Without
+              this, GitHub has nowhere to send the browser back to after an install (or a change to
+              an existing install&apos;s repository access) completes, and the connection here will
+              never see it. This is separate from any OAuth &quot;Callback URL&quot; field on the same
+              page - this platform doesn&apos;t use OAuth user login, only the App installation itself.
+            </p>
+          </div>
+          <div>
+            <div className="font-display font-semibold text-ink mb-3">3. Set permissions</div>
+            <ul className="list-disc list-inside flex flex-col gap-3">
+              <li>Repository permissions &rarr; Contents: Read-only</li>
+              <li>Repository permissions &rarr; Metadata: Read-only</li>
+            </ul>
+          </div>
+          <div>
+            <div className="font-display font-semibold text-ink mb-3">4. Enable webhook delivery</div>
+            <p>
+              This step is what makes push-triggered Auto-deploy possible at all - skip it and
+              Auto-deploy has nothing to react to, even once enabled per-app. Under{' '}
+              <strong className="font-semibold text-ink">Webhook</strong>, check{' '}
+              <strong className="font-semibold text-ink">Active</strong>, set{' '}
+              <strong className="font-semibold text-ink">Webhook URL</strong> to{' '}
+              <CopyableCode value={webhookUrl || 'https://<your-deployment-manager-host>/api/webhooks/github'} />
+              {' '}(a different URL from the Setup URL above), and set a{' '}
+              <strong className="font-semibold text-ink">Webhook secret</strong> - enter that same secret
+              when configuring the App below (or update it here if already configured), since this
+              platform verifies every delivery&apos;s signature against it before doing anything with
+              it. Under{' '}
+              <strong className="font-semibold text-ink">Permissions &amp; events &rarr; Subscribe to events</strong>,
+              check <strong className="font-semibold text-ink">Push</strong>.
+            </p>
+          </div>
+          <div>
+            <div className="font-display font-semibold text-ink mb-3">5. Generate a private key</div>
+            <p>
+              On the App&apos;s page, scroll to <strong className="font-semibold text-ink">Private keys</strong> and click{' '}
+              <strong className="font-semibold text-ink">Generate a private key</strong> - this downloads a
+              <span className="font-mono text-meta bg-surface border border-line-token rounded-badge px-5 py-1 mx-3">.pem</span>
+              file. Paste its full contents into this platform&apos;s Private key field when configuring
+              the App below (or when rotating it) - keep the downloaded file itself somewhere safe too,
+              since GitHub won&apos;t show it again.
+            </p>
+          </div>
+          <div>
+            <div className="font-display font-semibold text-ink mb-3">6. Connect an app &amp; enable Auto-deploy</div>
+            <p>
+              Once the App above is saved, go to each app&apos;s own settings page: click{' '}
+              <strong className="font-semibold text-ink">Connect GitHub</strong> (or{' '}
+              <strong className="font-semibold text-ink">Check for existing installation</strong> if it&apos;s
+              already installed on GitHub), then flip the{' '}
+              <strong className="font-semibold text-ink">Auto-deploy</strong> switch once connected -
+              connecting alone never enables it, that&apos;s a separate, explicit, per-app opt-in.
+            </p>
+          </div>
+          <div>
+            <a
+              href="https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/registering-a-github-app"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary underline hover:text-primary-active"
+            >
+              GitHub docs: Registering a GitHub App
+            </a>
+          </div>
+        </div>
+      </Disclosure>
+
       {!connected ? (
         <div className="flex flex-col gap-14">
           <p className="text-field text-ink-muted">
             Register a GitHub App once for this platform, then connect individual apps to their
             repositories from each app&apos;s settings page.
           </p>
-
-          <Disclosure title="How to create a GitHub App">
-            <div className="flex flex-col gap-14 text-panel text-ink-muted">
-              <div>
-                <div className="font-display font-semibold text-ink mb-3">1. Create the App</div>
-                <p>
-                  Go to{' '}
-                  <strong className="font-semibold text-ink">
-                    GitHub Settings &rarr; Developer settings &rarr; GitHub Apps &rarr; New GitHub App
-                  </strong>
-                  . Any owner account works (personal or org).
-                </p>
-              </div>
-              <div>
-                <div className="font-display font-semibold text-ink mb-3">2. Set the Setup URL</div>
-                <p>
-                  Under <strong className="font-semibold text-ink">Identifying and authorizing users</strong>, set{' '}
-                  <strong className="font-semibold text-ink">Setup URL</strong> to{' '}
-                  <span className="font-mono text-meta bg-surface border border-line-token rounded-badge px-5 py-1">
-                    https://&lt;your-deployment-manager-host&gt;/api/github/installations/callback
-                  </span>
-                  , and check <strong className="font-semibold text-ink">Redirect on update</strong>. Without
-                  this, GitHub has nowhere to send the browser back to after an install (or a change to
-                  an existing install&apos;s repository access) completes, and the connection here will
-                  never see it. This is separate from any OAuth &quot;Callback URL&quot; field on the same
-                  page - this release doesn&apos;t use OAuth user login, only the App installation itself.
-                </p>
-              </div>
-              <div>
-                <div className="font-display font-semibold text-ink mb-3">3. Set permissions</div>
-                <ul className="list-disc list-inside flex flex-col gap-3">
-                  <li>Repository permissions &rarr; Contents: Read-only</li>
-                  <li>Repository permissions &rarr; Metadata: Read-only</li>
-                </ul>
-              </div>
-              <div>
-                <div className="font-display font-semibold text-ink mb-3">4. Enable webhook delivery</div>
-                <p>
-                  This step is what makes push-triggered Auto-deploy possible at all - skip it and
-                  Auto-deploy has nothing to react to, even once enabled per-app. Under{' '}
-                  <strong className="font-semibold text-ink">Webhook</strong>, check{' '}
-                  <strong className="font-semibold text-ink">Active</strong>, set{' '}
-                  <strong className="font-semibold text-ink">Webhook URL</strong> to{' '}
-                  <span className="font-mono text-meta bg-surface border border-line-token rounded-badge px-5 py-1">
-                    {webhookUrl || 'https://<your-deployment-manager-host>/api/webhooks/github'}
-                  </span>
-                  {' '}(a different URL from the Setup URL above), and set a{' '}
-                  <strong className="font-semibold text-ink">Webhook secret</strong> - paste that same
-                  secret into the field below, since this platform verifies every delivery&apos;s
-                  signature against it before doing anything with it. Under{' '}
-                  <strong className="font-semibold text-ink">Permissions &amp; events &rarr; Subscribe to events</strong>,
-                  check <strong className="font-semibold text-ink">Push</strong>.
-                </p>
-              </div>
-              <div>
-                <div className="font-display font-semibold text-ink mb-3">5. Generate a private key</div>
-                <p>
-                  On the App&apos;s page, scroll to <strong className="font-semibold text-ink">Private keys</strong> and click{' '}
-                  <strong className="font-semibold text-ink">Generate a private key</strong> - this downloads a
-                  <span className="font-mono text-meta bg-surface border border-line-token rounded-badge px-5 py-1 mx-3">.pem</span>
-                  file. Paste its full contents below.
-                </p>
-              </div>
-              <div>
-                <a
-                  href="https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/registering-a-github-app"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-primary underline hover:text-primary-active"
-                >
-                  GitHub docs: Registering a GitHub App
-                </a>
-              </div>
-            </div>
-          </Disclosure>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-14">
             <Input
@@ -230,7 +267,7 @@ export default function GithubAppSettingsCard() {
             Connect individual apps to a repository from that app&apos;s settings page.
           </p>
           <p className="text-field text-ink-muted">
-            Webhook URL: <CodeToken>{webhookUrl || '/api/webhooks/github'}</CodeToken> - subscribed to{' '}
+            Webhook URL: <CopyableCode value={webhookUrl || '/api/webhooks/github'} /> - subscribed to{' '}
             <CodeToken>push</CodeToken> events, signed with the webhook secret above. Set on the App&apos;s
             page under <strong className="font-semibold text-ink">Webhook</strong>.
           </p>
