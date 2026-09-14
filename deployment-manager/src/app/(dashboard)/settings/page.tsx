@@ -3,6 +3,7 @@ import PageHeader from "~/components/general/PageHeader";
 import { fetchServicesHealth } from "./actions";
 import SettingsAdminUser from "~/components/settings/SettingsAdminUser";
 import CloudflareSettingsCard from "~/components/settings/CloudflareSettingsCard";
+import GithubAppSettingsCard from "~/components/settings/GithubAppSettingsCard";
 import { auth } from "~/lib/auth";
 import { headers } from "next/headers";
 import ServiceCard from "~/components/services/ServiceCard";
@@ -37,10 +38,17 @@ const SettingsPage = async () => {
         ))}
       </div>
 
-      <div>
+      <div className="mb-24">
         <Panel
           title="Cloudflare"
           content={<CloudflareSettingsCard />}
+        />
+      </div>
+
+      <div>
+        <Panel
+          title="GitHub App"
+          content={<GithubAppSettingsCard />}
         />
       </div>
     </main>

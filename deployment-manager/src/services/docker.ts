@@ -2,8 +2,9 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 
-import { getActiveDeployments, updateDeploymentContainer, deduplicateActiveDeployments, cleanupStaleBuildingDeployments, cleanupOrphanedPreviewDeployments } from '~/services/database';
-import { updateNginxConfig } from '~/services/nginx';
+import { getActiveDeployments, updateDeploymentContainer, deduplicateActiveDeployments, getInterruptedDeployments, cleanupOrphanedPreviewDeployments } from '~/services/database';
+import { updateDeploymentStatus } from '~/services/deploymentStatus';
+import { updateNginxConfig, isRoutingHostnameCurrentlyConfigured } from '~/services/nginx';
 import logger from '~/services/logger';
 import { modifyNextConfig } from '~/services/nextConfig';
 
@@ -515,11 +516,87 @@ async function imageExists(imageTag: string): Promise<boolean> {
   }
 }
 
+/**
+ * Interrupted deployments (crashed while building/preflight/migrating) are only ever
+ * marked failed after checking whether their traffic switch actually completed - a
+ * deployment can have live traffic while its status still reads 'preflight' if the
+ * process died between switchTraffic() succeeding and the status flip (see
+ * releasePipeline.ts's recordDeploymentContainer/updateDeploymentStatus ordering).
+ *
+ * This throws (does not catch-and-guess) if the container-state check itself errors
+ * unexpectedly - turning "we couldn't check" into "so it must have failed" would be
+ * actively wrong: it could fail a deployment that's serving live traffic. An inconclusive
+ * result blocks startup (see recoverContainers()'s caller in instrumentation.ts, which
+ * only calls markSystemReady() if this resolves without throwing) rather than guessing.
+ *
+ * Known accepted gap: the routing check reads nginx's on-disk desired config
+ * (isRoutingHostnameCurrentlyConfigured), which applyConfigMutation() in nginx.ts writes
+ * before validating/reloading nginx - a crash in that narrow window could show a hostname
+ * nginx hasn't actually picked up yet. Forcing a reload here to close that is deferred as
+ * separate follow-up work rather than part of this refactor.
+ */
+async function reconcileInterruptedDeployments(): Promise<{ promoted: number; failed: number }> {
+  const interrupted = await getInterruptedDeployments();
+  if (interrupted.length === 0) {
+    return { promoted: 0, failed: 0 };
+  }
+
+  let promoted = 0;
+  let failed = 0;
+
+  for (const deployment of interrupted) {
+    if (!deployment.container_id) {
+      // Never got far enough to have a container - unambiguously not live.
+      await updateDeploymentStatus(deployment.deployment_id, 'failed');
+      failed++;
+      continue;
+    }
+
+    const exists = await containerExists(deployment.container_id);
+    if (!exists) {
+      await updateDeploymentStatus(deployment.deployment_id, 'failed');
+      failed++;
+      continue;
+    }
+
+    const previewBranch = deployment.is_preview
+      ? (deployment.preview_branch || deployment.deployment_branch)
+      : undefined;
+    const routeDomain = deployment.is_preview ? deployment.preview_subdomain : deployment.domain;
+
+    if (!routeDomain) {
+      await updateDeploymentStatus(deployment.deployment_id, 'failed');
+      failed++;
+      continue;
+    }
+
+    const routingHostname = await getContainerRoutingHostname(
+      deployment.container_id,
+      deployment.deployment_id
+    );
+    const isLive = await isRoutingHostnameCurrentlyConfigured(
+      deployment.name,
+      routeDomain,
+      previewBranch,
+      routingHostname
+    );
+
+    await updateDeploymentStatus(deployment.deployment_id, isLive ? 'active' : 'failed');
+    if (isLive) {
+      promoted++;
+    } else {
+      failed++;
+    }
+  }
+
+  return { promoted, failed };
+}
+
 async function recoverContainers(): Promise<void> {
   try {
-    const interrupted = await cleanupStaleBuildingDeployments();
-    if (interrupted.length > 0) {
-      await logger.info('Marked interrupted deployments as failed', { count: interrupted.length });
+    const { promoted, failed } = await reconcileInterruptedDeployments();
+    if (promoted > 0 || failed > 0) {
+      await logger.info('Reconciled interrupted deployments', { promoted, failed });
     }
 
     const stale = await deduplicateActiveDeployments();
@@ -603,9 +680,11 @@ async function recoverContainers(): Promise<void> {
             const allEnv = await mergeAppEnv(deployment, targetBranch, dbEnv, {
               isPreview: targetBranch !== deployment.branch,
             });
-            const envString = Object.entries(allEnv)
-              .map(([key, value]) => `"-e${key}=${value}"`)
-              .join(' ');
+            // Shared helper (not a re-inlined copy) so this recovery path gets the same
+            // shell-escaping as the normal deploy path - targetBranch here is whatever
+            // branch was already recorded for this deployment, which for a webhook-
+            // triggered one is the same untrusted-until-escaped value.
+            const envString = formatDockerEnvString(allEnv);
 
             const timestamp = new Date().getTime();
             const containerName = `${deployment.name}_${deployment.version}_${timestamp}`;

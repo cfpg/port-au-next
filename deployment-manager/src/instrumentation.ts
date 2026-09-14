@@ -84,10 +84,32 @@ export async function register() {
         await setupBugsink();
       });
 
-      await runOptionalStep('Container recovery', async () => {
+      // Container recovery and deploy-queue recovery are NOT run through runOptionalStep:
+      // that helper swallows errors so later steps still run, but the deploy queue must
+      // only start processing jobs once both of these have genuinely completed - reaching
+      // this point in the step list is not the same guarantee. See deployQueue.ts's
+      // markSystemReady()/kick(), which are no-ops until this succeeds.
+      const recoveryStartedAt = Date.now();
+      try {
         const { recoverContainers } = await import('./services/docker');
         await recoverContainers();
-      });
+
+        const { reconcileInterruptedJobs, markSystemReady } = await import('./services/deployQueue');
+        await reconcileInterruptedJobs();
+
+        markSystemReady();
+        console.log('Container and deploy-queue recovery completed', {
+          durationMs: Date.now() - recoveryStartedAt,
+        });
+      } catch (error) {
+        console.warn(
+          'Container/deploy-queue recovery failed - auto-deploy and queued manual deploys will not run until the next successful restart',
+          {
+            error: error instanceof Error ? error.message : String(error),
+            durationMs: Date.now() - recoveryStartedAt,
+          }
+        );
+      }
 
       await runOptionalStep('Platform service Cloudflare route sync', async () => {
         const { syncPlatformServicesOnStartup } = await import(

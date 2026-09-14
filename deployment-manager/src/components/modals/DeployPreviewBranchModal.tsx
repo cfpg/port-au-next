@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useSWRConfig } from 'swr';
 import Modal from '~/components/general/Modal';
 import Button from '~/components/general/Button';
 import Input from '~/components/general/Input';
@@ -27,9 +28,11 @@ export default function DeployPreviewBranchModal({
   isOpen,
   onClose,
   appName,
+  appId,
   previewDomain
 }: DeployPreviewBranchModalProps) {
   const router = useRouter();
+  const { mutate } = useSWRConfig();
   const [branch, setBranch] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<FormError | null>(null);
@@ -75,8 +78,11 @@ export default function DeployPreviewBranchModal({
         return;
       }
 
-      showToast(`Deployment started successfully for branch ${branch}`, "success");
+      showToast('Deployment queued.', 'success');
       setBranchToConfirm(null);
+      mutate(`/api/apps/${appId}/deployments`);
+      mutate('/api/apps');
+      mutate('/api/apps/deployments');
       router.refresh();
       onClose();
     } catch (error) {
@@ -140,10 +146,10 @@ export default function DeployPreviewBranchModal({
         onClose={() => setBranchToConfirm(null)}
         onConfirm={() => handleDeploy(true)}
         isLoading={isLoading}
-        title="Deploy branch again?"
-        confirmLabel="Deploy again"
+        title="Queue another deployment?"
+        confirmLabel="Queue another"
         confirmVariant="primary"
-        description="That branch is currently deploying and building. Are you sure you want to deploy it again?"
+        description="This branch already has a queued or running deployment. Queue another?"
       />
     </Modal>
   );

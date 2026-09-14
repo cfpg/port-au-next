@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { usePathname } from 'next/navigation';
+import { useSWRConfig } from 'swr';
 import { App, Deployment, ServiceStatus } from '~/types';
 import Table, { TableColumn } from '~/components/general/Table';
 import RelativeTime from '~/components/general/RelativeTime';
@@ -10,11 +11,13 @@ import Badge from '~/components/general/Badge';
 import CodeToken from '~/components/general/CodeToken';
 import { getServiceStatusTone } from '~/utils/serviceColors';
 import Link from '~/components/general/Link';
+import getSingleAppPath from '~/utils/getSingleAppPath';
 import AppDeployButton from '~/components/buttons/AppDeployButton';
 import EmptyState from '~/components/general/EmptyState';
 import Menu from '~/components/general/Menu';
 import Button from '~/components/general/Button';
 import Modal from '~/components/general/Modal';
+import ConfirmDialog from '~/components/general/ConfirmDialog';
 import DeploymentLogViewerContainer from '~/components/deployments/DeploymentLogViewerContainer';
 import { EyeIcon, RefreshIcon, ClipboardIcon, CheckIcon } from '~/components/general/icons';
 import { triggerDeployment } from '~/app/(dashboard)/actions';
@@ -29,16 +32,34 @@ interface DeploymentHistoryTableProps {
 /** A DeploymentRow's ⋮ menu - view logs, redeploy this build, copy commit SHA. */
 function DeploymentRowMenu({ deployment, includeViewLogs = true }: { deployment: Deployment; includeViewLogs?: boolean }) {
   const pathname = usePathname();
+  const { mutate } = useSWRConfig();
   const [logsOpen, setLogsOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [confirmRedeploy, setConfirmRedeploy] = useState(false);
+  const [isRedeploying, setIsRedeploying] = useState(false);
 
-  const handleRedeploy = async () => {
+  const handleRedeploy = async (confirmConcurrent = false) => {
     try {
-      const result = await triggerDeployment(deployment.app_name, { pathname, branch: deployment.branch });
+      setIsRedeploying(true);
+      const result = await triggerDeployment(deployment.app_name, {
+        pathname,
+        branch: deployment.branch,
+        confirmConcurrent,
+      });
+      if (result?.requiresConfirmation) {
+        setConfirmRedeploy(true);
+        return;
+      }
       if (result?.error) throw new Error(result.error);
-      showToast(`Redeploying ${deployment.app_name} · ${deployment.version}`, 'success');
+      setConfirmRedeploy(false);
+      showToast('Deployment queued.', 'success');
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Failed to redeploy', 'error');
+    } finally {
+      setIsRedeploying(false);
+      mutate(`/api/apps/${deployment.app_id}/deployments`);
+      mutate('/api/apps');
+      mutate('/api/apps/deployments');
     }
   };
 
@@ -57,7 +78,7 @@ function DeploymentRowMenu({ deployment, includeViewLogs = true }: { deployment:
           ...(includeViewLogs
             ? [{ label: 'View logs', icon: <EyeIcon className="text-ink-muted" />, onClick: () => setLogsOpen(true) }]
             : []),
-          { label: 'Redeploy this build', icon: <RefreshIcon className="text-ink-muted" />, onClick: handleRedeploy },
+          { label: 'Redeploy this build', icon: <RefreshIcon className="text-ink-muted" />, onClick: () => handleRedeploy() },
           ...(deployment.commit_id
             ? [{
                 label: copied ? 'Copied' : 'Copy commit SHA',
@@ -75,6 +96,16 @@ function DeploymentRowMenu({ deployment, includeViewLogs = true }: { deployment:
       >
         <DeploymentLogViewerContainer appName={deployment.app_name} deploymentId={deployment.id} enabled={logsOpen} />
       </Modal>
+      <ConfirmDialog
+        isOpen={confirmRedeploy}
+        onClose={() => setConfirmRedeploy(false)}
+        onConfirm={() => handleRedeploy(true)}
+        isLoading={isRedeploying}
+        title="Queue another deployment?"
+        confirmLabel="Queue another"
+        confirmVariant="primary"
+        description="This branch already has a queued or running deployment. Queue another?"
+      />
     </>
   );
 }
@@ -112,7 +143,13 @@ export default function DeploymentHistoryTable({
             header: 'app',
             width: '1.3fr',
             render: (d: Deployment) => (
-              <Link href={`/apps/${d.app_name}/deployments/${d.id}`} variant="default" className="truncate block">
+              // A queued placeholder's `id` is a synthetic negative number, not a real
+              // deployment - link to the app itself rather than a nonexistent detail page.
+              <Link
+                href={d.isQueued ? getSingleAppPath(d.app_name) : `/apps/${d.app_name}/deployments/${d.id}`}
+                variant="default"
+                className="truncate block"
+              >
                 {d.app_name}
               </Link>
             ),
@@ -123,7 +160,12 @@ export default function DeploymentHistoryTable({
       key: 'version',
       header: 'version',
       width: '1.5fr',
-      render: (d) => <span className="font-mono text-meta text-ink">{d.version}</span>,
+      render: (d) =>
+        d.isQueued ? (
+          <span className="font-mono text-meta text-ink-ghost">-</span>
+        ) : (
+          <span className="font-mono text-meta text-ink">{d.version}</span>
+        ),
     },
     { key: 'branch', header: 'branch', width: '0.7fr', render: (d) => <span className="font-mono text-meta text-ink-muted">{d.branch || 'main'}</span> },
     {
@@ -143,7 +185,10 @@ export default function DeploymentHistoryTable({
       key: 'status',
       header: 'status',
       width: '0.9fr',
-      render: (d) => <Badge tone={getServiceStatusTone(d.status as ServiceStatus)} withDot>{d.status}</Badge>,
+      render: (d) => {
+        const badge = <Badge tone={getServiceStatusTone(d.status as ServiceStatus)} withDot>{d.status}</Badge>;
+        return d.queueError ? <span title={d.queueError}>{badge}</span> : badge;
+      },
     },
     {
       key: 'deployedAt',
@@ -162,8 +207,13 @@ export default function DeploymentHistoryTable({
       header: 'actions',
       width: scope === 'app' ? '132px' : '88px',
       align: 'right',
-      render: (d) =>
-        scope === 'app' ? (
+      render: (d) => {
+        // No deployment id exists yet - nothing here (logs, redeploy, copy SHA) has
+        // anything to act on.
+        if (d.isQueued) {
+          return null;
+        }
+        return scope === 'app' ? (
           <>
             <DeploymentLogAction deployment={d} />
             <DeploymentRowMenu deployment={d} includeViewLogs={false} />
@@ -173,7 +223,8 @@ export default function DeploymentHistoryTable({
             <AppDeployButton app={{ name: d.app_name, id: d.app_id } as App} branch={d.branch} />
             <DeploymentRowMenu deployment={d} />
           </>
-        ),
+        );
+      },
     },
   ];
 

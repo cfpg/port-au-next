@@ -27,6 +27,22 @@ export async function updateDeploymentStatus(
   await pool.query('UPDATE deployments SET status = $1 WHERE id = $2', [status, deploymentId]);
 }
 
+/**
+ * Persists the container/commit a deployment resolved to, BEFORE traffic is switched to
+ * it. Recovery after a crash relies on this having already happened regardless of which
+ * side of the switch the crash landed on - see recoverContainers()/cleanupStaleBuildingDeployments().
+ */
+export async function recordDeploymentContainer(
+  deploymentId: number,
+  commitId: string,
+  containerId: string
+): Promise<void> {
+  await pool.query(
+    `UPDATE deployments SET commit_id = $1, container_id = $2 WHERE id = $3`,
+    [commitId, containerId, deploymentId]
+  );
+}
+
 export async function markDeploymentInactiveByContainerId(containerId: string): Promise<void> {
   await pool.query(
     `UPDATE deployments
