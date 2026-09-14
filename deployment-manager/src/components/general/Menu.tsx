@@ -51,7 +51,7 @@ export default function Menu({ items, align = 'right', ariaLabel = 'More actions
         anchorRef={triggerRef}
         placement={align === 'right' ? 'bottom-end' : 'bottom-start'}
       >
-        <div role="menu" className="min-w-174 bg-surface border border-line rounded-menu shadow-pop p-4 z-110">
+        <div role="menu" className="min-w-174 bg-surface border border-line rounded-menu shadow-pop p-4">
           {items.map((item, index) =>
             item.type === 'separator' ? (
               <div key={index} className="h-1 bg-line-soft my-4" />

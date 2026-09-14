@@ -186,6 +186,64 @@ describe('githubApp', () => {
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
+  it('lists branch names for a repository, using the repo-scoped token', async () => {
+    fetchMock
+      .mockResolvedValueOnce({
+        // Token mint, always the first call.
+        ok: true,
+        status: 201,
+        json: async () => ({ token: 'repo-scoped', expires_at: new Date(Date.now() + 3600_000).toISOString() }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => [{ name: 'main' }, { name: 'feature/foo' }],
+      });
+
+    const { listRepositoryBranches } = await import('./githubApp');
+    const branches = await listRepositoryBranches(555, 42, 'example/demo');
+
+    expect(branches).toEqual(['main', 'feature/foo']);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const [url] = fetchMock.mock.calls[1];
+    expect(url).toContain('/repos/example/demo/branches');
+  });
+
+  it('paginates listRepositoryBranches across multiple pages', async () => {
+    const fullPage = Array.from({ length: 100 }, (_, i) => ({ name: `branch-${i}` }));
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 201,
+        json: async () => ({ token: 'repo-scoped', expires_at: new Date(Date.now() + 3600_000).toISOString() }),
+      })
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => fullPage })
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => [{ name: 'last-branch' }] });
+
+    const { listRepositoryBranches } = await import('./githubApp');
+    const branches = await listRepositoryBranches(555, 42, 'example/demo');
+
+    expect(branches).toHaveLength(101);
+    expect(branches[100]).toBe('last-branch');
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('URL-encodes the owner/repo segments when listing branches', async () => {
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 201,
+        json: async () => ({ token: 'repo-scoped', expires_at: new Date(Date.now() + 3600_000).toISOString() }),
+      })
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => [] });
+
+    const { listRepositoryBranches } = await import('./githubApp');
+    await listRepositoryBranches(555, 42, 'my org/repo name');
+
+    const [url] = fetchMock.mock.calls[1];
+    expect(url).toContain('/repos/my%20org/repo%20name/branches');
+  });
+
   it('throws a clear, non-secret-leaking error when GitHub rejects the request', async () => {
     fetchMock.mockResolvedValueOnce({ ok: false, status: 401 });
 

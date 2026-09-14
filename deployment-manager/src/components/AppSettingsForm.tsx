@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Button from '~/components/general/Button';
 import Input from '~/components/general/Input';
 import FormSection from '~/components/general/FormSection';
+import BranchCombobox from '~/components/github/BranchCombobox';
 import { updateAppSettings } from '~/app/(dashboard)/apps/[appName]/actions';
 import { showToast } from '~/components/general/Toaster';
 
@@ -82,11 +83,12 @@ export function AppSettingsForm({ appId, className, initialSettings }: AppSettin
         placeholder="https://github.com/myapp/myapp"
       />
 
-      <Input
+      <BranchCombobox
+        appId={appId}
         id="branch"
         label="Branch"
         value={settings.branch || ''}
-        onChange={(e) => handleChange('branch', e.target.value)}
+        onChange={(value) => handleChange('branch', value)}
         placeholder="main"
       />
 

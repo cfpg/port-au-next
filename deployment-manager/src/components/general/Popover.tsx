@@ -89,6 +89,14 @@ export default function Popover({
         left: 0,
         // Off-screen until the first position lands, so it never flashes at (0,0).
         transform: coords ? `translate(${coords.x}px, ${coords.y}px)` : 'translate(-9999px, -9999px)',
+        // Above Modal/ConfirmDialog's backdrop (z-100) so any popover (menu, tooltip,
+        // combobox) still stacks correctly when opened while one is showing. Belongs
+        // here, not on each consumer's own content div: a z-index on a child only has an
+        // effect if that child is itself positioned, and even then it would only be
+        // compared within THIS wrapper's own stacking context - which, without an
+        // explicit z-index of its own, doesn't outrank a sibling that has one (like the
+        // modal backdrop) no matter what a child's z-index says.
+        zIndex: 120,
       }}
     >
       {children}

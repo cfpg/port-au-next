@@ -281,6 +281,43 @@ export async function listInstallationRepositories(installationId: number): Prom
   return repos;
 }
 
+/**
+ * Every branch name in a specific repository (GET /repos/{owner}/{repo}/branches,
+ * paginated), via the same repo-scoped installation token already used for git
+ * clone/fetch - minimum privilege, no new permission needed (Contents: Read already
+ * covers this). Powers a branch picker for a connected app (preview-branch deploy, app
+ * settings) instead of a free-typed branch name; callers are responsible for confirming
+ * the installation is still the one actually connected for the app asking (see
+ * resolveGitAuth.ts's equivalent check for the deploy path - this function itself trusts
+ * whatever installationId/repoId/repoFullName it's given).
+ */
+export async function listRepositoryBranches(
+  installationId: number,
+  repoId: number,
+  repoFullName: string
+): Promise<string[]> {
+  const token = await getInstallationToken(installationId, repoId);
+  const [owner, repo] = repoFullName.split('/');
+  const branches: string[] = [];
+  let page = 1;
+
+  while (true) {
+    const result = (await githubApiFetch(
+      `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/branches?per_page=100&page=${page}`,
+      { token }
+    )) as Array<{ name: string }>;
+    for (const branch of result) {
+      branches.push(branch.name);
+    }
+    if (result.length < 100) {
+      break;
+    }
+    page += 1;
+  }
+
+  return branches;
+}
+
 export type FindInstallationForRepoResult =
   | { status: 'found'; installationId: number; accountLogin: string; repo: GithubRepoSummary }
   | { status: 'not_found' }

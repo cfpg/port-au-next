@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation';
 import { useSWRConfig } from 'swr';
 import Modal from '~/components/general/Modal';
 import Button from '~/components/general/Button';
-import Input from '~/components/general/Input';
 import Callout from '~/components/general/Callout';
+import BranchCombobox from '~/components/github/BranchCombobox';
 import { triggerDeployment } from '~/app/(dashboard)/actions';
 import { showToast } from "~/components/general/Toaster";
 import ConfirmDialog from '~/components/general/ConfirmDialog';
@@ -109,14 +109,14 @@ export default function DeployPreviewBranchModal({
       size="sm"
     >
       <form onSubmit={(e) => { e.preventDefault(); handleDeploy(); }} className="flex flex-col gap-14">
-        <Input
+        <BranchCombobox
+          appId={appId}
           id="branch"
-          type="text"
           label="Branch"
           placeholder="feature/checkout-v2"
           value={branch}
-          onChange={(e) => {
-            setBranch(e.target.value);
+          onChange={(value) => {
+            setBranch(value);
             if (error?.field === "branch") {
               setError(null);
             }
@@ -127,7 +127,6 @@ export default function DeployPreviewBranchModal({
               ? `A preview deployment will be created at ${branch ? `${branch}.${previewDomain}` : `[branch].${previewDomain}`}`
               : undefined
           }
-          required
         />
 
         {error && !error.field ? <Callout tone="danger">{error.message}</Callout> : null}

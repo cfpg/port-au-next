@@ -18,7 +18,7 @@ export const buttonStyles = tv({
       'inline-flex items-center justify-center cursor-pointer',
       'rounded-r-control transition-colors duration-150 focus-ring',
     ],
-    dropdownContent: 'min-w-190 bg-surface border border-line rounded-menu shadow-pop p-4 z-110',
+    dropdownContent: 'min-w-190 bg-surface border border-line rounded-menu shadow-pop p-4',
     dropdownItem: [
       'w-full flex items-center gap-9 px-9 py-7 rounded-badge text-panel text-ink text-left cursor-pointer',
       'transition-colors duration-100 hover:bg-hover active:bg-pressed',

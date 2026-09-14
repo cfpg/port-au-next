@@ -34,7 +34,7 @@ export default function Tooltip({ content, children, className }: TooltipProps) 
           id={id}
           role="tooltip"
           className={[
-            'block whitespace-nowrap bg-ink text-paper font-mono text-mini rounded-control px-8 py-5 shadow-tip z-110',
+            'block whitespace-nowrap bg-ink text-paper font-mono text-mini rounded-control px-8 py-5 shadow-tip',
             className,
           ].join(' ')}
         >
