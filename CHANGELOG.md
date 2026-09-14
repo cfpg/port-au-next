@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Changed
+
+### Fixed
+
+## [0.8.0] - 2026-09-13
+
+### Added
+
 - **GitHub App integration:** Configure a platform-wide GitHub App (Settings → GitHub App) and connect individual apps to a specific repository via GitHub's install flow or "check for existing installation" (for an installation that already has access) - manual Deploy can then clone/fetch private repositories using short-lived, repository-scoped installation tokens instead of the host's own SSH/git credentials.
 - **Push-triggered auto-deploy:** A per-app "Auto-deploy" toggle (off by default, including for already-connected apps) queues a deployment automatically when GitHub delivers a signed push to the connected repository. A push to the app's production branch deploys normally; a push to any other branch deploys as an isolated preview when Preview Branches is enabled with a domain configured. Every deployment records and verifies the exact commit SHA it was asked to deploy, never "whatever the branch tip happens to be by the time it runs."
 - **GitHub webhook receiver:** A public, signature-verified endpoint (`/api/webhooks/github`) validates and durably records each eligible push exactly once per delivery, independent of whether the dashboard is open. See `docs/SOW-github-autodeploy.md` for GitHub App and webhook setup.
