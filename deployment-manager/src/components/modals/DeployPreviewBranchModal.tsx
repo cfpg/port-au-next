@@ -2,12 +2,14 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useSWRConfig } from 'swr';
 import Modal from '~/components/general/Modal';
 import Button from '~/components/general/Button';
 import Input from '~/components/general/Input';
 import Callout from '~/components/general/Callout';
 import { triggerDeployment } from '~/app/(dashboard)/actions';
 import { showToast } from "~/components/general/Toaster";
+import ConfirmDialog from '~/components/general/ConfirmDialog';
 
 interface DeployPreviewBranchModalProps {
   isOpen: boolean;
@@ -26,14 +28,17 @@ export default function DeployPreviewBranchModal({
   isOpen,
   onClose,
   appName,
+  appId,
   previewDomain
 }: DeployPreviewBranchModalProps) {
   const router = useRouter();
+  const { mutate } = useSWRConfig();
   const [branch, setBranch] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<FormError | null>(null);
+  const [branchToConfirm, setBranchToConfirm] = useState<string | null>(null);
 
-  const handleDeploy = async () => {
+  const handleDeploy = async (confirmConcurrent = false) => {
     setError(null);
 
     if (!branch.trim()) {
@@ -47,10 +52,19 @@ export default function DeployPreviewBranchModal({
     try {
       setIsLoading(true);
 
-      const result = await triggerDeployment(appName, { branch: branch.trim() });
+      const targetBranch = branch.trim();
+      const result = await triggerDeployment(appName, {
+        branch: targetBranch,
+        confirmConcurrent,
+      });
 
-      if (!result.success) {
-        const errorMessage = result.error || "Failed to start deployment";
+      if (result?.requiresConfirmation) {
+        setBranchToConfirm(targetBranch);
+        return;
+      }
+
+      if (!result?.success) {
+        const errorMessage = result?.error || "Failed to start deployment";
         if (errorMessage.toLowerCase().includes("branch") && errorMessage.toLowerCase().includes("not found")) {
           setError({
             message: "Branch not found. Please check the branch name and try again.",
@@ -64,7 +78,11 @@ export default function DeployPreviewBranchModal({
         return;
       }
 
-      showToast(`Deployment started successfully for branch ${branch}`, "success");
+      showToast('Deployment queued.', 'success');
+      setBranchToConfirm(null);
+      mutate(`/api/apps/${appId}/deployments`);
+      mutate('/api/apps');
+      mutate('/api/apps/deployments');
       router.refresh();
       onClose();
     } catch (error) {
@@ -79,6 +97,7 @@ export default function DeployPreviewBranchModal({
 
   const handleClose = () => {
     setError(null);
+    setBranchToConfirm(null);
     onClose();
   };
 
@@ -122,6 +141,16 @@ export default function DeployPreviewBranchModal({
           </Button>
         </div>
       </form>
+      <ConfirmDialog
+        isOpen={branchToConfirm !== null}
+        onClose={() => setBranchToConfirm(null)}
+        onConfirm={() => handleDeploy(true)}
+        isLoading={isLoading}
+        title="Queue another deployment?"
+        confirmLabel="Queue another"
+        confirmVariant="primary"
+        description="This branch already has a queued or running deployment. Queue another?"
+      />
     </Modal>
   );
 }

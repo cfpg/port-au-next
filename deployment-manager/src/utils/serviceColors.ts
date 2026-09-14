@@ -15,6 +15,7 @@ export const getServiceStatusTone = (status: ServiceStatus) => {
     case 'building':
     case 'preflight':
     case 'migrating':
+    case 'queued':
       return 'warning';
     default:
       return 'idle';

@@ -2,26 +2,13 @@
 
 import pool from '~/services/database';
 import logger from '~/services/logger';
-import { stopContainer } from '~/services/docker';
-import { runReleasePipeline } from '~/services/releasePipeline';
-import { updateNginxConfig } from '~/services/nginx';
-import cloudflare from '~/services/cloudflare';
-import { getLatestCommit } from '~/services/git';
-import { pullLatestChanges } from '~/services/git';
 import fetchAppsQuery from '~/queries/fetchAppsQuery';
 import fetchRecentDeploymentsQuery from '~/queries/fetchRecentDeploymentsQuery';
 import { revalidatePath } from 'next/cache';
 import { withAuth } from '~/lib/auth-utils';
-import {
-  updateDeploymentStatus,
-  markDeploymentInactiveByContainerId,
-} from '~/services/deploymentStatus';
-import {
-  isPreviewBranchesEnabled,
-  setupPreviewBranch,
-  getPreviewBranch,
-  deployPreviewBranch
-} from '~/services/previewBranches';
+import { auth } from '~/lib/auth';
+import { headers } from 'next/headers';
+import { enqueueManualDeployment } from '~/services/deployQueue';
 
 export const fetchApps = withAuth(async () => {
   const apps = await fetchAppsQuery();
@@ -33,217 +20,49 @@ export const fetchRecentDeployments = withAuth(async () => {
   return deployments;
 });
 
-export const triggerDeployment = withAuth(async (appName: string, { pathname, branch }: { pathname?: string; branch?: string } = {}) => {
-  let deploymentId: number;
+export const triggerDeployment = withAuth(async (
+  appName: string,
+  {
+    pathname,
+    branch,
+    confirmConcurrent = false,
+  }: { pathname?: string; branch?: string; confirmConcurrent?: boolean } = {}
+) => {
   try {
-    // Get app details
-    const appResult = await pool.query(
-      'SELECT * FROM apps WHERE name = $1',
-      [appName]
-    );
-
+    const appResult = await pool.query('SELECT id, branch FROM apps WHERE name = $1', [appName]);
     if (appResult.rows.length === 0) {
       throw new Error('App not found');
     }
-
     const app = appResult.rows[0];
-    const version = new Date().toISOString().replace(/[^0-9]/g, '');
     const targetBranch = branch || app.branch;
-    const isPreviewBranch = !!(branch && branch !== app.branch);
-    let previewBranch = null;
 
-    // If this is a preview branch deployment, check if preview branches are enabled
-    if (isPreviewBranch) {
-      const enabled = await isPreviewBranchesEnabled(app.id);
-      if (!enabled) {
-        throw new Error('Preview branches are not enabled for this app');
-      }
+    const session = await auth.api.getSession({ headers: await headers() });
 
-      if (!app.preview_domain) {
-        throw new Error('Preview domain is not configured');
-      }
-
-      // Check if preview branch db entry exists, if not set it up
-      previewBranch = await getPreviewBranch(app.id, targetBranch);
-      if (!previewBranch) {
-        previewBranch = await setupPreviewBranch({
-          appId: app.id,
-          appName,
-          branch: targetBranch,
-          previewDomain: app.preview_domain
-        });
-      } else if (previewBranch.deleted_at) {
-        // If preview branch exists but is soft-deleted, restore it
-        await pool.query(
-          'UPDATE preview_branches SET deleted_at = NULL WHERE id = $1',
-          [previewBranch.id]
-        );
-        await logger.info('Restored soft-deleted preview branch', {
-          branch: targetBranch,
-          previewBranchId: previewBranch.id
-        });
-      }
-    }
-
-    // Start deployment record
-    const deploymentResult = await pool.query(
-      `INSERT INTO deployments (app_id, version, status, branch, is_preview, preview_branch_id)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING id`,
-      [app.id, version, 'pending', targetBranch, isPreviewBranch, isPreviewBranch ? previewBranch.id : null]
+    const result = await enqueueManualDeployment(
+      app.id,
+      session?.user?.id,
+      targetBranch,
+      confirmConcurrent
     );
 
-    deploymentId = deploymentResult.rows[0].id;
-    logger.setDeploymentContext(deploymentId);
-    await logger.info('Deployment record created', {
-      version,
-      branch: targetBranch,
-      isPreview: isPreviewBranch,
-      previewBranchId: isPreviewBranch ? previewBranch.id : null
-    });
+    if (result.requiresConfirmation) {
+      return { success: false, requiresConfirmation: true, branch: targetBranch };
+    }
 
-    // Revalidate path if available
     if (pathname) {
       revalidatePath(pathname);
     }
 
-    // Async deployment process
-    (async () => {
-      try {
-        await logger.info('Starting deployment process');
-        await logger.info('Updating deployment status to building');
-
-        await pool.query(
-          'UPDATE deployments SET status = $1 WHERE id = $2',
-          ['building', deploymentId]
-        );
-
-        if (isPreviewBranch) {
-          const result = await deployPreviewBranch(
-            app.id,
-            targetBranch,
-            deploymentId,
-            version
-          );
-
-          await logger.info('Marking deployment as active');
-          await pool.query(
-            `UPDATE deployments 
-             SET status = $1, commit_id = $2, container_id = $3 
-             WHERE id = $4`,
-            ['active', result.commitId, result.containerId, deploymentId]
-          );
-        } else {
-          await logger.info(`Pulling latest changes from branch ${targetBranch}`);
-          await pullLatestChanges(appName, targetBranch);
-
-          const commitId = await getLatestCommit(appName, targetBranch);
-          await logger.info('Got latest commit', { commitId });
-
-          const oldDeployment = await pool.query(
-            `SELECT container_id, commit_id FROM deployments 
-             WHERE app_id = $1
-               AND status = 'active'
-               AND COALESCE(is_preview, FALSE) = FALSE
-             ORDER BY id DESC
-             LIMIT 1`,
-            [app.id]
-          );
-          const oldContainerId = oldDeployment.rows[0]?.container_id;
-          const oldCommitId = oldDeployment.rows[0]?.commit_id;
-
-          const appEnv = {
-            POSTGRES_USER: app.db_user,
-            POSTGRES_PASSWORD: app.db_password,
-            POSTGRES_DB: app.db_name,
-            POSTGRES_HOST: 'postgres',
-            BRANCH: targetBranch,
-            DATABASE_URL: `postgres://${app.db_user}:${app.db_password}@postgres:5432/${app.db_name}`,
-          };
-
-          const { containerId } = await runReleasePipeline({
-            app,
-            version,
-            branch: targetBranch,
-            appEnv,
-            deploymentId,
-            switchTraffic: async (_id, depId, routingHostname) =>
-              updateNginxConfig(
-                appName,
-                app.domain,
-                routingHostname,
-                undefined,
-                depId,
-                { requireApplied: true }
-              ),
-          });
-
-          await logger.info('Marking deployment as active');
-          await pool.query(
-            `UPDATE deployments 
-             SET status = $1, commit_id = $2, container_id = $3 
-             WHERE id = $4`,
-            ['active', commitId, containerId, deploymentId]
-          );
-
-          if (oldContainerId) {
-            try {
-              await logger.info('Stopping old container', { oldContainerId });
-              await stopContainer(oldContainerId);
-              await logger.info('Old container stopped and marked as inactive');
-            } catch (error) {
-              await logger.warning('Failed to stop old container - new deployment is still active', {
-                oldContainerId,
-                error: (error as Error).message
-              });
-            } finally {
-              await markDeploymentInactiveByContainerId(oldContainerId);
-            }
-          }
-
-          if (oldCommitId && app.cloudflare_zone_id) {
-            try {
-              const changedAssets = await cloudflare.getChangedAssets(
-                appName,
-                oldCommitId,
-                commitId
-              );
-
-              if (changedAssets.length > 0) {
-                await cloudflare.purgeCache(
-                  app.domain,
-                  app.cloudflare_zone_id,
-                  changedAssets
-                );
-              }
-            } catch (error) {
-              await logger.warning('Failed to purge Cloudflare cache', error as Error);
-            }
-          }
-        }
-
-        await logger.info('Deployment completed successfully');
-
-      } catch (error) {
-        await logger.error('Deployment failed', error as Error);
-        await updateDeploymentStatus(deploymentId, 'failed');
-      } finally {
-        // Clear the deployment context when done
-        logger.clearDeploymentContext();
-      }
-    })();
-
     return {
       success: true,
-      message: 'Deployment started',
-      deploymentId,
-      version
+      message: 'Deployment queued',
+      queueJobId: result.queueJobId,
     };
   } catch (error) {
-    logger.error('Error initiating deployment', error as Error);
+    await logger.error('Error initiating deployment', error as Error);
     return {
       success: false,
-      error: (error as Error).message || 'Deployment failed'
+      error: (error as Error).message || 'Deployment failed',
     };
   }
 });

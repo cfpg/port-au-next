@@ -138,12 +138,20 @@ export const createApp = withAuth(async ({
   branch,
   domain,
   root_path,
+  defer_github_clone,
 }: {
   name: string;
   repo_url: string;
   branch: string;
   domain: string;
   root_path?: string;
+  /**
+   * True for a private repo whose access will come from a GitHub App connection made
+   * after this app exists (the connect flow needs an app_id to bind its state to). The
+   * initial clone happens later, authenticated, inside the queue worker's normal git
+   * workspace preparation - see git.ts's prepareWorkspaceAtCommit and its `auth` param.
+   */
+  defer_github_clone?: boolean;
 }) => {
   const normalizedRootPath = normalizeRootPath(root_path);
 
@@ -169,18 +177,22 @@ export const createApp = withAuth(async ({
         ]);
       }
     }
-    
-    try {
-      await cloneRepository(name, repo_url, branch);
-      await logger.info(`Repository cloned for app ${name}`);
 
-      const projectDir = getAppProjectDir(name, normalizedRootPath);
-      assertAppProjectLayout(projectDir);
-    } catch (error) {
-      await logger.error(`Failed to clone repository for app ${name}`, error as Error);
-      throw error;
+    if (defer_github_clone) {
+      await logger.info(`Deferring initial clone for app ${name} until GitHub is connected`);
+    } else {
+      try {
+        await cloneRepository(name, repo_url, branch);
+        await logger.info(`Repository cloned for app ${name}`);
+
+        const projectDir = getAppProjectDir(name, normalizedRootPath);
+        assertAppProjectLayout(projectDir);
+      } catch (error) {
+        await logger.error(`Failed to clone repository for app ${name}`, error as Error);
+        throw error;
+      }
     }
-    
+
     // Set up the database (idempotent)
     try {
       const dbSetup = await setupAppDatabase(name);
@@ -236,6 +248,22 @@ export const deleteApp = withAuth(async (appName: string): Promise<{ success: bo
     }
 
     const app = appResult.rows[0];
+
+    // App deletion tears down containers/checkout/database that a running deploy job
+    // might still be using - refuse rather than race it. (Not airtight against a job
+    // enqueued in the instant after this check; closing that fully is follow-up work,
+    // not something this refactor needs to solve.)
+    const activeJob = await pool.query(
+      `SELECT id FROM deploy_queue_jobs WHERE app_id = $1 AND status IN ('queued', 'running') LIMIT 1`,
+      [app.id]
+    );
+    if (activeJob.rows.length > 0) {
+      return {
+        success: false,
+        message: 'An active or queued deployment exists for this app. Wait for it to finish before deleting.',
+      };
+    }
+
     await logger.info(`Starting deletion process for app ${appName}`);
 
     // Delete app data from each service, continuing even if individual steps fail
@@ -368,6 +396,20 @@ export const deletePreviewBranch = withAuth(async (appId: number, branch: string
     }
 
     const previewBranch = branchResult.rows[0];
+
+    // Refuse rather than tear down a container/database an enqueued-or-running deploy
+    // job might still be using (same simple guard as deleteApp()'s).
+    const activeJob = await pool.query(
+      `SELECT id FROM deploy_queue_jobs WHERE app_id = $1 AND branch = $2 AND status IN ('queued', 'running') LIMIT 1`,
+      [appId, branch]
+    );
+    if (activeJob.rows.length > 0) {
+      return {
+        success: false,
+        message: 'An active or queued deployment exists for this preview branch. Wait for it to finish before deleting.',
+      };
+    }
+
     await logger.info(`Starting deletion process for preview branch ${branch} of app ${appId}`);
 
     try {

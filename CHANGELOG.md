@@ -12,6 +12,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.8.0] - 2026-09-13
+
+### Added
+
+- **GitHub App integration:** Configure a platform-wide GitHub App (Settings → GitHub App) and connect individual apps to a specific repository via GitHub's install flow or "check for existing installation" (for an installation that already has access) - manual Deploy can then clone/fetch private repositories using short-lived, repository-scoped installation tokens instead of the host's own SSH/git credentials.
+- **Push-triggered auto-deploy:** A per-app "Auto-deploy" toggle (off by default, including for already-connected apps) queues a deployment automatically when GitHub delivers a signed push to the connected repository. A push to the app's production branch deploys normally; a push to any other branch deploys as an isolated preview when Preview Branches is enabled with a domain configured. Every deployment records and verifies the exact commit SHA it was asked to deploy, never "whatever the branch tip happens to be by the time it runs."
+- **GitHub webhook receiver:** A public, signature-verified endpoint (`/api/webhooks/github`) validates and durably records each eligible push exactly once per delivery, independent of whether the dashboard is open. See `docs/SOW-github-autodeploy.md` for GitHub App and webhook setup.
+- **Unified deployment queue:** Manual and push-triggered deployments now share a single FIFO queue and worker instead of running immediately/fire-and-forget. Queue status (queued, building, failed) is now visible throughout the dashboard - Applications table, sidebar, and deployment history - without a page refresh.
+
+### Changed
+
+- Manual "Deploy" now queues behind other in-flight work across the whole platform (one deployment runs at a time) instead of starting immediately; the dashboard reflects queued/building state rather than assuming the deploy already started.
+- Startup recovery now also reconciles interrupted queue jobs, not just container/deployment status.
+
+### Fixed
+
+- **Preview branch subdomain/database collisions:** Branches that only differ in characters stripped during sanitization (e.g. `feature/foo` and `feature-foo`) no longer collide on the same preview subdomain and database name prefix.
+- **Non-atomic preview branch provisioning:** Preview branch setup/teardown now runs as a real transaction instead of separate, potentially different, pooled connections; a failure after the preview database is created but before its row commits no longer leaks an orphaned database.
+- **Shared checkout branch safety:** Deploying no longer risks resetting whichever branch happened to be checked out last in an app's shared working directory - the target branch is checked out explicitly before any destructive git operation.
+- **Shell argument handling in git/container commands:** Git and Docker commands built from database-stored or (with this release) webhook-supplied values now use argument arrays and shell-safe quoting instead of raw string interpolation.
+
 ## [0.7.0] - 2026-09-09
 
 ### Added

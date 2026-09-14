@@ -9,6 +9,18 @@ export interface Deployment {
   deployed_at: string;
   container_id?: string;
   branch?: string;
+  /**
+   * True for a synthetic row representing a deploy_queue_jobs entry that hasn't produced
+   * a real `deployments` row yet (queued, or claimed but not yet linked). `id` on such a
+   * row is a placeholder for React/table keying only - never a real deployment id, so
+   * deployment-scoped actions (view logs, redeploy, copy SHA) must be hidden when this is
+   * true rather than passed a fake id.
+   */
+  isQueued?: boolean;
+  /** The deploy_queue_jobs.id backing an isQueued row. */
+  queueJobId?: number;
+  /** Redacted error text for a queue job that failed before a deployment row existed. */
+  queueError?: string;
 }
 
 export interface DeploymentLog {
@@ -33,6 +45,12 @@ export interface App {
   env?: Record<string, string>;
   preview_domain?: string;
   root_path?: string;
+  /**
+   * Precedence-derived: an in-progress deployment's own status, else 'queued' if a
+   * request is waiting with nothing executing, else the last deployment's status (or
+   * 'stopped'). See utils/appStatus.ts's deriveAppStatus - the single source of this
+   * logic, not duplicated elsewhere.
+   */
   status: string;
   last_deployment?: {
     version: string;
@@ -40,6 +58,12 @@ export interface App {
     status: string;
     deployed_at: Date;
   };
+  /**
+   * Later of the last real deployment's time and the oldest waiting queue request's
+   * request time - ordering-only (see utils/appStatus.ts's deriveActivityAt). Never
+   * substitutes for `last_deployment.deployed_at`, which stays the real deployment time.
+   */
+  activity_at?: string | null;
 }
 
 export interface AppDeployment  {

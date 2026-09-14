@@ -6,6 +6,7 @@ import ObjectStorageCard from '~/components/settings/ObjectStorageCard';
 import AnalyticsCard from '~/components/settings/AnalyticsCard';
 import ErrorTrackingCard from '~/components/settings/ErrorTrackingCard';
 import CloudflareAppCard from '~/components/settings/CloudflareAppCard';
+import GithubAppCard from '~/components/settings/GithubAppCard';
 import { AppSettingsForm } from '~/components/AppSettingsForm';
 
 export default async function AppSettingsPage({
@@ -34,6 +35,7 @@ export default async function AppSettingsPage({
         }}
       />
 
+      <Panel title="GitHub" content={<GithubAppCard app={app} />} />
       <Panel title="Cloudflare" content={<CloudflareAppCard app={app} />} />
       <Panel title="Object Storage" content={<ObjectStorageCard app={app} />} />
       <Panel title="Analytics" content={<AnalyticsCard app={app} />} />

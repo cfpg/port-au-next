@@ -373,6 +373,104 @@ export async function migrate() {
       )
     `);
 
+    // Single unified queue for manual and (future) webhook-triggered deployments.
+    // See docs/SOW-github-autodeploy.md - 'webhook' source lands in a later phase.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS deploy_queue_jobs (
+        id SERIAL PRIMARY KEY,
+        app_id INTEGER NOT NULL REFERENCES apps(id) ON DELETE CASCADE,
+        source TEXT NOT NULL CHECK (source IN ('manual', 'webhook')),
+        branch TEXT NOT NULL,
+        requested_sha TEXT,
+        requested_by_user_id TEXT,
+        installation_id BIGINT,
+        github_delivery_id TEXT,
+        status TEXT NOT NULL DEFAULT 'queued' CHECK (status IN ('queued','running','done','failed')),
+        deployment_id INTEGER REFERENCES deployments(id) ON DELETE SET NULL,
+        error TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        started_at TIMESTAMP WITH TIME ZONE,
+        finished_at TIMESTAMP WITH TIME ZONE
+      )
+    `);
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_deploy_queue_jobs_pending
+      ON deploy_queue_jobs (id) WHERE status = 'queued'
+    `);
+
+    await pool.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS uq_deploy_queue_jobs_delivery
+      ON deploy_queue_jobs (app_id, github_delivery_id) WHERE github_delivery_id IS NOT NULL
+    `);
+
+    // Push-triggered auto-deploy: a webhook job records the installation AND repository it
+    // was accepted against (not just installation_id), so the worker can detect - before
+    // doing any git/credential work - that the app's GitHub connection changed or was
+    // removed while the job sat in the queue, and refuse rather than silently deploy
+    // through a different repository or fall back to unauthenticated credentials.
+    await pool.query(`
+      ALTER TABLE deploy_queue_jobs
+      ADD COLUMN IF NOT EXISTS repo_id BIGINT
+    `);
+
+    // GitHub App milestone: configuration, per-app installation mapping, and short-lived
+    // connect-flow state. No webhook/auto-deploy schema here - deploy_queue_jobs already
+    // carries installation_id/github_delivery_id from the earlier queue migration, unused
+    // until that later milestone.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS github_app_config (
+        id SERIAL PRIMARY KEY,
+        app_slug TEXT NOT NULL,
+        app_id TEXT NOT NULL,
+        client_id TEXT,
+        private_key_encrypted TEXT NOT NULL,
+        webhook_secret_encrypted TEXT NOT NULL,
+        connected_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Enforces a single global row (one platform-wide GitHub App), the same way
+    // cloudflare_config is treated as single-row by convention, but backed by a real
+    // constraint here since two rows would silently make "the" config ambiguous.
+    await pool.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS uq_github_app_config_singleton
+      ON github_app_config ((true))
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS github_installations (
+        id SERIAL PRIMARY KEY,
+        app_id INTEGER NOT NULL REFERENCES apps(id) ON DELETE CASCADE,
+        installation_id BIGINT NOT NULL,
+        account_login TEXT NOT NULL,
+        repo_id BIGINT NOT NULL,
+        repo_full_name TEXT NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (app_id)
+      )
+    `);
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_github_installations_installation_id
+      ON github_installations (installation_id)
+    `);
+
+    // Single-use, short-lived state for the "Connect GitHub" callback. Consuming a row is
+    // an atomic UPDATE ... SET used_at WHERE used_at IS NULL AND expires_at > now(), so a
+    // replayed or expired token is rejected outright (see githubConnectStatesQuery.ts).
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS github_connect_states (
+        token_hash TEXT PRIMARY KEY,
+        app_id INTEGER NOT NULL REFERENCES apps(id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL,
+        expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+        used_at TIMESTAMP WITH TIME ZONE
+      )
+    `);
+
     await pool.query('COMMIT');
     console.log('Database migration completed successfully');
   } catch (error) {

@@ -4,8 +4,10 @@ import pool from '~/services/database';
 import { grantCreateDb, revokeCreateDb } from '~/services/database';
 import { AppFeature } from '~/types/appFeatures';
 import { syncPreviewWildcardRoute } from '~/services/cloudflareRoutes';
+import { findGithubInstallationForApp } from '~/queries/githubInstallationsQuery';
+import { normalizeGithubRepoFullName } from '~/utils/githubRepoMatch';
 
-export const GET = withAuth(async (request: Request, { params }: { params: { appId: string } }) => {
+export const GET = withAuth(async (request: Request, { params }: { params: Promise<{ appId: string }> }) => {
   const { appId: appIdParam } = await params;
   const appId = parseInt(appIdParam);
 
@@ -41,8 +43,9 @@ export const GET = withAuth(async (request: Request, { params }: { params: { app
   }
 });
 
-export const PATCH = withAuth(async (request: Request, { params }: { params: { appId: string } }) => {
-  const appId = parseInt(params.appId);
+export const PATCH = withAuth(async (request: Request, { params }: { params: Promise<{ appId: string }> }) => {
+  const { appId: appIdParam } = await params;
+  const appId = parseInt(appIdParam);
 
   if (isNaN(appId)) {
     return NextResponse.json(
@@ -82,6 +85,36 @@ export const PATCH = withAuth(async (request: Request, { params }: { params: { a
 
     if (feature === AppFeature.USES_PRISMA && !enabled) {
       mergedConfig = { ...mergedConfig, auto_migrate: false };
+    }
+
+    // Turning Auto-deploy OFF is always allowed (it only stops NEW webhook pushes from
+    // being enqueued - jobs already accepted keep running, and manual Deploy is
+    // unaffected). Turning it ON requires a GitHub connection that actually matches this
+    // app's current repository - without this check, enabling it on a disconnected app,
+    // or one whose repo_url has since diverged from its connection, would look like it
+    // worked but every push would just fail at execution time instead.
+    if (feature === AppFeature.AUTO_DEPLOY && enabled) {
+      const installation = await findGithubInstallationForApp(appId);
+      if (!installation) {
+        return NextResponse.json(
+          { error: 'Connect this app to a GitHub repository before enabling Auto-deploy.' },
+          { status: 400 }
+        );
+      }
+
+      const appResult = await pool.query<{ repo_url: string }>('SELECT repo_url FROM apps WHERE id = $1', [appId]);
+      const repoUrl = appResult.rows[0]?.repo_url;
+      const normalizedRepoUrl = repoUrl ? normalizeGithubRepoFullName(repoUrl) : null;
+      if (!normalizedRepoUrl || normalizedRepoUrl !== installation.repo_full_name.toLowerCase()) {
+        return NextResponse.json(
+          {
+            error:
+              "This app's repository has changed since GitHub was connected. Disconnect and reconnect " +
+              'GitHub for the current repository before enabling Auto-deploy.',
+          },
+          { status: 400 }
+        );
+      }
     }
 
     await pool.query(

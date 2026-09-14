@@ -1,6 +1,6 @@
 export const site = {
   name: "Port-Au-Next",
-  version: "0.7.0",
+  version: "0.8.0",
   githubUrl: "https://github.com/cfpg/port-au-next",
   creator: "cfpg",
   creatorUrl: "https://cfpg.me/",

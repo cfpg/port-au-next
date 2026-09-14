@@ -116,13 +116,22 @@ export async function setupAppDatabase(appName: string) {
   }
 }
 
-export async function cleanupStaleBuildingDeployments() {
+/**
+ * Read-only: deployments left in an in-progress status by a crash/restart, with enough
+ * app/preview-branch context to check whether traffic was actually switched to them
+ * before deciding whether to promote or fail them. See recoverContainers() in docker.ts -
+ * this replaces the old cleanupStaleBuildingDeployments(), which failed all of these
+ * unconditionally, including ones whose traffic switch had already succeeded.
+ */
+export async function getInterruptedDeployments() {
   const result = await pool.query(`
-    UPDATE deployments
-    SET status = 'failed',
-        failed_at = COALESCE(failed_at, CURRENT_TIMESTAMP)
-    WHERE status IN ('building', 'pending', 'preflight', 'migrating')
-    RETURNING id, app_id, branch
+    SELECT a.id AS app_id, a.name, a.domain, a.branch,
+           d.id AS deployment_id, d.container_id, d.branch AS deployment_branch, d.is_preview,
+           pb.branch AS preview_branch, pb.subdomain AS preview_subdomain
+    FROM deployments d
+    JOIN apps a ON a.id = d.app_id
+    LEFT JOIN preview_branches pb ON pb.id = d.preview_branch_id
+    WHERE d.status IN ('building', 'pending', 'preflight', 'migrating')
   `);
   return result.rows;
 }
@@ -251,10 +260,43 @@ export async function revokeCreateDb(dbUser: string): Promise<void> {
 }
 
 export async function deleteAppRecord(appId: number) {
-  // Delete all related records first
+  // `deployments.preview_branch_id` has no ON DELETE CASCADE, so a preview_branches row
+  // can't be deleted while a deployment still references it. Clean up each preview
+  // branch's container/nginx/database (but not its row) BEFORE deleting deployments,
+  // then delete deployments (which drops the references), THEN the preview_branches
+  // rows themselves - including already soft-deleted ones, since a soft-deleted row
+  // still occupies the table and still blocks the FK.
+  const { cleanupPreviewBranchResources } = await import('~/services/previewBranches');
+  const appResult = await pool.query('SELECT name FROM apps WHERE id = $1', [appId]);
+  const appName = appResult.rows[0]?.name;
+
+  const previewBranches = await pool.query(
+    'SELECT id, branch, container_id, db_name, db_user FROM preview_branches WHERE app_id = $1',
+    [appId]
+  );
+
+  // Check every branch's cleanup BEFORE deleting anything: if any of them fails (e.g. a
+  // database drop that can't reach Postgres), nothing below has run yet, so the app can
+  // simply be deleted again later once the underlying issue is fixed - a partial delete
+  // that removed some rows but not others would leave orphaned resources with no record
+  // left to retry cleanup against.
+  const cleanupFailures: string[] = [];
+  for (const previewBranch of previewBranches.rows) {
+    const result = await cleanupPreviewBranchResources(previewBranch, appName);
+    if (!result.success) {
+      cleanupFailures.push(`preview branch "${previewBranch.branch}": ${result.errors.join('; ')}`);
+    }
+  }
+  if (cleanupFailures.length > 0) {
+    throw new Error(
+      `App deletion aborted before any records were removed - preview branch cleanup incomplete: ${cleanupFailures.join(' | ')}`
+    );
+  }
+
   await pool.query('DELETE FROM deployment_logs WHERE deployment_id IN (SELECT id FROM deployments WHERE app_id = $1)', [appId]);
   await pool.query('DELETE FROM app_env_vars WHERE app_id = $1', [appId]);
   await pool.query('DELETE FROM deployments WHERE app_id = $1', [appId]);
+  await pool.query('DELETE FROM preview_branches WHERE app_id = $1', [appId]);
   // Finally delete the app record
   await pool.query('DELETE FROM apps WHERE id = $1', [appId]);
 }
