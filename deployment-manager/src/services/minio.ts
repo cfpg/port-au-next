@@ -2,7 +2,7 @@ import * as Minio from 'minio';
 import crypto from 'crypto';
 import logger from '~/services/logger';
 import { App } from '~/types';
-import { generateBucketName } from '~/utils/bucket';
+import { generateBucketName, generateMinioPolicyName } from '~/utils/bucket';
 import fetchAppServiceCredentialsQuery from '~/queries/fetchAppServiceCredentialsQuery';
 import insertAppServiceCredentialsQuery from '~/queries/insertAppServiceCredentialsQuery';
 import { execCommand } from '~/utils/docker';
@@ -23,10 +23,14 @@ const client = new Minio.Client({
   secretKey: rootPassword,
 });
 
-interface MinioCredentials {
+export interface MinioCredentials {
   public_key: string;
   secret_key: string;
   bucket: string;
+}
+
+export interface SetupAppStorageOptions {
+  isPreview?: boolean;
 }
 
 async function generateRandomString(length: number): Promise<string> {
@@ -84,12 +88,16 @@ async function createMinioUser(accessKey: string, secretKey: string): Promise<bo
   }
 }
 
-async function createAndAttachUserPolicy(appName: string, accessKey: string, bucketName: string): Promise<boolean> {
+async function createAndAttachUserPolicy(
+  appName: string,
+  accessKey: string,
+  bucketName: string,
+  isPreview: boolean
+): Promise<boolean> {
   try {
     await logger.info(`Creating and attaching policy for user ${accessKey} with bucket ${bucketName}`);
-    
-    // Create a policy name based on the app name
-    const policyName = `${appName.toLowerCase().replace(/[^a-z0-9]/g, '-')}-policy`;
+
+    const policyName = generateMinioPolicyName(appName, isPreview);
     
     // Create the policy content
     const policyContent = {
@@ -190,35 +198,44 @@ async function setBucketPolicy(bucketName: string, accessKey: string): Promise<b
   }
 }
 
-export async function setupAppStorage(app: App): Promise<MinioCredentials> {
+function credentialsFromService(
+  service: { public_key: string; secret_key: string },
+  bucket: string
+): MinioCredentials {
+  return {
+    public_key: service.public_key,
+    secret_key: service.secret_key,
+    bucket,
+  };
+}
+
+export async function setupAppStorage(
+  app: App,
+  options: SetupAppStorageOptions = {}
+): Promise<MinioCredentials> {
+  const isPreview = options.isPreview ?? false;
+  const bucket = generateBucketName(app.name, isPreview);
+
   try {
-    // Generate unique identifiers
     const accessKey = await generateRandomString(20);
     const secretKey = await generateRandomString(40);
-    const bucket = generateBucketName(app.name);
 
-    await logger.info(`Setting up storage for app ${app.name} with bucket ${bucket}`);
+    await logger.info(`Setting up ${isPreview ? 'preview' : 'production'} storage for app ${app.name}`, {
+      bucket,
+      isPreview,
+    });
 
-    // Check if service credentials already exist in database
-    const existingService = await fetchAppServiceCredentialsQuery(app.id, 'minio');
+    const existingService = await fetchAppServiceCredentialsQuery(app.id, 'minio', isPreview);
 
     if (existingService.length > 0) {
-      await logger.info(`Found existing Minio service for app ${app.name}`);
-      // Return existing credentials
-      const service = existingService[0];
-      return {
-        public_key: service.public_key,
-        secret_key: service.secret_key,
-        bucket: bucket
-      };
+      await logger.info(`Found existing Minio service for app ${app.name}`, { isPreview });
+      return credentialsFromService(existingService[0], bucket);
     }
 
-    // Check if bucket exists but we don't have credentials
     const exists = await checkBucketExists(bucket);
     await logger.info(`Bucket ${bucket} ${exists ? 'exists' : 'does not exist'}`);
-    
+
     if (!exists) {
-      // Create new bucket if it doesn't exist
       const bucketCreated = await createBucket(bucket);
       if (!bucketCreated) {
         throw new Error(`Failed to create bucket ${bucket}`);
@@ -226,33 +243,44 @@ export async function setupAppStorage(app: App): Promise<MinioCredentials> {
       await logger.info(`Created new bucket ${bucket}`);
     }
 
-    // Create Minio user with the generated credentials
     const userCreated = await createMinioUser(accessKey, secretKey);
     if (!userCreated) {
       throw new Error(`Failed to create Minio user for app ${app.name}`);
     }
-    
-    // Create and attach a policy for the user
-    const policyAttached = await createAndAttachUserPolicy(app.name, accessKey, bucket);
+
+    const policyAttached = await createAndAttachUserPolicy(app.name, accessKey, bucket, isPreview);
     if (!policyAttached) {
       throw new Error(`Failed to create and attach policy for app ${app.name}`);
     }
 
-    // Set policy for the bucket using the generated access key
     const policySet = await setBucketPolicy(bucket, accessKey);
     if (!policySet) {
       throw new Error(`Failed to set policy for bucket ${bucket}`);
     }
 
-    // Store credentials in database
-    await insertAppServiceCredentialsQuery(app.id, 'minio', accessKey, secretKey);
+    try {
+      await insertAppServiceCredentialsQuery(app.id, 'minio', accessKey, secretKey, isPreview);
+    } catch (error: unknown) {
+      const code = (error as { code?: string }).code;
+      if (code === '23505') {
+        const again = await fetchAppServiceCredentialsQuery(app.id, 'minio', isPreview);
+        if (again[0]?.public_key && again[0]?.secret_key) {
+          await logger.info(`Minio credentials already existed for app ${app.name}`, { isPreview });
+          return credentialsFromService(again[0], bucket);
+        }
+      }
+      throw error;
+    }
 
-    await logger.info(`${exists ? 'Reconnected to' : 'Created'} Minio storage for app ${app.name}`);
+    await logger.info(`${exists ? 'Reconnected to' : 'Created'} Minio storage for app ${app.name}`, {
+      isPreview,
+      bucket,
+    });
 
     return {
       public_key: accessKey,
       secret_key: secretKey,
-      bucket
+      bucket,
     };
   } catch (error) {
     await logger.error(`Failed to setup Minio storage for app ${app.name}:`, error as Error);
@@ -260,11 +288,33 @@ export async function setupAppStorage(app: App): Promise<MinioCredentials> {
   }
 }
 
-export function getMinioEnvVars(credentials: MinioCredentials, appName: string): Record<string, string> {
+/**
+ * Idempotent preview MinIO for an app: one shared `{app}-preview-bucket` reused by every
+ * preview branch. Only runs when production object storage is already enabled. Called from
+ * env assembly so every preview deploy (including retries of an existing branch) injects
+ * MINIO_* before `next build`.
+ */
+export async function ensurePreviewAppStorage(app: App): Promise<MinioCredentials | null> {
+  const production = await fetchAppServiceCredentialsQuery(app.id, 'minio', false);
+  if (production.length === 0) {
+    await logger.debug('Skipping preview MinIO setup; object storage is not enabled', {
+      app: app.name,
+    });
+    return null;
+  }
+
+  return setupAppStorage(app, { isPreview: true });
+}
+
+export function getMinioEnvVars(
+  credentials: Pick<MinioCredentials, 'public_key' | 'secret_key'> & { bucket?: string },
+  appName: string,
+  isPreview: boolean = false
+): Record<string, string> {
   return {
     MINIO_HOST: host,
     MINIO_ACCESS_KEY: credentials.public_key,
     MINIO_SECRET_KEY: credentials.secret_key,
-    MINIO_BUCKET: credentials.bucket || generateBucketName(appName)
+    MINIO_BUCKET: credentials.bucket || generateBucketName(appName, isPreview),
   };
 }

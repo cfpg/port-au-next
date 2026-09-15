@@ -1,7 +1,8 @@
 import pool from '~/services/database';
 import { App } from '~/types';
 import fetchAppServiceCredentialsQuery from '~/queries/fetchAppServiceCredentialsQuery';
-import { getMinioEnvVars } from '~/services/minio';
+import { ensurePreviewAppStorage, getMinioEnvVars } from '~/services/minio';
+import { generateBucketName } from '~/utils/bucket';
 import { ensurePortScheduleForProductionApp } from '~/services/portSchedule';
 import { getUmamiEnvVarsForProductionApp } from '~/services/umami';
 import { getBugsinkEnvVarsForProductionApp } from '~/services/bugsink';
@@ -16,6 +17,8 @@ interface EnvVar {
  * Fetches user-defined env vars from the DB and merges platform-injected vars
  * (Minio, Imgproxy, port-schedule, Umami, Bugsink, test database, site URL). Platform keys listed
  * later win over duplicate keys from the DB.
+ *
+ * Preview deploys ensure a shared per-app MinIO bucket when production object storage is enabled.
  */
 export async function getPlatformAppEnvVars(
   app: App,
@@ -39,11 +42,25 @@ export async function getPlatformAppEnvVars(
   const envVars = envResult.rows;
 
   const isProduction = !isPreview;
-  const minioCredentials = await fetchAppServiceCredentialsQuery(app.id, 'minio', !isProduction);
-
   let minioEnvVars: Record<string, string> = {};
-  if (minioCredentials.length) {
-    minioEnvVars = getMinioEnvVars(minioCredentials[0], app.name);
+  if (isPreview) {
+    const previewMinio = await ensurePreviewAppStorage(app);
+    if (previewMinio) {
+      minioEnvVars = getMinioEnvVars(previewMinio, app.name, true);
+    }
+  } else {
+    const minioCredentials = await fetchAppServiceCredentialsQuery(app.id, 'minio', false);
+    if (minioCredentials.length) {
+      minioEnvVars = getMinioEnvVars(
+        {
+          public_key: minioCredentials[0].public_key,
+          secret_key: minioCredentials[0].secret_key,
+          bucket: generateBucketName(app.name, false),
+        },
+        app.name,
+        false
+      );
+    }
   }
 
   const minioEnvVarsArray = Object.entries(minioEnvVars).map(([key, value]) => ({

@@ -4,6 +4,7 @@ import pool from '~/services/database';
 import { withAuth } from '~/lib/auth-utils';
 import { generateBucketName } from '~/utils/bucket';
 import fetchSingleAppQuery from '~/queries/fetchSingleAppQuery';
+import fetchAppServiceCredentialsQuery from '~/queries/fetchAppServiceCredentialsQuery';
 import logger from '~/services/logger';
 
 export const GET = withAuth(async (request: Request, { params }: { params: Promise<{ appId: string }> }) => {
@@ -25,21 +26,17 @@ export const GET = withAuth(async (request: Request, { params }: { params: Promi
       );
     }
 
-    // Check if object storage is already set up for this app
-    const result = await pool.query(
-      'SELECT public_key, secret_key FROM app_services WHERE app_id = $1 AND service_type = $2',
-      [appId, 'minio']
-    );
+    const services = await fetchAppServiceCredentialsQuery(appId, 'minio', false);
 
-    if (result.rows.length === 0) {
+    if (services.length === 0) {
       return NextResponse.json(null);
     }
 
-    const service = result.rows[0];
+    const service = services[0];
     return NextResponse.json({
       accessKey: service.public_key,
       secretKey: service.secret_key,
-      bucket: generateBucketName(app.name)
+      bucket: generateBucketName(app.name, false)
     });
   } catch (error) {
     console.error('Error fetching object storage credentials:', error);
@@ -81,8 +78,8 @@ export const POST = withAuth(async (request: Request, { params }: { params: { ap
     const credentials = await setupAppStorage(app);
 
     return NextResponse.json({
-      accessKey: credentials.accessKey,
-      secretKey: credentials.secretKey,
+      accessKey: credentials.public_key,
+      secretKey: credentials.secret_key,
       bucket: credentials.bucket
     });
   } catch (error) {
