@@ -244,6 +244,29 @@ describe('githubApp', () => {
     expect(url).toContain('/repos/my%20org/repo%20name/branches');
   });
 
+  it('lists open pull requests for a head branch using the repo-scoped token', async () => {
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 201,
+        json: async () => ({ token: 'repo-scoped', expires_at: new Date(Date.now() + 3600_000).toISOString() }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => [{ number: 12 }, { number: 15 }],
+      });
+
+    const { listOpenPullsByHead } = await import('./githubApp');
+    const pulls = await listOpenPullsByHead(555, 42, 'example/demo', 'feature/foo');
+
+    expect(pulls).toEqual([{ number: 12 }, { number: 15 }]);
+    const [url] = fetchMock.mock.calls[1];
+    expect(url).toContain('/repos/example/demo/pulls');
+    expect(url).toContain('state=open');
+    expect(url).toContain(`head=${encodeURIComponent('example:feature/foo')}`);
+  });
+
   it('throws a clear, non-secret-leaking error when GitHub rejects the request', async () => {
     fetchMock.mockResolvedValueOnce({ ok: false, status: 401 });
 

@@ -38,20 +38,27 @@ export function isValidCommitSha(value: unknown): value is string {
 const BRANCH_REF_PREFIX = 'refs/heads/';
 
 /**
+ * A branch name safe to hand to git as a positional argument later (a leading `-` risks
+ * being parsed as an option by `git fetch`/`checkout`/`reset` even though every call site
+ * uses an argv array, not a shell string - see git.ts). A real GitHub branch name is never
+ * empty and never starts with `-` (GitHub itself enforces `git check-ref-format`).
+ */
+export function isSafeGitBranchName(branch: unknown): branch is string {
+  return typeof branch === 'string' && branch.length > 0 && !branch.startsWith('-');
+}
+
+/**
  * Extracts the branch name from a push event's `ref`, or null if it isn't a branch ref
  * (e.g. a tag push, `refs/tags/...`) or the branch name itself would be unsafe to hand to
- * git as a positional argument later (a leading `-` risks being parsed as an option by
- * `git fetch`/`checkout`/`reset` even though every call site uses an argv array, not a
- * shell string - see git.ts). A real GitHub branch name is never empty and never starts
- * with `-` (GitHub itself enforces `git check-ref-format` on the branch that was pushed),
- * so this rejects only inputs that could not have come from a genuine push.
+ * git as a positional argument later. This rejects only inputs that could not have come
+ * from a genuine push.
  */
 export function parsePushBranchRef(ref: unknown): string | null {
   if (typeof ref !== 'string' || !ref.startsWith(BRANCH_REF_PREFIX)) {
     return null;
   }
   const branch = ref.slice(BRANCH_REF_PREFIX.length);
-  if (!branch || branch.startsWith('-')) {
+  if (!isSafeGitBranchName(branch)) {
     return null;
   }
   return branch;
@@ -124,5 +131,110 @@ export function validatePushPayload(body: unknown): PushPayloadValidationResult 
   return {
     ok: true,
     payload: { branch, sha: after, installationId, repoId },
+  };
+}
+
+export const PULL_REQUEST_DEPLOY_ACTIONS = new Set(['opened', 'synchronize', 'reopened']);
+export const PULL_REQUEST_TEARDOWN_ACTIONS = new Set(['closed']);
+
+export type PullRequestJobKind = 'deploy' | 'teardown';
+
+export interface ValidatedPullRequestPayload {
+  kind: PullRequestJobKind;
+  action: string;
+  prNumber: number;
+  branch: string;
+  sha: string;
+  installationId: number;
+  repoId: number;
+}
+
+export type PullRequestPayloadValidationResult =
+  | { ok: true; payload: ValidatedPullRequestPayload }
+  | { ok: false; reason: 'ignored_action' | 'fork' | 'malformed' };
+
+/**
+ * Structural validation of a GitHub `pull_request` webhook payload. Same untrusted-JSON
+ * stance as validatePushPayload: a valid HMAC only proves who sent the bytes.
+ *
+ * `ignored_action` (labeled, assigned, edited, …) and `fork` (head repo is not the
+ * installed repository) are expected, ignorable inputs - callers should acknowledge them
+ * successfully without deploying or tearing anything down. Only `malformed` indicates the
+ * payload itself is suspect. Ignored actions are classified BEFORE the rest of the shape
+ * is required, so a `labeled` delivery missing `head.sha` is not a 400 that GitHub would
+ * retry.
+ */
+export function validatePullRequestPayload(body: unknown): PullRequestPayloadValidationResult {
+  if (!body || typeof body !== 'object') {
+    return { ok: false, reason: 'malformed' };
+  }
+  const record = body as Record<string, unknown>;
+
+  if (typeof record.action !== 'string') {
+    return { ok: false, reason: 'malformed' };
+  }
+
+  const kind: PullRequestJobKind | null = PULL_REQUEST_DEPLOY_ACTIONS.has(record.action)
+    ? 'deploy'
+    : PULL_REQUEST_TEARDOWN_ACTIONS.has(record.action)
+      ? 'teardown'
+      : null;
+  if (kind === null) {
+    return { ok: false, reason: 'ignored_action' };
+  }
+
+  const installation = record.installation;
+  const installationId =
+    installation && typeof installation === 'object' ? (installation as Record<string, unknown>).id : undefined;
+  if (!isPositiveInteger(installationId)) {
+    return { ok: false, reason: 'malformed' };
+  }
+
+  const repository = record.repository;
+  const repoId =
+    repository && typeof repository === 'object' ? (repository as Record<string, unknown>).id : undefined;
+  if (!isPositiveInteger(repoId)) {
+    return { ok: false, reason: 'malformed' };
+  }
+
+  const pullRequest = record.pull_request;
+  if (!pullRequest || typeof pullRequest !== 'object') {
+    return { ok: false, reason: 'malformed' };
+  }
+  const pr = pullRequest as Record<string, unknown>;
+  if (!isPositiveInteger(pr.number)) {
+    return { ok: false, reason: 'malformed' };
+  }
+
+  const head = pr.head;
+  if (!head || typeof head !== 'object') {
+    return { ok: false, reason: 'malformed' };
+  }
+  const headRecord = head as Record<string, unknown>;
+  if (!isSafeGitBranchName(headRecord.ref)) {
+    return { ok: false, reason: 'malformed' };
+  }
+  if (!isValidCommitSha(headRecord.sha) || headRecord.sha.toLowerCase() === GITHUB_ZERO_SHA) {
+    return { ok: false, reason: 'malformed' };
+  }
+
+  const headRepo = headRecord.repo;
+  const headRepoId =
+    headRepo && typeof headRepo === 'object' ? (headRepo as Record<string, unknown>).id : undefined;
+  if (!isPositiveInteger(headRepoId) || headRepoId !== repoId) {
+    return { ok: false, reason: 'fork' };
+  }
+
+  return {
+    ok: true,
+    payload: {
+      kind,
+      action: record.action,
+      prNumber: pr.number,
+      branch: headRecord.ref,
+      sha: headRecord.sha,
+      installationId,
+      repoId,
+    },
   };
 }

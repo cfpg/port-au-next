@@ -281,6 +281,45 @@ export async function listInstallationRepositories(installationId: number): Prom
   return repos;
 }
 
+export interface GithubOpenPullSummary {
+  number: number;
+}
+
+/**
+ * Open pull requests whose head branch is `headBranch` (GET /repos/{owner}/{repo}/pulls
+ * ?state=open&head={owner}:{branch}). Used by the teardown worker to avoid destroying a
+ * preview still needed by another open PR on the same branch. Pull requests: Read is
+ * required; Contents: Read does not cover this endpoint.
+ */
+export async function listOpenPullsByHead(
+  installationId: number,
+  repoId: number,
+  repoFullName: string,
+  headBranch: string
+): Promise<GithubOpenPullSummary[]> {
+  const token = await getInstallationToken(installationId, repoId);
+  const [owner, repo] = repoFullName.split('/');
+  const head = `${owner}:${headBranch}`;
+  const pulls: GithubOpenPullSummary[] = [];
+  let page = 1;
+
+  while (true) {
+    const result = (await githubApiFetch(
+      `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls?state=open&head=${encodeURIComponent(head)}&per_page=100&page=${page}`,
+      { token }
+    )) as Array<{ number: number }>;
+    for (const pull of result) {
+      pulls.push({ number: pull.number });
+    }
+    if (result.length < 100) {
+      break;
+    }
+    page += 1;
+  }
+
+  return pulls;
+}
+
 /**
  * Every branch name in a specific repository (GET /repos/{owner}/{repo}/branches,
  * paginated), via the same repo-scoped installation token already used for git

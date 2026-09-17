@@ -160,7 +160,11 @@ export async function cleanupPreviewBranchResources(
   return { success: errors.length === 0, errors };
 }
 
-export async function deletePreviewBranch(appId: number, branch: string) {
+export async function deletePreviewBranch(
+  appId: number,
+  branch: string,
+  options?: { skipActiveJobCheck?: boolean }
+) {
   const branchResult = await pool.query(
     'SELECT * FROM preview_branches WHERE app_id = $1 AND branch = $2',
     [appId, branch]
@@ -171,14 +175,19 @@ export async function deletePreviewBranch(appId: number, branch: string) {
   const previewBranch = branchResult.rows[0];
 
   // Refuse rather than tear down a container/database an enqueued-or-running deploy job
-  // might still be using. (Not airtight against a job enqueued in the instant after this
-  // check - closing that fully is follow-up work, not something this refactor needs.)
-  const activeJob = await pool.query(
-    `SELECT id FROM deploy_queue_jobs WHERE app_id = $1 AND branch = $2 AND status IN ('queued', 'running') LIMIT 1`,
-    [appId, branch]
-  );
-  if (activeJob.rows.length > 0) {
-    throw new Error('An active or queued deployment exists for this preview branch. Wait for it to finish before deleting.');
+  // might still be using. The queue worker skips this when running a teardown job: that
+  // job itself is 'running', and a deploy queued behind it (PR reopen) must be allowed
+  // to recreate the preview after this returns.
+  if (!options?.skipActiveJobCheck) {
+    const activeJob = await pool.query(
+      `SELECT id FROM deploy_queue_jobs
+       WHERE app_id = $1 AND branch = $2 AND job_kind = 'deploy' AND status IN ('queued', 'running')
+       LIMIT 1`,
+      [appId, branch]
+    );
+    if (activeJob.rows.length > 0) {
+      throw new Error('An active or queued deployment exists for this preview branch. Wait for it to finish before deleting.');
+    }
   }
 
   try {

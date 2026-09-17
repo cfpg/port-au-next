@@ -86,8 +86,9 @@ export default function GithubAppSettingsCard() {
     <div className="flex flex-col gap-24">
       <Callout tone="warning">
         Connecting an app to GitHub only lets the manual Deploy button pull a private repository -
-        it does not deploy anything by itself. A push only triggers a deployment for an app that
-        also has Auto-deploy explicitly enabled on that app&apos;s settings page.
+        it does not deploy anything by itself. Auto-deploy (a separate per-app opt-in) queues a
+        production deploy on push to the app&apos;s configured branch, and a preview deploy when a
+        pull request is opened or updated.
       </Callout>
 
       {/* Kept visible whether or not the App is configured yet - useful as a running
@@ -138,13 +139,20 @@ export default function GithubAppSettingsCard() {
             <ul className="list-disc list-inside flex flex-col gap-3">
               <li>Repository permissions &rarr; Contents: Read-only</li>
               <li>Repository permissions &rarr; Metadata: Read-only</li>
+              <li>Repository permissions &rarr; Pull requests: Read-only</li>
             </ul>
+            <p className="mt-3">
+              If this App already exists, saving the new Pull requests permission sends an
+              additional-permissions request. Each installation must <strong className="font-semibold text-ink">accept
+              that request</strong> on GitHub or <code className="font-mono">pull_request</code> events will not be
+              delivered.
+            </p>
           </div>
           <div>
             <div className="font-display font-semibold text-ink mb-3">4. Enable webhook delivery</div>
             <p>
-              This step is what makes push-triggered Auto-deploy possible at all - skip it and
-              Auto-deploy has nothing to react to, even once enabled per-app. Under{' '}
+              This step is what makes Auto-deploy possible at all - skip it and Auto-deploy has
+              nothing to react to, even once enabled per-app. Under{' '}
               <strong className="font-semibold text-ink">Webhook</strong>, check{' '}
               <strong className="font-semibold text-ink">Active</strong>, set{' '}
               <strong className="font-semibold text-ink">Webhook URL</strong> to{' '}
@@ -155,7 +163,9 @@ export default function GithubAppSettingsCard() {
               platform verifies every delivery&apos;s signature against it before doing anything with
               it. Under{' '}
               <strong className="font-semibold text-ink">Permissions &amp; events &rarr; Subscribe to events</strong>,
-              check <strong className="font-semibold text-ink">Push</strong>.
+              check <strong className="font-semibold text-ink">Push</strong> (production auto-deploy) and{' '}
+              <strong className="font-semibold text-ink">Pull request</strong> (preview auto-deploy and
+              teardown).
             </p>
           </div>
           <div>

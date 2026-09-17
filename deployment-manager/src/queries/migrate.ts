@@ -414,6 +414,32 @@ export async function migrate() {
       ADD COLUMN IF NOT EXISTS repo_id BIGINT
     `);
 
+    // PR-gated preview lifecycle: webhook jobs are either a deploy or a teardown. Existing
+    // rows (manual deploys, production pushes) stay 'deploy'. github_pr_number is history
+    // only - preview identity remains app_id+branch, never the PR number.
+    await pool.query(`
+      ALTER TABLE deploy_queue_jobs
+      ADD COLUMN IF NOT EXISTS job_kind TEXT NOT NULL DEFAULT 'deploy'
+    `);
+    await pool.query(`
+      ALTER TABLE deploy_queue_jobs
+      ADD COLUMN IF NOT EXISTS github_pr_number INTEGER
+    `);
+    await pool.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint
+          WHERE conname = 'deploy_queue_jobs_job_kind_check'
+            AND conrelid = 'deploy_queue_jobs'::regclass
+        ) THEN
+          ALTER TABLE deploy_queue_jobs
+          ADD CONSTRAINT deploy_queue_jobs_job_kind_check
+          CHECK (job_kind IN ('deploy', 'teardown'));
+        END IF;
+      END $$;
+    `);
+
     // GitHub App milestone: configuration, per-app installation mapping, and short-lived
     // connect-flow state. No webhook/auto-deploy schema here - deploy_queue_jobs already
     // carries installation_id/github_delivery_id from the earlier queue migration, unused

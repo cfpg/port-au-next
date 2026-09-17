@@ -19,9 +19,9 @@ export const APP_FEATURES = {
   [AppFeature.AUTO_DEPLOY]: {
     name: 'Auto-deploy',
     description:
-      'Queue a deployment automatically when GitHub delivers a push to the connected repository - ' +
-      'the production branch deploys normally, any other branch deploys as a preview (requires Preview ' +
-      'Branches enabled with a preview domain configured). Requires GitHub already connected for this app.',
+      'Queue a deployment automatically from GitHub: a push to the production branch deploys normally, ' +
+      'and an open pull request deploys as a preview (requires Preview Branches enabled with a preview ' +
+      'domain configured). Closing the PR destroys that preview. Requires GitHub already connected for this app.',
     enabled: false
   }
 } as const;

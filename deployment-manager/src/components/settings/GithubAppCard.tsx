@@ -119,8 +119,8 @@ export default function GithubAppCard({ app }: GithubAppCardProps) {
       <p className="text-panel text-ink-muted">
         Connect this app to a GitHub repository so the manual Deploy button can pull it with
         short-lived credentials - useful for private repositories. Connecting alone does not
-        trigger deployments; enable Auto-deploy below once connected to also queue a deployment
-        whenever GitHub delivers a push.
+        trigger deployments; enable Auto-deploy below once connected to queue a production
+        deploy on push, and a preview deploy when a pull request is opened or updated.
       </p>
 
       {!data?.connected ? (
@@ -170,12 +170,14 @@ export default function GithubAppCard({ app }: GithubAppCardProps) {
                 label="Auto-deploy"
                 hint={
                   <>
-                    A push to <CodeToken>{app.branch}</CodeToken> queues a normal deployment. A
-                    push to any other branch queues an isolated preview deployment, but only when
-                    Preview Branches is enabled for this app with a preview domain configured -
-                    otherwise that push is ignored. Every deployment (manual or automatic) shares
-                    the same global queue, so it may wait behind other work. Disabling this stops
-                    new pushes from being queued; a push already accepted keeps running.
+                    A push to <CodeToken>{app.branch}</CodeToken> queues a normal deployment.
+                    Opening, updating, or reopening a pull request queues an isolated preview
+                    of the head branch when Preview Branches is enabled with a preview domain;
+                    closing the PR destroys that preview. A push to any other branch does not
+                    queue a preview. Every deployment (manual or automatic) shares the same
+                    global queue, so it may wait behind other work. Disabling this stops new
+                    production pushes and PR deploys from being queued; a job already accepted
+                    keeps running. Closed PRs still tear down an existing preview.
                   </>
                 }
               />

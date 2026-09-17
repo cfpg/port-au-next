@@ -1,8 +1,9 @@
-# GitHub App Integration: Connected Deploys and Push-Triggered Auto-Deploy
+# GitHub App Integration: Connected Deploys, Auto-Deploy, and PR-Gated Previews
 
 **Status:** v1 implemented (this document) - GitHub App configuration, per-app repository
-connection, authenticated manual deploys of private repositories, and opt-in
-push-triggered auto-deploy, all through the same deployment queue.
+connection, authenticated manual deploys of private repositories, and opt-in auto-deploy
+(production on push; previews on pull request open/sync/reopen, torn down on close), all
+through the same deployment queue.
 
 ---
 
@@ -17,18 +18,22 @@ push-triggered auto-deploy, all through the same deployment queue.
 - Support for creating an app whose initial clone is deferred until after it's connected
   (for a private repository that doesn't exist locally yet).
 - A public webhook receiver (`POST /api/webhooks/github`) that verifies each delivery's
-  signature and durably enqueues an exact-commit deployment for every eligible,
-  Auto-deploy-enabled app - through the exact same queue and worker a manual Deploy click
-  uses.
+  signature and durably enqueues work for every eligible, Auto-deploy-enabled app -
+  production deploys from `push`, preview deploys/teardowns from `pull_request` - through
+  the exact same queue and worker a manual Deploy click uses.
 - A per-app **Auto-deploy** toggle (off by default, including for apps connected before
-  this feature existed) that gates whether a push actually queues anything.
+  this feature existed) that gates whether a production push or PR deploy actually queues
+  anything. Closing a PR still tears down an existing preview even if Auto-deploy is off.
 
 ## What v1 does NOT add
 
 - Commit status / check-run reporting back to GitHub.
+- PR comments with the preview URL (would need Pull requests: Write).
+- Fork PR previews (head repository must be the installed repo).
 - Any lifecycle handling for `installation`/`installation_repositories` events
-  (suspension, removal) or branch-delete -> preview-teardown automation.
-- Cancellation, prioritization, or a dedicated queue dashboard.
+  (suspension, removal), or teardown on branch-delete (teardown is PR-close).
+- Cancellation of queued preview deploys (except on PR close), prioritization, or a
+  dedicated queue dashboard.
 - Automatic reconciliation against GitHub for a delivery it gave up retrying (a documented
   gap - see "Missed deliveries" below).
 - Any change to how apps that are *not* connected to GitHub behave - unconnected apps
@@ -64,6 +69,17 @@ Required permissions:
 |---|---|
 | Repository permissions -> Contents | Read-only |
 | Repository permissions -> Metadata | Read-only |
+| Repository permissions -> Pull requests | Read-only |
+
+**Pull requests: Read** is required both to receive `pull_request` webhook deliveries and
+for the worker's "are there other open PRs on this head branch?" check before tearing a
+preview down. Do not grant Pull requests: Write - this slice does not comment on PRs.
+
+If this App already existed with only Contents + Metadata, saving the new permission
+sends GitHub's additional-permissions request. **Each installation must accept that
+request** or `pull_request` events will not be delivered. Update the GitHub App
+(permission + event subscription) and accept it **before** shipping code that stops
+queueing previews from non-production pushes.
 
 **Webhook** (a separate section from the Setup URL above, and a different URL): check
 **Active**, set **Webhook URL** to
@@ -75,8 +91,9 @@ https://<deployment-manager-host>/api/webhooks/github
 and set a **Webhook secret** (any random string) - paste this same value into the
 platform's config in step 3 below, since every delivery's `X-Hub-Signature-256` is
 verified against it before anything else happens. Under **Permissions & events ->
-Subscribe to events**, check **Push**. This is what auto-deploy actually reacts to; skip
-it and Auto-deploy has nothing to enqueue from, even once toggled on per-app.
+Subscribe to events**, check **Push** (production auto-deploy) and **Pull request**
+(preview auto-deploy and teardown). Skip either and that half of Auto-deploy has nothing
+to enqueue from, even once toggled on per-app.
 
 Where you can install it: choose "Only on this account" or "Any account" depending on
 whether the repositories you'll connect live under your own account or an organization.
@@ -144,24 +161,35 @@ With it enabled:
 
 - A push to the app's configured production branch queues a normal deployment of the
   pushed commit.
-- A push to any other branch queues an isolated preview deployment - but only if
-  **Preview Branches** is also enabled for that app with a preview domain configured.
-  Otherwise that push is silently ignored (acknowledged to GitHub, nothing queued).
+- A push to any other branch is acknowledged and ignored (`preview_requires_pull_request`).
+  Preview identity stays `app + branch`; GitHub pull requests are only the trigger.
+- Opening, synchronizing, or reopening a pull request whose head is in the connected
+  repository (not a fork) and is not the production branch queues an isolated preview
+  deployment of that head branch at `head.sha` - but only if **Preview Branches** is also
+  enabled for that app with a preview domain configured. Otherwise the delivery is
+  acknowledged and nothing is queued.
+- Closing a pull request (merged or not) queues a **teardown** of that head branch's
+  preview: stop the container, remove nginx, drop the per-branch database, delete the
+  `preview_branches` row. Teardown does **not** require Auto-deploy to still be on.
+  If another open PR still uses the same head branch, teardown is skipped. Queued
+  (not running) deploy jobs for that branch are cancelled when the teardown is accepted.
 - Every deployment - manual or automatic, production or preview, for every app on this
-  platform - shares the one global queue and worker (see the existing deployment-queue
-  docs/behavior). A push can and will wait behind other work; nothing runs concurrently.
-- **Disabling** Auto-deploy stops NEW pushes from being queued. A job already accepted
-  before you disabled it keeps running to completion - this only gates future pushes.
+  platform - and every preview teardown shares the one global queue and worker (see the
+  existing deployment-queue docs/behavior). Work can and will wait behind other work;
+  nothing runs concurrently.
+- **Disabling** Auto-deploy stops NEW production pushes and PR deploys from being queued.
+  A job already accepted before you disabled it keeps running to completion. Closed PRs
+  still tear down an existing preview.
 - **Disconnecting** GitHub from an app always leaves Auto-deploy disabled, even if it was
   on beforehand. Reconnecting (to the same or a different installation/repository) never
   silently re-enables it - it must be turned on again explicitly, and only once the new
   connection is in place.
-- A queued push always deploys the **exact commit SHA GitHub reported** (the push
-  payload's `after`), never "whatever the branch tip happens to be by the time the worker
-  gets to it." If that exact commit can no longer be fetched or resolved by the time the
-  job runs (e.g. it was force-pushed away before the worker reached it), the job fails
-  visibly in the deployment history with a redacted error - it never silently substitutes
-  the current branch tip instead.
+- A queued production push or PR deploy always deploys the **exact commit SHA GitHub
+  reported** (`push.after` or `pull_request.head.sha`), never "whatever the branch tip
+  happens to be by the time the worker gets to it." If that exact commit can no longer
+  be fetched or resolved by the time the job runs (e.g. it was force-pushed away before
+  the worker reached it), the job fails visibly in the deployment history with a redacted
+  error - it never silently substitutes the current branch tip instead.
 
 ### Missed deliveries and redelivery
 
@@ -215,14 +243,20 @@ without a manual redeliver) is out of scope for v1.
   deliveries"](https://docs.github.com/en/webhooks/using-webhooks/validating-webhook-deliveries)).
   A missing/invalid signature is rejected outright; nothing about the payload is even
   parsed first.
-- Only `push` events to a branch ref (`refs/heads/...`) with a real, non-zero commit SHA
-  are ever considered. A `ping` (signed, sent when the webhook is first saved) is
-  acknowledged without deploying. Tag pushes, branch deletions, and the all-zero SHA
-  GitHub can send alongside a deletion are all acknowledged and ignored, never treated as
-  errors.
+- `push` events to a branch ref (`refs/heads/...`) with a real, non-zero commit SHA
+  are considered for **production** auto-deploy only. A `ping` (signed, sent when the
+  webhook is first saved) is acknowledged without deploying. Tag pushes, branch
+  deletions, the all-zero SHA GitHub can send alongside a deletion, and pushes to
+  non-production branches are all acknowledged and ignored, never treated as errors.
+- `pull_request` events with action `opened`, `synchronize`, or `reopened` queue a
+  preview deploy of `head.ref` at `head.sha`. Action `closed` queues a preview teardown.
+  Other actions (`edited`, `labeled`, `assigned`, …), fork PRs (`head.repo.id` != the
+  installed `repository.id`), and PRs whose head is the app's production branch are
+  acknowledged and ignored. Draft PRs are deployed the same as ready ones.
 - A single delivery can queue a job for **more than one app**, if more than one app on
-  this platform is connected to the same installation+repository and has Auto-deploy
-  enabled - every eligible app gets its own job, not just the first match.
+  this platform is connected to the same installation+repository - every eligible app
+  gets its own job, not just the first match. Production pushes and PR deploys still
+  require Auto-deploy; PR-close teardown only requires a live preview row.
 - Deduplication is by GitHub's own `X-GitHub-Delivery` id, per app, via a durable database
   constraint (not an in-memory cache) - a redelivery of the same delivery id, even after
   the original job already finished (successfully or not), or arriving concurrently from
@@ -231,8 +265,8 @@ without a manual redeliver) is out of scope for v1.
   commits (`202` for newly accepted work, `200` with a small outcome for an ignored event
   or a duplicate) and never waits for the deployment itself to run, call the GitHub API,
   touch git, or provision any infrastructure.
-- The request body is capped at 2 MiB - far larger than any realistic `push` payload, but
-  bounded rather than unbounded.
+- The request body is capped at 2 MiB - far larger than any realistic `push` or
+  `pull_request` payload, but bounded rather than unbounded.
 
 ## Trust model for the connect flow
 
@@ -302,18 +336,25 @@ App" above (a local tunnel such as `ngrok`/`smee.io` works for a dev environment
    Confirm the response is a successful `200` (not `202`) and no second deployment is
    created.
 6. With **Preview Branches** enabled and a preview domain configured, push a commit to a
-   non-production branch. Confirm it deploys as an isolated preview at that branch's
-   subdomain. Disable Preview Branches (or clear the preview domain) and push to a
-   different non-production branch - confirm that push is acknowledged but nothing is
-   queued or provisioned.
-7. Push a tag (not a branch) and delete a branch. Confirm neither creates a queue row,
+   non-production branch that has **no** open PR. Confirm the delivery is acknowledged
+   (`preview_requires_pull_request` / nothing queued) and no preview is provisioned.
+7. Open a pull request from that branch. Confirm a preview deploys at the branch
+   subdomain. Push another commit to the PR (synchronize). Confirm a second preview
+   deploy of the new SHA. Close the PR. Confirm the preview is torn down (container
+   stopped, nginx gone, preview row gone). Reopen the same PR. Confirm the preview is
+   created again.
+8. Disable Preview Branches (or clear the preview domain) and open a different PR -
+   confirm that delivery is acknowledged but nothing is queued or provisioned. A fork PR
+   (head repo != this repo) is likewise ignored.
+9. Push a tag (not a branch) and delete a branch. Confirm neither creates a queue row,
    deployment, or any provisioning/deletion side effect.
-8. Disable Auto-deploy, then push again. Confirm no new job is created but any job already
-   queued before disabling still completes.
-9. Disconnect GitHub, then reconnect (potentially to a different installation). Confirm
-   Auto-deploy is off after reconnecting and must be explicitly re-enabled - it does not
-   come back on by itself.
-10. With a job still queued (e.g. behind another deployment), disconnect GitHub from that
+10. Disable Auto-deploy, then push the production branch again. Confirm no new production
+    job is created but any job already queued before disabling still completes. Close a
+    PR whose preview still exists - confirm teardown still runs.
+11. Disconnect GitHub, then reconnect (potentially to a different installation). Confirm
+    Auto-deploy is off after reconnecting and must be explicitly re-enabled - it does not
+    come back on by itself.
+12. With a job still queued (e.g. behind another deployment), disconnect GitHub from that
     app or edit its repo URL to point elsewhere, then let the worker reach that job.
     Confirm it fails visibly in the deployment history with a redacted error, rather than
     deploying through the old credential or a mismatched repository.

@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { poolQueryMock, withTransactionMock } = vi.hoisted(() => ({
+const { poolQueryMock, withTransactionMock, listOpenPullsByHeadMock } = vi.hoisted(() => ({
   poolQueryMock: vi.fn(),
   withTransactionMock: vi.fn(),
+  listOpenPullsByHeadMock: vi.fn(),
 }));
 
 vi.mock('~/services/database', () => ({
@@ -20,15 +21,24 @@ vi.mock('~/services/logger', () => ({
 }));
 vi.mock('~/services/deploymentExecutor', () => ({ executeDeployment: vi.fn() }));
 vi.mock('~/services/deploymentStatus', () => ({ updateDeploymentStatus: vi.fn() }));
-vi.mock('~/services/previewBranches', () => ({ ensurePreviewBranch: vi.fn() }));
+vi.mock('~/services/previewBranches', () => ({
+  ensurePreviewBranch: vi.fn(),
+  deletePreviewBranch: vi.fn(),
+  getPreviewBranch: vi.fn(),
+}));
+vi.mock('~/services/githubApp', () => ({
+  listOpenPullsByHead: listOpenPullsByHeadMock,
+}));
 
-import { enqueueGithubPushEvent, enqueueManualDeployment, runJob } from './deployQueue';
+import { enqueueGithubPushEvent, enqueueGithubPullRequestEvent, enqueueManualDeployment, runJob } from './deployQueue';
 import { AppFeature } from '~/types/appFeatures';
-import { ensurePreviewBranch } from '~/services/previewBranches';
+import { deletePreviewBranch, ensurePreviewBranch, getPreviewBranch } from '~/services/previewBranches';
 import { executeDeployment } from '~/services/deploymentExecutor';
 
 const ensurePreviewBranchMock = vi.mocked(ensurePreviewBranch);
 const executeDeploymentMock = vi.mocked(executeDeployment);
+const deletePreviewBranchMock = vi.mocked(deletePreviewBranch);
+const getPreviewBranchMock = vi.mocked(getPreviewBranch);
 
 /**
  * A fake transaction client that records every query issued through it and answers
@@ -54,6 +64,9 @@ function makeFakeClient(candidateRows: unknown[], dedupedAppIds: Set<number> = n
         }
         return { rows: [{ id: 1000 + appId }] };
       }
+      if (sql.includes('Cancelled: pull request closed')) {
+        return { rows: [] };
+      }
       throw new Error(`Unexpected query in test: ${sql}`);
     }),
   };
@@ -65,6 +78,9 @@ beforeEach(() => {
   withTransactionMock.mockReset();
   ensurePreviewBranchMock.mockReset();
   executeDeploymentMock.mockReset();
+  deletePreviewBranchMock.mockReset();
+  getPreviewBranchMock.mockReset();
+  listOpenPullsByHeadMock.mockReset();
 });
 
 describe('enqueueGithubPushEvent', () => {
@@ -75,6 +91,7 @@ describe('enqueueGithubPushEvent', () => {
       repo_url: 'https://github.com/example/demo.git',
       preview_domain: null,
       repo_full_name: 'example/demo',
+      auto_deploy_enabled: true,
       previews_enabled: false,
     };
     const { client, queries } = makeFakeClient([candidate]);
@@ -91,17 +108,17 @@ describe('enqueueGithubPushEvent', () => {
     expect(result).toEqual({ eligibleAppIds: [1], insertedJobIds: [1001] });
 
     const eligibilityQuery = queries.find((q) => q.sql.includes('FROM apps a'));
-    expect(eligibilityQuery?.params).toEqual([AppFeature.AUTO_DEPLOY, AppFeature.PREVIEW_BRANCHES, 555, 42]);
+    expect(eligibilityQuery?.params).toEqual([AppFeature.AUTO_DEPLOY, AppFeature.PREVIEW_BRANCHES, 555, 42, 'main']);
 
     const insertQuery = queries.find((q) => q.sql.includes('INSERT INTO deploy_queue_jobs'));
-    expect(insertQuery?.params).toEqual([1, 'main', 'a'.repeat(40), 555, 42, 'delivery-1']);
+    expect(insertQuery?.params).toEqual([1, 'main', 'a'.repeat(40), 555, 42, 'delivery-1', 'deploy', null]);
     expect(insertQuery?.sql).toContain("ON CONFLICT (app_id, github_delivery_id) WHERE github_delivery_id IS NOT NULL DO NOTHING");
   });
 
   it('enqueues a job for every eligible app when more than one app is connected to the same installation+repo', async () => {
     const candidates = [
-      { id: 1, branch: 'main', repo_url: 'https://github.com/example/demo.git', preview_domain: null, repo_full_name: 'example/demo', previews_enabled: false },
-      { id: 2, branch: 'main', repo_url: 'https://github.com/example/demo.git', preview_domain: null, repo_full_name: 'example/demo', previews_enabled: false },
+      { id: 1, branch: 'main', repo_url: 'https://github.com/example/demo.git', preview_domain: null, repo_full_name: 'example/demo', auto_deploy_enabled: true, previews_enabled: false },
+      { id: 2, branch: 'main', repo_url: 'https://github.com/example/demo.git', preview_domain: null, repo_full_name: 'example/demo', auto_deploy_enabled: true, previews_enabled: false },
     ];
     const { client } = makeFakeClient(candidates);
     withTransactionMock.mockImplementation(async (callback: (c: unknown) => Promise<unknown>) => callback(client));
@@ -125,6 +142,7 @@ describe('enqueueGithubPushEvent', () => {
       repo_url: 'https://github.com/example/a-different-repo.git',
       preview_domain: null,
       repo_full_name: 'example/demo', // installation is still connected to "demo", not the app's current repo_url
+      auto_deploy_enabled: true,
       previews_enabled: false,
     };
     const { client } = makeFakeClient([candidate]);
@@ -143,8 +161,8 @@ describe('enqueueGithubPushEvent', () => {
 
   it('does not enqueue a preview-branch push when Preview Branches is disabled or has no domain configured', async () => {
     const candidates = [
-      { id: 1, branch: 'main', repo_url: 'https://github.com/example/demo.git', preview_domain: null, repo_full_name: 'example/demo', previews_enabled: false },
-      { id: 2, branch: 'main', repo_url: 'https://github.com/example/demo.git', preview_domain: null, repo_full_name: 'example/demo', previews_enabled: true }, // enabled but no domain
+      { id: 1, branch: 'main', repo_url: 'https://github.com/example/demo.git', preview_domain: null, repo_full_name: 'example/demo', auto_deploy_enabled: true, previews_enabled: false },
+      { id: 2, branch: 'main', repo_url: 'https://github.com/example/demo.git', preview_domain: null, repo_full_name: 'example/demo', auto_deploy_enabled: true, previews_enabled: true }, // enabled but no domain
     ];
     const { client } = makeFakeClient(candidates);
     withTransactionMock.mockImplementation(async (callback: (c: unknown) => Promise<unknown>) => callback(client));
@@ -157,16 +175,21 @@ describe('enqueueGithubPushEvent', () => {
       deliveryId: 'delivery-1',
     });
 
-    expect(result).toEqual({ eligibleAppIds: [], insertedJobIds: [] });
+    expect(result).toEqual({
+      eligibleAppIds: [],
+      insertedJobIds: [],
+      ignoredReason: 'preview_requires_pull_request',
+    });
   });
 
-  it('enqueues a preview-branch push when Preview Branches is enabled with a domain configured', async () => {
+  it('does not enqueue a preview-branch push even when Preview Branches is enabled with a domain configured', async () => {
     const candidate = {
       id: 1,
       branch: 'main',
       repo_url: 'https://github.com/example/demo.git',
       preview_domain: 'preview.example.com',
       repo_full_name: 'example/demo',
+      auto_deploy_enabled: true,
       previews_enabled: true,
     };
     const { client, queries } = makeFakeClient([candidate]);
@@ -180,9 +203,12 @@ describe('enqueueGithubPushEvent', () => {
       deliveryId: 'delivery-2',
     });
 
-    expect(result).toEqual({ eligibleAppIds: [1], insertedJobIds: [1001] });
-    const insertQuery = queries.find((q) => q.sql.includes('INSERT INTO deploy_queue_jobs'));
-    expect(insertQuery?.params[1]).toBe('feature/foo'); // the pushed branch, not the app's production branch
+    expect(result).toEqual({
+      eligibleAppIds: [],
+      insertedJobIds: [],
+      ignoredReason: 'preview_requires_pull_request',
+    });
+    expect(queries.some((q) => q.sql.includes('INSERT INTO deploy_queue_jobs'))).toBe(false);
   });
 
   it('counts a deduplicated (ON CONFLICT DO NOTHING) app as eligible but not inserted', async () => {
@@ -192,6 +218,7 @@ describe('enqueueGithubPushEvent', () => {
       repo_url: 'https://github.com/example/demo.git',
       preview_domain: null,
       repo_full_name: 'example/demo',
+      auto_deploy_enabled: true,
       previews_enabled: false,
     };
     const { client } = makeFakeClient([candidate], new Set([1]));
@@ -236,6 +263,7 @@ describe('enqueueGithubPushEvent', () => {
       repo_url: 'https://github.com/example/demo.git',
       preview_domain: null,
       repo_full_name: 'example/demo',
+      auto_deploy_enabled: true,
       previews_enabled: false,
     };
     const { client } = makeFakeClient([candidate]);
@@ -251,6 +279,144 @@ describe('enqueueGithubPushEvent', () => {
 
     expect(withTransactionMock).toHaveBeenCalledTimes(1);
     expect(poolQueryMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('enqueueGithubPullRequestEvent', () => {
+  const previewCandidate = {
+    id: 1,
+    branch: 'main',
+    repo_url: 'https://github.com/example/demo.git',
+    preview_domain: 'preview.example.com',
+    repo_full_name: 'example/demo',
+    auto_deploy_enabled: true,
+    previews_enabled: true,
+    has_live_preview: false,
+  };
+
+  it('enqueues a preview deploy for an opened PR when auto-deploy and preview branches are enabled', async () => {
+    const { client, queries } = makeFakeClient([previewCandidate]);
+    withTransactionMock.mockImplementation(async (callback: (c: unknown) => Promise<unknown>) => callback(client));
+
+    const result = await enqueueGithubPullRequestEvent({
+      installationId: 555,
+      repoId: 42,
+      branch: 'feature/foo',
+      sha: 'b'.repeat(40),
+      deliveryId: 'pr-delivery-1',
+      prNumber: 12,
+      kind: 'deploy',
+    });
+
+    expect(result).toEqual({ eligibleAppIds: [1], insertedJobIds: [1001] });
+    const insertQuery = queries.find((q) => q.sql.includes('INSERT INTO deploy_queue_jobs'));
+    expect(insertQuery?.params).toEqual([
+      1,
+      'feature/foo',
+      'b'.repeat(40),
+      555,
+      42,
+      'pr-delivery-1',
+      'deploy',
+      12,
+    ]);
+    expect(queries.some((q) => q.sql.includes('Cancelled: pull request closed'))).toBe(false);
+  });
+
+  it('does not enqueue a preview deploy when Preview Branches is off', async () => {
+    const { client } = makeFakeClient([{ ...previewCandidate, previews_enabled: false }]);
+    withTransactionMock.mockImplementation(async (callback: (c: unknown) => Promise<unknown>) => callback(client));
+
+    const result = await enqueueGithubPullRequestEvent({
+      installationId: 555,
+      repoId: 42,
+      branch: 'feature/foo',
+      sha: 'b'.repeat(40),
+      deliveryId: 'pr-delivery-1',
+      prNumber: 12,
+      kind: 'deploy',
+    });
+
+    expect(result).toEqual({ eligibleAppIds: [], insertedJobIds: [] });
+  });
+
+  it('does not enqueue a preview deploy when the head branch is the app production branch', async () => {
+    const { client, queries } = makeFakeClient([previewCandidate]);
+    withTransactionMock.mockImplementation(async (callback: (c: unknown) => Promise<unknown>) => callback(client));
+
+    const result = await enqueueGithubPullRequestEvent({
+      installationId: 555,
+      repoId: 42,
+      branch: 'main',
+      sha: 'b'.repeat(40),
+      deliveryId: 'pr-delivery-1',
+      prNumber: 12,
+      kind: 'deploy',
+    });
+
+    expect(result).toEqual({ eligibleAppIds: [], insertedJobIds: [] });
+    expect(queries.some((q) => q.sql.includes('INSERT INTO deploy_queue_jobs'))).toBe(false);
+  });
+
+  it('enqueues a teardown when a live preview exists, even if auto-deploy is off, and cancels queued deploys', async () => {
+    const { client, queries } = makeFakeClient([
+      { ...previewCandidate, auto_deploy_enabled: false, has_live_preview: true },
+    ]);
+    withTransactionMock.mockImplementation(async (callback: (c: unknown) => Promise<unknown>) => callback(client));
+
+    const result = await enqueueGithubPullRequestEvent({
+      installationId: 555,
+      repoId: 42,
+      branch: 'feature/foo',
+      sha: 'b'.repeat(40),
+      deliveryId: 'pr-close-1',
+      prNumber: 12,
+      kind: 'teardown',
+    });
+
+    expect(result).toEqual({ eligibleAppIds: [1], insertedJobIds: [1001] });
+    const insertQuery = queries.find((q) => q.sql.includes('INSERT INTO deploy_queue_jobs'));
+    expect(insertQuery?.params[6]).toBe('teardown');
+    expect(insertQuery?.params[2]).toBeNull();
+    expect(queries.some((q) => q.sql.includes('Cancelled: pull request closed'))).toBe(true);
+  });
+
+  it('does not cancel queued deploys when the teardown insert is a duplicate delivery', async () => {
+    const { client, queries } = makeFakeClient(
+      [{ ...previewCandidate, has_live_preview: true }],
+      new Set([1])
+    );
+    withTransactionMock.mockImplementation(async (callback: (c: unknown) => Promise<unknown>) => callback(client));
+
+    const result = await enqueueGithubPullRequestEvent({
+      installationId: 555,
+      repoId: 42,
+      branch: 'feature/foo',
+      sha: 'b'.repeat(40),
+      deliveryId: 'already-closed',
+      prNumber: 12,
+      kind: 'teardown',
+    });
+
+    expect(result).toEqual({ eligibleAppIds: [1], insertedJobIds: [] });
+    expect(queries.some((q) => q.sql.includes('Cancelled: pull request closed'))).toBe(false);
+  });
+
+  it('does not enqueue teardown when there is no live preview row', async () => {
+    const { client } = makeFakeClient([{ ...previewCandidate, has_live_preview: false }]);
+    withTransactionMock.mockImplementation(async (callback: (c: unknown) => Promise<unknown>) => callback(client));
+
+    const result = await enqueueGithubPullRequestEvent({
+      installationId: 555,
+      repoId: 42,
+      branch: 'feature/foo',
+      sha: 'b'.repeat(40),
+      deliveryId: 'pr-close-1',
+      prNumber: 12,
+      kind: 'teardown',
+    });
+
+    expect(result).toEqual({ eligibleAppIds: [], insertedJobIds: [] });
   });
 });
 
@@ -423,5 +589,160 @@ describe('runJob - webhook connection re-check before preview provisioning', () 
     expect(poolQueryMock.mock.calls.some(([sql]) => sql.includes('FROM github_installations'))).toBe(false);
     expect(ensurePreviewBranchMock).not.toHaveBeenCalled();
     expect(executeDeploymentMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('tears down a preview when no other open PR shares the head branch', async () => {
+    poolQueryMock.mockImplementation(async (sql: string) => {
+      if (sql.includes('FROM apps WHERE id')) {
+        return {
+          rows: [{ id: 1, name: 'demo', branch: 'main', repo_url: 'https://github.com/example/demo.git' }],
+        };
+      }
+      if (sql.includes('FROM github_installations')) {
+        return { rows: [{ installation_id: '555', repo_id: '42', account_login: 'x', repo_full_name: 'example/demo' }] };
+      }
+      if (sql.includes("UPDATE deploy_queue_jobs SET status = 'done'")) {
+        return { rows: [] };
+      }
+      throw new Error(`Unexpected query in test: ${sql}`);
+    });
+    getPreviewBranchMock.mockResolvedValue({ id: 77, deleted_at: null });
+    listOpenPullsByHeadMock.mockResolvedValue([{ number: 12 }]);
+    deletePreviewBranchMock.mockResolvedValue(undefined);
+
+    const job = {
+      id: 30,
+      app_id: 1,
+      source: 'webhook' as const,
+      branch: 'feature/foo',
+      requested_sha: null,
+      requested_by_user_id: null,
+      installation_id: '555',
+      repo_id: '42',
+      github_delivery_id: 'pr-close-1',
+      job_kind: 'teardown' as const,
+      github_pr_number: 12,
+    };
+
+    await runJob(job);
+
+    expect(listOpenPullsByHeadMock).toHaveBeenCalledWith(555, 42, 'example/demo', 'feature/foo');
+    expect(deletePreviewBranchMock).toHaveBeenCalledWith(1, 'feature/foo', { skipActiveJobCheck: true });
+    expect(ensurePreviewBranchMock).not.toHaveBeenCalled();
+    expect(executeDeploymentMock).not.toHaveBeenCalled();
+  });
+
+  it('skips destroy when another open PR still uses the head branch', async () => {
+    poolQueryMock.mockImplementation(async (sql: string) => {
+      if (sql.includes('FROM apps WHERE id')) {
+        return {
+          rows: [{ id: 1, name: 'demo', branch: 'main', repo_url: 'https://github.com/example/demo.git' }],
+        };
+      }
+      if (sql.includes('FROM github_installations')) {
+        return { rows: [{ installation_id: '555', repo_id: '42', account_login: 'x', repo_full_name: 'example/demo' }] };
+      }
+      if (sql.includes("UPDATE deploy_queue_jobs SET status = 'done'")) {
+        return { rows: [] };
+      }
+      throw new Error(`Unexpected query in test: ${sql}`);
+    });
+    getPreviewBranchMock.mockResolvedValue({ id: 77, deleted_at: null });
+    listOpenPullsByHeadMock.mockResolvedValue([{ number: 12 }, { number: 99 }]);
+
+    const job = {
+      id: 31,
+      app_id: 1,
+      source: 'webhook' as const,
+      branch: 'feature/foo',
+      requested_sha: null,
+      requested_by_user_id: null,
+      installation_id: '555',
+      repo_id: '42',
+      github_delivery_id: 'pr-close-2',
+      job_kind: 'teardown' as const,
+      github_pr_number: 12,
+    };
+
+    await runJob(job);
+
+    expect(deletePreviewBranchMock).not.toHaveBeenCalled();
+    expect(executeDeploymentMock).not.toHaveBeenCalled();
+  });
+
+  it('fails the teardown job without destroying when listing open PRs fails', async () => {
+    poolQueryMock.mockImplementation(async (sql: string) => {
+      if (sql.includes('FROM apps WHERE id')) {
+        return {
+          rows: [{ id: 1, name: 'demo', branch: 'main', repo_url: 'https://github.com/example/demo.git' }],
+        };
+      }
+      if (sql.includes('FROM github_installations')) {
+        return { rows: [{ installation_id: '555', repo_id: '42', account_login: 'x', repo_full_name: 'example/demo' }] };
+      }
+      if (sql.includes("UPDATE deploy_queue_jobs SET status = 'failed'")) {
+        return { rows: [] };
+      }
+      throw new Error(`Unexpected query in test: ${sql}`);
+    });
+    getPreviewBranchMock.mockResolvedValue({ id: 77, deleted_at: null });
+    listOpenPullsByHeadMock.mockRejectedValue(new Error('GitHub API request failed: GET ... -> 403'));
+
+    const job = {
+      id: 32,
+      app_id: 1,
+      source: 'webhook' as const,
+      branch: 'feature/foo',
+      requested_sha: null,
+      requested_by_user_id: null,
+      installation_id: '555',
+      repo_id: '42',
+      github_delivery_id: 'pr-close-3',
+      job_kind: 'teardown' as const,
+      github_pr_number: 12,
+    };
+
+    await runJob(job);
+
+    expect(deletePreviewBranchMock).not.toHaveBeenCalled();
+    const failureUpdate = poolQueryMock.mock.calls.find(([sql]) => sql.includes("status = 'failed'"));
+    expect(failureUpdate?.[1][0]).toContain('GitHub API request failed');
+  });
+
+  it('marks teardown done without destroying when the preview row is already gone', async () => {
+    poolQueryMock.mockImplementation(async (sql: string) => {
+      if (sql.includes('FROM apps WHERE id')) {
+        return {
+          rows: [{ id: 1, name: 'demo', branch: 'main', repo_url: 'https://github.com/example/demo.git' }],
+        };
+      }
+      if (sql.includes('FROM github_installations')) {
+        return { rows: [{ installation_id: '555', repo_id: '42', account_login: 'x', repo_full_name: 'example/demo' }] };
+      }
+      if (sql.includes("UPDATE deploy_queue_jobs SET status = 'done'")) {
+        return { rows: [] };
+      }
+      throw new Error(`Unexpected query in test: ${sql}`);
+    });
+    getPreviewBranchMock.mockResolvedValue(null);
+
+    const job = {
+      id: 33,
+      app_id: 1,
+      source: 'webhook' as const,
+      branch: 'feature/foo',
+      requested_sha: null,
+      requested_by_user_id: null,
+      installation_id: '555',
+      repo_id: '42',
+      github_delivery_id: 'pr-close-4',
+      job_kind: 'teardown' as const,
+      github_pr_number: 12,
+    };
+
+    await runJob(job);
+
+    expect(listOpenPullsByHeadMock).not.toHaveBeenCalled();
+    expect(deletePreviewBranchMock).not.toHaveBeenCalled();
   });
 });

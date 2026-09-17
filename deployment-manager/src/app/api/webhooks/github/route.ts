@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireGithubAppConfig } from '~/services/githubApp';
-import { verifyGithubSignature, validatePushPayload } from '~/lib/githubWebhook';
-import { enqueueGithubPushEvent } from '~/services/deployQueue';
+import { verifyGithubSignature, validatePushPayload, validatePullRequestPayload } from '~/lib/githubWebhook';
+import { enqueueGithubPushEvent, enqueueGithubPullRequestEvent } from '~/services/deployQueue';
 import logger from '~/services/logger';
 
 // Must run in the Node runtime (not edge): requireGithubAppConfig() decrypts secrets via
@@ -53,12 +53,13 @@ async function readBodyWithLimit(request: NextRequest, maxBytes: number): Promis
  * GitHub docs: "Validating webhook deliveries" and "Handling webhook deliveries".
  *
  * This route ONLY validates the delivery and durably enqueues a queue row per eligible app
- * (see deployQueue.ts's enqueueGithubPushEvent) - it never calls the GitHub API, never
- * touches git/clone/build, never provisions preview infrastructure, never creates a
- * `deployments` row, and never mutates the logger's deployment context. All of that stays
- * exactly where it already lived: inside the single queue worker (deployQueue.ts's
- * runJob -> deploymentExecutor.ts), which this route only kicks AFTER its own transaction
- * commits (never before, and never synchronously waiting for it to run).
+ * (see deployQueue.ts's enqueueGithubPushEvent / enqueueGithubPullRequestEvent) - it never
+ * calls the GitHub API, never touches git/clone/build, never provisions or tears down
+ * preview infrastructure, never creates a `deployments` row, and never mutates the
+ * logger's deployment context. All of that stays exactly where it already lived: inside
+ * the single queue worker (deployQueue.ts's runJob -> deploymentExecutor.ts /
+ * deletePreviewBranch), which this route only kicks AFTER its own transaction commits
+ * (never before, and never synchronously waiting for it to run).
  *
  * The middleware.ts session-auth allowlist has a narrow exception for exactly this
  * pathname and POST - every other GitHub route (config, connect, discover, the install
@@ -109,7 +110,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (event === 'ping') {
     return NextResponse.json({ ok: true, event: 'ping' }, { status: 200 });
   }
-  if (event !== 'push') {
+  if (event !== 'push' && event !== 'pull_request') {
     return NextResponse.json({ ok: true, ignored: true, reason: 'unsupported_event' }, { status: 200 });
   }
 
@@ -120,6 +121,21 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Malformed JSON payload' }, { status: 400 });
   }
 
+  try {
+    if (event === 'pull_request') {
+      return await handlePullRequestEvent(body, deliveryId);
+    }
+    return await handlePushEvent(body, deliveryId);
+  } catch (error) {
+    await logger.error(
+      event === 'pull_request' ? 'Failed to enqueue GitHub pull_request event' : 'Failed to enqueue GitHub push event',
+      error as Error
+    );
+    return NextResponse.json({ error: 'Failed to record webhook event' }, { status: 500 });
+  }
+}
+
+async function handlePushEvent(body: unknown, deliveryId: string): Promise<NextResponse> {
   const validation = validatePushPayload(body);
   if (!validation.ok) {
     if (validation.reason === 'malformed') {
@@ -131,33 +147,74 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   const { branch, sha, installationId, repoId } = validation.payload;
+  const result = await enqueueGithubPushEvent({ installationId, repoId, branch, sha, deliveryId });
 
-  try {
-    const result = await enqueueGithubPushEvent({ installationId, repoId, branch, sha, deliveryId });
-
-    if (result.insertedJobIds.length > 0) {
-      await logger.info('GitHub push enqueued', {
-        deliveryId,
-        installationId,
-        repoId,
-        branch,
-        queued: result.insertedJobIds.length,
-      });
-      // 202: new work was durably accepted - this is strictly after the enqueue
-      // transaction committed, and the deployment itself has not run yet.
-      return NextResponse.json({ accepted: true, queued: result.insertedJobIds.length }, { status: 202 });
-    }
-
-    return NextResponse.json(
-      {
-        accepted: false,
-        queued: 0,
-        reason: result.eligibleAppIds.length === 0 ? 'no_eligible_apps' : 'duplicate_delivery',
-      },
-      { status: 200 }
-    );
-  } catch (error) {
-    await logger.error('Failed to enqueue GitHub push event', error as Error);
-    return NextResponse.json({ error: 'Failed to record push event' }, { status: 500 });
+  if (result.insertedJobIds.length > 0) {
+    await logger.info('GitHub push enqueued', {
+      deliveryId,
+      installationId,
+      repoId,
+      branch,
+      queued: result.insertedJobIds.length,
+    });
+    // 202: new work was durably accepted - this is strictly after the enqueue
+    // transaction committed, and the deployment itself has not run yet.
+    return NextResponse.json({ accepted: true, queued: result.insertedJobIds.length }, { status: 202 });
   }
+
+  if (result.ignoredReason) {
+    return NextResponse.json({ ok: true, ignored: true, reason: result.ignoredReason }, { status: 200 });
+  }
+
+  return NextResponse.json(
+    {
+      accepted: false,
+      queued: 0,
+      reason: result.eligibleAppIds.length === 0 ? 'no_eligible_apps' : 'duplicate_delivery',
+    },
+    { status: 200 }
+  );
+}
+
+async function handlePullRequestEvent(body: unknown, deliveryId: string): Promise<NextResponse> {
+  const validation = validatePullRequestPayload(body);
+  if (!validation.ok) {
+    if (validation.reason === 'malformed') {
+      return NextResponse.json({ error: 'Malformed pull_request payload' }, { status: 400 });
+    }
+    return NextResponse.json({ ok: true, ignored: true, reason: validation.reason }, { status: 200 });
+  }
+
+  const { kind, prNumber, branch, sha, installationId, repoId } = validation.payload;
+  const result = await enqueueGithubPullRequestEvent({
+    installationId,
+    repoId,
+    branch,
+    sha,
+    deliveryId,
+    prNumber,
+    kind,
+  });
+
+  if (result.insertedJobIds.length > 0) {
+    await logger.info('GitHub pull_request enqueued', {
+      deliveryId,
+      installationId,
+      repoId,
+      branch,
+      prNumber,
+      kind,
+      queued: result.insertedJobIds.length,
+    });
+    return NextResponse.json({ accepted: true, queued: result.insertedJobIds.length }, { status: 202 });
+  }
+
+  return NextResponse.json(
+    {
+      accepted: false,
+      queued: 0,
+      reason: result.eligibleAppIds.length === 0 ? 'no_eligible_apps' : 'duplicate_delivery',
+    },
+    { status: 200 }
+  );
 }

@@ -2,9 +2,10 @@ import { createHmac } from 'crypto';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
-const { requireGithubAppConfigMock, enqueueGithubPushEventMock, loggerErrorMock } = vi.hoisted(() => ({
+const { requireGithubAppConfigMock, enqueueGithubPushEventMock, enqueueGithubPullRequestEventMock, loggerErrorMock } = vi.hoisted(() => ({
   requireGithubAppConfigMock: vi.fn(),
   enqueueGithubPushEventMock: vi.fn(),
+  enqueueGithubPullRequestEventMock: vi.fn(),
   loggerErrorMock: vi.fn(),
 }));
 
@@ -13,6 +14,7 @@ vi.mock('~/services/githubApp', () => ({
 }));
 vi.mock('~/services/deployQueue', () => ({
   enqueueGithubPushEvent: enqueueGithubPushEventMock,
+  enqueueGithubPullRequestEvent: enqueueGithubPullRequestEventMock,
 }));
 vi.mock('~/services/logger', () => ({
   default: { info: vi.fn(), error: loggerErrorMock },
@@ -63,6 +65,7 @@ const validPushBody = JSON.stringify({
 beforeEach(() => {
   requireGithubAppConfigMock.mockReset();
   enqueueGithubPushEventMock.mockReset();
+  enqueueGithubPullRequestEventMock.mockReset();
   loggerErrorMock.mockReset();
   requireGithubAppConfigMock.mockResolvedValue({
     appId: '1',
@@ -269,5 +272,87 @@ describe('POST /api/webhooks/github', () => {
     const response = await POST(makeRequest(body));
 
     expect(response.status).toBe(202);
+  });
+
+  const validPullRequestBody = JSON.stringify({
+    action: 'opened',
+    installation: { id: 555 },
+    repository: { id: 42, full_name: 'example/demo' },
+    pull_request: {
+      number: 12,
+      head: { ref: 'feature/foo', sha: 'c'.repeat(40), repo: { id: 42 } },
+    },
+  });
+
+  it('enqueues a signed pull_request opened event as a preview deploy', async () => {
+    enqueueGithubPullRequestEventMock.mockResolvedValue({ eligibleAppIds: [1], insertedJobIds: [20] });
+
+    const response = await POST(makeRequest(validPullRequestBody, {}, { event: 'pull_request' }));
+
+    expect(response.status).toBe(202);
+    expect(await response.json()).toEqual({ accepted: true, queued: 1 });
+    expect(enqueueGithubPushEventMock).not.toHaveBeenCalled();
+    expect(enqueueGithubPullRequestEventMock).toHaveBeenCalledWith({
+      installationId: 555,
+      repoId: 42,
+      branch: 'feature/foo',
+      sha: 'c'.repeat(40),
+      deliveryId: 'delivery-1',
+      prNumber: 12,
+      kind: 'deploy',
+    });
+  });
+
+  it('enqueues a signed pull_request closed event as a teardown', async () => {
+    const closed = JSON.stringify({
+      ...JSON.parse(validPullRequestBody),
+      action: 'closed',
+    });
+    enqueueGithubPullRequestEventMock.mockResolvedValue({ eligibleAppIds: [1], insertedJobIds: [21] });
+
+    const response = await POST(makeRequest(closed, {}, { event: 'pull_request' }));
+
+    expect(response.status).toBe(202);
+    expect(enqueueGithubPullRequestEventMock).toHaveBeenCalledWith(expect.objectContaining({ kind: 'teardown', prNumber: 12 }));
+  });
+
+  it('acknowledges and ignores labeled pull_request actions without enqueueing', async () => {
+    const labeled = JSON.stringify({ action: 'labeled' });
+    const response = await POST(makeRequest(labeled, {}, { event: 'pull_request' }));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true, ignored: true, reason: 'ignored_action' });
+    expect(enqueueGithubPullRequestEventMock).not.toHaveBeenCalled();
+  });
+
+  it('acknowledges and ignores a fork pull_request without enqueueing', async () => {
+    const forked = JSON.stringify({
+      action: 'opened',
+      installation: { id: 555 },
+      repository: { id: 42, full_name: 'example/demo' },
+      pull_request: {
+        number: 12,
+        head: { ref: 'feature/foo', sha: 'c'.repeat(40), repo: { id: 99 } },
+      },
+    });
+    const response = await POST(makeRequest(forked, {}, { event: 'pull_request' }));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true, ignored: true, reason: 'fork' });
+    expect(enqueueGithubPullRequestEventMock).not.toHaveBeenCalled();
+  });
+
+  it('acknowledges a non-production push that enqueue reports as preview_requires_pull_request', async () => {
+    enqueueGithubPushEventMock.mockResolvedValue({
+      eligibleAppIds: [],
+      insertedJobIds: [],
+      ignoredReason: 'preview_requires_pull_request',
+    });
+
+    const response = await POST(makeRequest(validPushBody));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true, ignored: true, reason: 'preview_requires_pull_request' });
+    expect(enqueueGithubPullRequestEventMock).not.toHaveBeenCalled();
   });
 });

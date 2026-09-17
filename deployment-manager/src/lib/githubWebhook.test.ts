@@ -3,7 +3,9 @@ import { describe, it, expect } from 'vitest';
 import {
   verifyGithubSignature,
   validatePushPayload,
+  validatePullRequestPayload,
   parsePushBranchRef,
+  isSafeGitBranchName,
   isValidCommitSha,
   GITHUB_ZERO_SHA,
 } from './githubWebhook';
@@ -169,5 +171,127 @@ describe('validatePushPayload', () => {
       ok: false,
       reason: 'malformed',
     });
+  });
+});
+
+describe('isSafeGitBranchName', () => {
+  it('accepts a normal branch name', () => {
+    expect(isSafeGitBranchName('main')).toBe(true);
+    expect(isSafeGitBranchName('feature/foo')).toBe(true);
+  });
+
+  it('rejects empty, non-string, or leading-dash names', () => {
+    expect(isSafeGitBranchName('')).toBe(false);
+    expect(isSafeGitBranchName('--upload-pack=evil')).toBe(false);
+    expect(isSafeGitBranchName(12)).toBe(false);
+    expect(isSafeGitBranchName(undefined)).toBe(false);
+  });
+});
+
+const validPullRequest = {
+  action: 'opened',
+  number: 12,
+  installation: { id: 555 },
+  repository: { id: 42, full_name: 'example/demo' },
+  pull_request: {
+    number: 12,
+    head: {
+      ref: 'feature/foo',
+      sha: 'b'.repeat(40),
+      repo: { id: 42 },
+    },
+  },
+};
+
+describe('validatePullRequestPayload', () => {
+  it('accepts opened, synchronize, and reopened as deploy', () => {
+    for (const action of ['opened', 'synchronize', 'reopened']) {
+      const result = validatePullRequestPayload({ ...validPullRequest, action });
+      expect(result).toEqual({
+        ok: true,
+        payload: {
+          kind: 'deploy',
+          action,
+          prNumber: 12,
+          branch: 'feature/foo',
+          sha: 'b'.repeat(40),
+          installationId: 555,
+          repoId: 42,
+        },
+      });
+    }
+  });
+
+  it('accepts closed as teardown', () => {
+    const result = validatePullRequestPayload({ ...validPullRequest, action: 'closed' });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.payload.kind).toBe('teardown');
+    }
+  });
+
+  it('flags labeled/edited/assigned as ignored_action before requiring the rest of the shape', () => {
+    expect(validatePullRequestPayload({ action: 'labeled' })).toEqual({ ok: false, reason: 'ignored_action' });
+    expect(validatePullRequestPayload({ action: 'edited' })).toEqual({ ok: false, reason: 'ignored_action' });
+    expect(validatePullRequestPayload({ action: 'assigned' })).toEqual({ ok: false, reason: 'ignored_action' });
+    expect(validatePullRequestPayload({ action: 'ready_for_review' })).toEqual({
+      ok: false,
+      reason: 'ignored_action',
+    });
+  });
+
+  it('flags a fork (head.repo.id !== repository.id) as fork, including a missing head repo', () => {
+    const forked = {
+      ...validPullRequest,
+      pull_request: {
+        ...validPullRequest.pull_request,
+        head: { ...validPullRequest.pull_request.head, repo: { id: 99 } },
+      },
+    };
+    expect(validatePullRequestPayload(forked)).toEqual({ ok: false, reason: 'fork' });
+
+    const deletedFork = {
+      ...validPullRequest,
+      pull_request: {
+        ...validPullRequest.pull_request,
+        head: { ...validPullRequest.pull_request.head, repo: null },
+      },
+    };
+    expect(validatePullRequestPayload(deletedFork)).toEqual({ ok: false, reason: 'fork' });
+  });
+
+  it('flags a leading-dash head ref as malformed', () => {
+    const payload = {
+      ...validPullRequest,
+      pull_request: {
+        ...validPullRequest.pull_request,
+        head: { ...validPullRequest.pull_request.head, ref: '--upload-pack=evil' },
+      },
+    };
+    expect(validatePullRequestPayload(payload)).toEqual({ ok: false, reason: 'malformed' });
+  });
+
+  it('flags a missing or non-numeric installation/repository/number as malformed', () => {
+    expect(validatePullRequestPayload({ ...validPullRequest, installation: {} })).toEqual({
+      ok: false,
+      reason: 'malformed',
+    });
+    expect(validatePullRequestPayload({ ...validPullRequest, pull_request: { head: validPullRequest.pull_request.head } })).toEqual({
+      ok: false,
+      reason: 'malformed',
+    });
+    expect(validatePullRequestPayload(null)).toEqual({ ok: false, reason: 'malformed' });
+    expect(validatePullRequestPayload({ action: 12 })).toEqual({ ok: false, reason: 'malformed' });
+  });
+
+  it('flags a zero or non-SHA head.sha as malformed', () => {
+    const zeroSha = {
+      ...validPullRequest,
+      pull_request: {
+        ...validPullRequest.pull_request,
+        head: { ...validPullRequest.pull_request.head, sha: GITHUB_ZERO_SHA },
+      },
+    };
+    expect(validatePullRequestPayload(zeroSha)).toEqual({ ok: false, reason: 'malformed' });
   });
 });
